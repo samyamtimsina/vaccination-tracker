@@ -43,6 +43,7 @@ model VaccinationRecord {
   id                  String      @id @default(uuid())
   citizenId           String
   vaccineType         VaccineType
+  customVaccineName   String?
   doseNumber          Int
   dateGiven           DateTime
   isComplete          Boolean
@@ -53,12 +54,13 @@ model VaccinationRecord {
 
 enum VaccineType {
   BCG
-  bOPV
+  ROTA
+  OPV
   DPT_HepB_hib
   fIPV
   PCV
   MR
   JE
-  HPV
   TCV
+  OTHERS
 }

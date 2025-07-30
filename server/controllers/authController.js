@@ -1,12 +1,18 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma.js';
+import { registerSchema, loginSchema } from '../validators/userSchema.js';
 
 const jwtSecret = process.env.JWT_SECRET;
 
 //Register
 export const register = async (req, res) => {
-  const { name, email, password, role, wardId } = req.body;
+  const result = registerSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ errors: result.error.message });
+  }
+  const { name, email, password, wardId } = result.data;
+
   try {
     const existing = await prisma.user.findUnique({
       where: { email },
@@ -21,7 +27,7 @@ export const register = async (req, res) => {
         name,
         email,
         passwordHash: hashedPassword,
-        role,
+        role: 'ward_officer',
         wardId,
       },
     });
@@ -32,15 +38,21 @@ export const register = async (req, res) => {
       role: newUser.role,
     });
   } catch (error) {
+    console.log(error);
     res
       .status(500)
-      .json({ error: 'Registration failed', details: err.message });
+      .json({ error: 'Registration failed', details: error.message });
   }
 };
 
 //Login
 export const login = async (req, res) => {
-  const { email, password } = req.body;
+  const result = loginSchema.safeParse(req.body);
+  if (!result.success) {
+    console.log(result.error);
+    return res.status(400).json({ errors: result.error.errors });
+  }
+  const { email, password } = result.data;
   try {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });

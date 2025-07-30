@@ -1,0 +1,28 @@
+{
+  "name": "vaccination-tracker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
+    "start": "concurrently \"npm run start --prefix client\" \"npm run start --prefix server\"",
+    "client-install": "npm install --prefix client",
+    "server-install": "npm install --prefix server",
+    "install-all": "npm run client-install && npm run server-install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DvanXanMalai/vaccination-tracker.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/DvanXanMalai/vaccination-tracker/issues"
+  },
+  "homepage": "https://github.com/DvanXanMalai/vaccination-tracker#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}
