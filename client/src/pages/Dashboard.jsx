@@ -33,19 +33,37 @@ export default function Dashboard() {
       <div className="space-x-4">
         <button
           onClick={() => navigate('/citizens')}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
+          className="bg-blue-600 text-white px-4 py-2 rounded
+             transition-all duration-300 ease-in-out
+             hover:bg-blue-700 hover:shadow-lg hover:scale-105
+             cursor-pointer"
         >
           Citizens List
         </button>
         <button
+          onClick={() => navigate('/addRecord')}
+          className="bg-blue-600 text-white px-4 py-2 rounded
+             transition-all duration-300 ease-in-out
+             hover:bg-blue-700 hover:shadow-lg hover:scale-105
+             cursor-pointer"
+        >
+          Add Records
+        </button>
+        <button
           onClick={() => navigate('/vaccination')}
-          className="bg-green-600 text-white px-4 py-2 rounded"
+          className="bg-green-600 text-white px-4 py-2 rounded
+             transition-all duration-300 ease-in-out
+             hover:bg-blue-700 hover:shadow-lg hover:scale-105
+             cursor-pointer"
         >
           Vaccination Form
         </button>
         <button
           onClick={() => navigate('/reports')}
-          className="bg-purple-600 text-white px-4 py-2 rounded"
+          className="bg-purple-600 text-white px-4 py-2 rounded
+             transition-all duration-300 ease-in-out
+             hover:bg-blue-700 hover:shadow-lg hover:scale-105
+             cursor-pointer"
         >
           Reports
         </button>

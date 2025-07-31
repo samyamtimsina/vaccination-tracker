@@ -6,6 +6,7 @@ import PrivateRoute from './auth/PrivateRoute';
 import { AuthProvider } from './auth/AuthContext';
 import { store } from './redux/store.js';
 import { Provider } from 'react-redux';
+import AddCitizen from './pages/AddCitizen.jsx';
 
 function App() {
   return (
@@ -20,6 +21,14 @@ function App() {
               element={
                 <PrivateRoute>
                   <Dashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/addRecord"
+              element={
+                <PrivateRoute>
+                  <AddCitizen />
                 </PrivateRoute>
               }
             />

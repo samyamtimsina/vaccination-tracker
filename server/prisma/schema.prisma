@@ -25,18 +25,19 @@ model User {
 }
 
 model Citizen {
-  id           String              @id @default(uuid())
-  fullName     String
-  wardNumber   Int
-  parentName   String
-  address      String
-  phoneNumber  String
-  casteCode    Int
-  birthDate    DateTime
-  createdById  Int
-  createdBy    User                @relation(fields: [createdById], references: [id])
-  vaccinations VaccinationRecord[]
-  createdAt    DateTime            @default(now())
+  id              String              @id @default(uuid())
+  fullName        String
+  wardNumber      Int
+  parentName      String
+  address         String
+  phoneNumber     String
+  casteCode       Int
+  birthDate       DateTime
+  createdById     Int
+  createdBy       User                @relation(fields: [createdById], references: [id])
+  vaccinations    VaccinationRecord[]
+  createdAt       DateTime            @default(now())
+  NotificationLog NotificationLog[]
 }
 
 model VaccinationRecord {
@@ -50,6 +51,16 @@ model VaccinationRecord {
   remarks             String?
   recommendedAtMonths Int
   citizen             Citizen     @relation(fields: [citizenId], references: [id])
+}
+
+model NotificationLog {
+  id          Int         @id @default(autoincrement())
+  citizenId   String
+  vaccineType VaccineType
+  doseNumber  Int
+  sentAt      DateTime    @default(now())
+  type        String // "due" or "oneWeekBefore"
+  citizen     Citizen     @relation(fields: [citizenId], references: [id])
 }
 
 enum VaccineType {

@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { authenticate, authorize } from './middlewares/auth.js';
 import authRoutes from './routes/authRoutes.js';
 import citizenRoutes from './routes/citizenRoutes.js';
+// import './jobs/smsCronJob.js';
 
 dotenv.config();
 
