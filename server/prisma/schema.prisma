@@ -26,13 +26,16 @@ model User {
 
 model Citizen {
   id              String              @id @default(uuid())
-  fullName        String
-  wardNumber      Int
-  parentName      String
-  address         String
-  phoneNumber     String
+  fullName        String // Combined full name (first + last)
+  wardNumber      String
   casteCode       Int
+  gender          String
+  parentName      String
+  tole            String
+  phoneNumber     String
   birthDate       DateTime
+  purnaKhop       Boolean             @default(false)
+  remarks         String?
   createdById     Int
   createdBy       User                @relation(fields: [createdById], references: [id])
   vaccinations    VaccinationRecord[]
@@ -44,13 +47,27 @@ model VaccinationRecord {
   id                  String      @id @default(uuid())
   citizenId           String
   vaccineType         VaccineType
-  customVaccineName   String?
   doseNumber          Int
   dateGiven           DateTime
   isComplete          Boolean
   remarks             String?
   recommendedAtMonths Int
+  customVaccineName   String? // keep optional for "OTHERS" type
   citizen             Citizen     @relation(fields: [citizenId], references: [id])
+}
+
+enum VaccineType {
+  BCG
+  ROTA
+  OPV
+  fIPV
+  PCV
+  DPT_HepB_hib
+  MR
+  JE
+  TCV
+  HPV // Added HPV based on your React doses
+  OTHERS
 }
 
 model NotificationLog {
@@ -61,17 +78,4 @@ model NotificationLog {
   sentAt      DateTime    @default(now())
   type        String // "due" or "oneWeekBefore"
   citizen     Citizen     @relation(fields: [citizenId], references: [id])
-}
-
-enum VaccineType {
-  BCG
-  ROTA
-  OPV
-  DPT_HepB_hib
-  fIPV
-  PCV
-  MR
-  JE
-  TCV
-  OTHERS
 }
