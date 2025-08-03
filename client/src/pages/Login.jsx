@@ -1,77 +1,51 @@
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext';
-import axios from '../utils/axios';
-import { loginSchema } from '../validators/authSchema.js';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import axiosClient from '../api/axiosClient';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import { useAuth } from '../context/AuthContext'; // import useAuth
 
 export default function Login() {
-  const { login } = useAuth();
+  const { register, handleSubmit } = useForm();
   const navigate = useNavigate();
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm({
-    resolver: zodResolver(loginSchema),
-  });
+  const { login } = useAuth(); // get login function from context
 
   const onSubmit = async (data) => {
     try {
-      const res = await axios.post('/login', data);
-      const { user, token } = res.data;
-
-      login(user, token);
-      navigate('/citizens');
-    } catch (error) {
-      alert(error.response?.data?.error || 'Login failed');
+      const res = await axiosClient.post('/login', data);
+      // Use context login to set user and token state AND update localStorage
+      login(res.data.user, res.data.token);
+      toast.success('Login successful');
+      navigate('/dashboard');
+    } catch (err) {
+      toast.error('Invalid credentials');
     }
   };
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="max-w-md mx-auto p-6 space-y-4 bg-white rounded shadow"
-    >
-      <h2 className="text-xl font-bold text-center">Login</h2>
-
-      <input
-        type="email"
-        placeholder="Email"
-        className={`w-full border p-2 ${errors.email ? 'border-red-500' : ''}`}
-        {...register('email')}
-      />
-      {errors.email && (
-        <p className="text-red-500 text-sm">{errors.email.message}</p>
-      )}
-
-      <input
-        type="password"
-        placeholder="Password"
-        className={`w-full border p-2 ${
-          errors.password ? 'border-red-500' : ''
-        }`}
-        {...register('password')}
-      />
-      {errors.password && (
-        <p className="text-red-500 text-sm">{errors.password.message}</p>
-      )}
-
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-full bg-blue-600 text-white py-2 rounded disabled:opacity-50"
-      >
-        {isSubmitting ? 'Logging in...' : 'Login'}
-      </button>
-
-      <p className="text-center text-sm">
-        Don&apos;t have an account?{' '}
-        <a href="/register" className="text-blue-600 underline">
-          Register here
-        </a>
-      </p>
-    </form>
+    <div className="max-w-md mx-auto mt-20 p-6 bg-white rounded shadow-md">
+      <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <input
+          {...register('email')}
+          type="email"
+          placeholder="Email"
+          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          required
+        />
+        <input
+          {...register('password')}
+          type="password"
+          placeholder="Password"
+          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          required
+        />
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+        >
+          Login
+        </button>
+      </form>
+    </div>
   );
 }

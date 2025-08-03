@@ -62,6 +62,7 @@ export const login = async (req, res) => {
 
     const token = jwt.sign(
       {
+        email: user.email,
         id: user.id,
         role: user.role,
         wardId: user.wardId,
@@ -76,6 +77,7 @@ export const login = async (req, res) => {
         name: user.name,
         role: user.role,
         wardId: user.wardId,
+        email: user.email,
       },
     });
   } catch (error) {

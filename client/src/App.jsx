@@ -1,41 +1,33 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
+import Home from './pages/Home';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard'; // placeholder
-import PrivateRoute from './auth/PrivateRoute';
-import { AuthProvider } from './auth/AuthContext';
-import { store } from './redux/store.js';
-import { Provider } from 'react-redux';
-import AddCitizen from './pages/AddCitizen.jsx';
+import Dashboard from './pages/Dashboard';
+import ProtectedRoute from './components/ProtectedRoutes';
+import Navbar from './components/NavBar';
+import { AuthProvider } from './context/AuthContext';
+import './index.css'; // Assuming you have a global CSS file
 
 function App() {
   return (
-    <Provider store={store}>
-      <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route
-              path="/citizens"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/addRecord"
-              element={
-                <PrivateRoute>
-                  <AddCitizen />
-                </PrivateRoute>
-              }
-            />
-          </Routes>
-        </Router>
-      </AuthProvider>
-    </Provider>
+    <AuthProvider>
+      <BrowserRouter>
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

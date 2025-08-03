@@ -15,16 +15,16 @@ datasource db {
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
+  id           Int     @id @default(autoincrement())
   name         String
-  email        String    @unique
+  email        String  @unique
   passwordHash String
   role         String
   wardId       Int?
-  Citizen      Citizen[]
+  Child        Child[]
 }
 
-model Citizen {
+model Child {
   id              String              @id @default(uuid())
   fullName        String // Combined full name (first + last)
   wardNumber      String
@@ -53,7 +53,7 @@ model VaccinationRecord {
   remarks             String?
   recommendedAtMonths Int
   customVaccineName   String? // keep optional for "OTHERS" type
-  citizen             Citizen     @relation(fields: [citizenId], references: [id])
+  child               Child       @relation(fields: [citizenId], references: [id])
 }
 
 enum VaccineType {
@@ -77,5 +77,5 @@ model NotificationLog {
   doseNumber  Int
   sentAt      DateTime    @default(now())
   type        String // "due" or "oneWeekBefore"
-  citizen     Citizen     @relation(fields: [citizenId], references: [id])
+  child       Child       @relation(fields: [citizenId], references: [id])
 }

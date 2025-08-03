@@ -13,43 +13,49 @@ function toMonths({
 }
 
 function mapVaccineNameToEnum(name) {
-  switch (name) {
-    case 'BCG':
+  console.log('Mapping vaccine name:', name);
+  if (!name) return 'OTHERS';
+  const normalized = name.toLowerCase();
+
+  switch (normalized) {
+    case 'bcg':
       return 'BCG';
-    case 'Rota':
+    case 'rota':
       return 'ROTA';
-    case 'Polio':
+    case 'polio':
+    case 'opv': // added here
       return 'OPV';
-    case 'fIPV':
+    case 'fipv':
       return 'fIPV';
-    case 'PCV':
+    case 'pcv':
       return 'PCV';
-    case 'DPT-HepB-Hib':
+    case 'dpt-hepb-hib':
+    case 'dpt_hepb_hib':
+    case 'dpthepbhib':
       return 'DPT_HepB_hib';
-    case 'MR':
+    case 'mr':
       return 'MR';
-    case 'JE':
+    case 'je':
       return 'JE';
-    case 'TCV':
+    case 'tcv':
       return 'TCV';
-    case 'HPV':
+    case 'hpv':
       return 'HPV';
     default:
       return 'OTHERS';
   }
 }
-
-export const createCitizen = async (req, res) => {
+export const createChild = async (req, res) => {
   try {
-    const { citizens } = req.body;
+    const { childs } = req.body;
 
-    if (!Array.isArray(citizens)) {
-      return res.status(400).json({ error: 'Invalid citizens data' });
+    if (!Array.isArray(childs)) {
+      return res.status(400).json({ error: 'Invalid Child data' });
     }
 
-    const createdCitizens = [];
+    const createdChilds = [];
 
-    for (const c of citizens) {
+    for (const c of childs) {
       const fullName = ((c.fullName || '') + ' ' + (c.lastName || '')).trim();
       if (!fullName) continue; // skip empty
 
@@ -102,7 +108,7 @@ export const createCitizen = async (req, res) => {
         },
       );
 
-      const citizen = await prisma.citizen.create({
+      const child = await prisma.child.create({
         data: {
           fullName,
           wardNumber,
@@ -122,14 +128,16 @@ export const createCitizen = async (req, res) => {
         include: { vaccinations: true },
       });
 
-      createdCitizens.push(citizen);
+      createdChilds.push(child);
     }
 
-    res.status(201).json(createdCitizens);
+    res.status(201).json(createdChilds);
   } catch (error) {
     console.error(error);
-    res
-      .status(500)
-      .json({ error: 'Citizen creation failed', details: error.message });
+    res.status(500);
+    console.log.json({
+      error: 'Child creation failed',
+      details: error.message,
+    });
   }
 };

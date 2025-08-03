@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { authenticate, authorize } from './middlewares/auth.js';
 import authRoutes from './routes/authRoutes.js';
-import citizenRoutes from './routes/citizenRoutes.js';
+import childRoutes from './routes/childRoutes.js';
 // import './jobs/smsCronJob.js';
 
 dotenv.config();
@@ -18,7 +18,7 @@ app.use(express.json());
 //Routes
 app.use(authRoutes);
 
-app.use('/api/citizens', citizenRoutes);
+app.use('/api/child', childRoutes);
 
 app.get('/api/protected', authenticate, (req, res) => {
   res.json({ message: `Hello, ${req.user.role}! You are authenticated.` });
