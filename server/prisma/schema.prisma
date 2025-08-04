@@ -15,19 +15,21 @@ datasource db {
 }
 
 model User {
-  id           Int     @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   name         String
-  email        String  @unique
+  email        String   @unique
   passwordHash String
   role         String
   wardId       Int?
   Child        Child[]
+  Mother       Mother[]
 }
 
 model Child {
   id              String              @id @default(uuid())
+  sewaDartaNumber Int
   fullName        String // Combined full name (first + last)
-  wardNumber      String
+  wardNumber      Int
   casteCode       Int
   gender          String
   parentName      String
@@ -41,6 +43,26 @@ model Child {
   vaccinations    VaccinationRecord[]
   createdAt       DateTime            @default(now())
   NotificationLog NotificationLog[]
+}
+
+model Mother {
+  id                   String    @id @default(uuid())
+  sewaDartaNumber      Int
+  name                 String
+  casteCode            Int
+  age                  Int
+  phoneNumber          String
+  tole                 String
+  wardNumber           Int
+  pregnancyCount       Int
+  previousTDTakenCount Int
+  tdDose1              DateTime?
+  tdDose2              DateTime?
+  tdDose2Plus          DateTime?
+  remarks              String?
+  createdAt            DateTime  @default(now())
+  createdById          Int
+  createdBy            User      @relation(fields: [createdById], references: [id])
 }
 
 model VaccinationRecord {

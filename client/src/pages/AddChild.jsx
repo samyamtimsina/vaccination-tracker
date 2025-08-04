@@ -1,11 +1,16 @@
 import { useForm, Controller, useWatch } from 'react-hook-form';
-import { vaccineSchedule } from '../utils/vaccineSchedule';
-import { NepaliDatePicker } from 'nepali-datepicker-reactjs';
+import { useNavigate } from 'react-router-dom';
 
+import { vaccineSchedule } from '../utils/vaccineSchedule';
+
+import { NepaliDatePicker } from 'nepali-datepicker-reactjs';
 import 'nepali-datepicker-reactjs/dist/index.css';
+
 import axiosClient from '../api/axiosClient.js';
+
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { FaArrowLeft } from 'react-icons/fa';
 
 export default function AddChild() {
   const {
@@ -17,6 +22,7 @@ export default function AddChild() {
     setValue, // setValue is needed to clear specific fields
   } = useForm();
 
+  const navigate = useNavigate(); //  back navigation
   const gender = useWatch({
     control,
     name: 'gender',
@@ -26,19 +32,15 @@ export default function AddChild() {
   const onSubmit = async (data) => {
     try {
       const formatted = {
-        childs: [
-          {
-            ...data,
-            vaccines: Object.fromEntries(
-              Object.entries(data.vaccines || {}).map(
-                ([vaccineName, doseArray]) => [
-                  vaccineName,
-                  doseArray.map((d) => (d === '' ? null : d)),
-                ],
-              ),
-            ),
-          },
-        ],
+        ...data,
+        vaccines: Object.fromEntries(
+          Object.entries(data.vaccines || {}).map(
+            ([vaccineName, doseArray]) => [
+              vaccineName,
+              doseArray.map((d) => (d === '' ? null : d)),
+            ],
+          ),
+        ),
       };
 
       const res = await axiosClient.post('/api/child', formatted);
@@ -64,19 +66,33 @@ export default function AddChild() {
         onSubmit={handleSubmit(onSubmit)}
         className="max-w-full mx-auto p-6 bg-white rounded shadow space-y-6"
       >
-        <h2 className="text-2xl font-semibold text-center mb-6">
-          छोराछोरी थप्नुहोस्
-        </h2>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-800 tracking-tight">
+            छोराछोरी थप्नुहोस्
+          </h1>
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-100 text-blue-600 font-medium rounded-md shadow-sm border border-blue-200 hover:bg-blue-200 hover:text-blue-700 hover:border-blue-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+          >
+            <FaArrowLeft />
+            <span>ड्यासबोर्डमा फर्कनुहोस्</span>
+          </button>
+        </div>
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="sm:col-span-2 lg:col-span-4">
-            <label className="block font-medium mb-1" htmlFor="sewaDartaNumber">
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label
+              className="block text-sm font-medium text-gray-700 mb-1"
+              htmlFor="sewaDartaNumber"
+            >
               सेवा दर्ता नम्बर
             </label>
             <input
               id="sewaDartaNumber"
+              type="number"
               {...register('sewaDartaNumber')}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
               placeholder="सेवा दर्ता नम्बर"
             />
           </div>
@@ -207,24 +223,29 @@ export default function AddChild() {
                 control={control}
                 rules={{ required: true }}
                 render={({ field }) => (
-                  <NepaliDatePicker
-                    {...field}
-                    className="w-full"
-                    inputClassName="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={field.value || ''}
-                    onChange={field.onChange}
-                    style={{ cursor: 'pointer' }}
-                  />
+                  <>
+                    <NepaliDatePicker
+                      {...field}
+                      className="w-full"
+                      inputClassName="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    {/* The x button is now conditionally rendered */}
+                    {field.value && (
+                      <button
+                        type="button"
+                        onClick={() => setValue('birthDate', '')}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 text-lg text-red-500 hover:text-red-700 bg-transparent hover:bg-gray-200 rounded-full transition-colors focus:outline-none cursor-pointer"
+                        title="मिति मेट्नुहोस्"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </>
                 )}
               />
-              <button
-                type="button"
-                onClick={() => setValue('birthDate', '')}
-                className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 text-lg text-red-500 hover:text-red-700 bg-transparent hover:bg-gray-200 rounded-full transition-colors focus:outline-none cursor-pointer"
-                title="मिति मेट्नुहोस्"
-              >
-                ✕
-              </button>
             </div>
             {errors.birthDate && (
               <p className="text-red-600 text-sm mt-1">जन्म मिति आवश्यक छ</p>
@@ -274,26 +295,31 @@ export default function AddChild() {
                         name={`vaccines.${vaccineName}.${idx}`}
                         control={control}
                         render={({ field }) => (
-                          <NepaliDatePicker
-                            {...field}
-                            className="w-full"
-                            inputClassName="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={field.value || ''}
-                            onChange={field.onChange}
-                            style={{ cursor: 'pointer' }}
-                          />
+                          <>
+                            <NepaliDatePicker
+                              {...field}
+                              className="w-full"
+                              inputClassName="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={field.value || ''}
+                              onChange={field.onChange}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            {/* The x button is now conditionally rendered */}
+                            {field.value && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setValue(`vaccines.${vaccineName}.${idx}`, '')
+                                }
+                                className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 text-lg text-red-500 hover:text-red-700 bg-transparent hover:bg-gray-200 rounded-full transition-colors focus:outline-none cursor-pointer"
+                                title="मिति मेट्नुहोस्"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </>
                         )}
                       />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setValue(`vaccines.${vaccineName}.${idx}`, '')
-                        }
-                        className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 text-lg text-red-500 hover:text-red-700 bg-transparent hover:bg-gray-200 rounded-full transition-colors focus:outline-none cursor-pointer"
-                        title="मिति मेट्नुहोस्"
-                      >
-                        ✕
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -315,17 +341,26 @@ export default function AddChild() {
           />
         </section>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className={`w-full py-3 rounded text-lg font-semibold transition mt-6 ${
-            isSubmitting
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 hover:bg-blue-700 cursor-pointer text-white'
-          }`}
-        >
-          {isSubmitting ? 'सेभ हुँदैछ...' : 'सेभ गर्नुहोस्'}
-        </button>
+        <div className="flex space-x-3 mt-6">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className={`flex-1 py-3 rounded text-lg font-semibold transition ${
+              isSubmitting
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
+            }`}
+          >
+            {isSubmitting ? 'सेभ हुँदैछ...' : 'सेभ गर्नुहोस्'}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-3 px-4 rounded-md shadow-sm transition-all duration-200 cursor-pointer"
+          >
+            रद्द गर्नुहोस्
+          </button>
+        </div>
       </form>
     </>
   );

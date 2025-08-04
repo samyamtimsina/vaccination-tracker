@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 import {
   FaChild,
   FaSearch,
@@ -9,200 +8,77 @@ import {
   FaSignOutAlt,
   FaFemale,
 } from 'react-icons/fa';
-import AddChild from '../components/AddChild';
+import { useAuth } from '../context/AuthContext';
 
 const menuItems = [
   {
-    id: 'addChild',
-    label: 'Add Child',
-    icon: <FaChild className="w-6 h-6" />,
-    color: 'bg-blue-600 hover:bg-blue-700',
+    to: '/add-child',
+    label: 'बालबालिका थप्नुहोस्',
+    icon: <FaChild />,
   },
   {
-    id: 'viewChildren',
-    label: 'View Children',
-    icon: <FaUsers className="w-6 h-6" />,
-    color: 'bg-green-600 hover:bg-green-700',
+    to: '/view-children',
+    label: 'बालबालिकाहरू हेर्नुहोस्',
+    icon: <FaUsers />,
   },
   {
-    id: 'addMother',
-    label: 'Add Mother',
-    icon: <FaUserPlus className="w-6 h-6" />,
-    color: 'bg-purple-600 hover:bg-purple-700',
+    to: '/add-mother',
+    label: 'आमा थप्नुहोस्',
+    icon: <FaUserPlus />,
   },
   {
-    id: 'viewMothers',
-    label: 'View Mothers',
-    icon: <FaFemale className="w-6 h-6" />,
-    color: 'bg-pink-600 hover:bg-pink-700',
+    to: '/view-mothers',
+    label: 'आमाहरू हेर्नुहोस्',
+    icon: <FaFemale />,
   },
   {
-    id: 'searchRecords',
-    label: 'Search Records',
-    icon: <FaSearch className="w-6 h-6" />,
-    color: 'bg-yellow-600 hover:bg-yellow-700',
+    to: '/search-records',
+    label: 'रेकर्डहरू खोज्नुहोस्',
+    icon: <FaSearch />,
   },
   {
-    id: 'profile',
-    label: 'Profile',
-    icon: <FaUserCircle className="w-6 h-6" />,
-    color: 'bg-teal-600 hover:bg-teal-700',
-  },
-  {
-    id: 'logout',
-    label: 'Logout',
-    icon: <FaSignOutAlt className="w-6 h-6" />,
-    color: 'bg-red-600 hover:bg-red-700',
+    to: '/profile',
+    label: 'प्रोफाइल',
+    icon: <FaUserCircle />,
   },
 ];
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
 
-  // Initialize state from localStorage or default to 'home'
-  const [activeView, setActiveView] = useState(() => {
-    const storedView = localStorage.getItem('dashboardActiveView');
-    return storedView || 'home';
-  });
-
-  // Use useEffect to save the current view to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('dashboardActiveView', activeView);
-  }, [activeView]);
-
-  const handleLogout = () => {
-    // Clear the stored view on logout
-    localStorage.removeItem('dashboardActiveView');
-    logout();
-  };
-
-  const handleClick = (id) => {
-    if (id === 'logout') {
-      handleLogout();
-    } else {
-      setActiveView(id);
-    }
-  };
-
-  const renderView = () => {
-    switch (activeView) {
-      case 'home':
-        return (
-          <>
-            <h2 className="text-2xl font-semibold mb-6">
-              Welcome, {user?.name}!
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-              {menuItems.map(({ id, label, icon, color }) => (
-                <button
-                  key={id}
-                  onClick={() => handleClick(id)}
-                  className={`${color} flex items-center space-x-3 px-4 py-3 rounded-lg shadow text-white transition`}
-                >
-                  <span>{icon}</span>
-                  <span className="font-medium">{label}</span>
-                </button>
-              ))}
-            </div>
-          </>
-        );
-      case 'addChild':
-        return (
-          <div>
-            <button
-              onClick={() => setActiveView('home')}
-              className="mb-4 text-blue-600 hover:underline"
-            >
-              ← Back to menu
-            </button>
-            <h2 className="text-2xl font-semibold mb-4">Add Child</h2>
-            <AddChild />
-          </div>
-        );
-      case 'viewChildren':
-        return (
-          <div>
-            <button
-              onClick={() => setActiveView('home')}
-              className="mb-4 text-blue-600 hover:underline"
-            >
-              ← Back to menu
-            </button>
-            <h2 className="text-2xl font-semibold mb-4">Children List</h2>
-            <p>Children list and vaccination records will be here.</p>
-          </div>
-        );
-      case 'addMother':
-        return (
-          <div>
-            <button
-              onClick={() => setActiveView('home')}
-              className="mb-4 text-blue-600 hover:underline"
-            >
-              ← Back to menu
-            </button>
-            <h2 className="text-2xl font-semibold mb-4">Add Mother</h2>
-            <p>Mother form will be here (coming soon!)</p>
-          </div>
-        );
-      case 'viewMothers':
-        return (
-          <div>
-            <button
-              onClick={() => setActiveView('home')}
-              className="mb-4 text-blue-600 hover:underline"
-            >
-              ← Back to menu
-            </button>
-            <h2 className="text-2xl font-semibold mb-4">Mothers List</h2>
-            <p>Mothers list and related records will be here.</p>
-          </div>
-        );
-      case 'searchRecords':
-        return (
-          <div>
-            <button
-              onClick={() => setActiveView('home')}
-              className="mb-4 text-blue-600 hover:underline"
-            >
-              ← Back to menu
-            </button>
-            <h2 className="text-2xl font-semibold mb-4">Search Records</h2>
-            <p>Search form and results will be here.</p>
-          </div>
-        );
-      case 'profile':
-        return (
-          <div>
-            <button
-              onClick={() => setActiveView('home')}
-              className="mb-4 text-blue-600 hover:underline"
-            >
-              ← Back to menu
-            </button>
-            <h2 className="text-2xl font-semibold mb-4">Your Profile</h2>
-            <p>
-              <strong>Name:</strong> {user?.name}
-            </p>
-            <p>
-              <strong>Email:</strong> {user?.email}
-            </p>
-            <p>
-              <strong>Role:</strong> {user?.role}
-            </p>
-            <p>
-              <strong>Ward ID:</strong> {user?.wardId || 'N/A'}
-            </p>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
   return (
-    <main className="max-w-6xl mx-auto mt-10 p-6 bg-white rounded shadow">
-      {renderView()}
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-6">
+      <div className="max-w-4xl w-full mx-auto p-6 sm:p-8 bg-white rounded-xl shadow-sm border border-gray-100">
+        <h2 className="text-2xl sm:text-3xl font-semibold text-gray-800 mb-8 text-center tracking-tight">
+          स्वागत छ,{' '}
+          <span className="text-blue-600">{user?.name || 'User'}</span>!
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+          {menuItems.map(({ to, label, icon }) => (
+            <Link
+              key={label}
+              to={to}
+              className="bg-white border border-gray-100 flex flex-col items-center justify-center p-4 rounded-lg shadow-sm text-gray-700 transition-all duration-200 hover:bg-blue-100 hover:border-blue-400 hover:shadow-md hover:-translate-y-1"
+            >
+              <span className="text-blue-600 text-2xl mb-2">{icon}</span>
+              <span className="font-medium text-sm sm:text-base text-center text-gray-800">
+                {label}
+              </span>
+            </Link>
+          ))}
+          <button
+            onClick={logout}
+            className="bg-red-100 border border-red-200 flex flex-col items-center justify-center p-4 rounded-lg shadow-sm text-red-600 transition-all duration-200 hover:bg-red-200 hover:border-red-400 hover:shadow-md hover:-translate-y-1"
+          >
+            <span className="text-2xl mb-2">
+              <FaSignOutAlt />
+            </span>
+            <span className="font-medium text-sm sm:text-base text-center">
+              Logout
+            </span>
+          </button>
+        </div>
+      </div>
     </main>
   );
 }

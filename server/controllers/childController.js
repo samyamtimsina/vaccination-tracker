@@ -13,7 +13,6 @@ function toMonths({
 }
 
 function mapVaccineNameToEnum(name) {
-  console.log('Mapping vaccine name:', name);
   if (!name) return 'OTHERS';
   const normalized = name.toLowerCase();
 
@@ -45,98 +44,144 @@ function mapVaccineNameToEnum(name) {
       return 'OTHERS';
   }
 }
+
+//create child
 export const createChild = async (req, res) => {
   try {
-    const { childs } = req.body;
+    const {
+      sewaDartaNumber,
+      fullName,
+      lastName,
+      wardNumber,
+      parentName,
+      tole,
+      phoneNumber,
+      gender,
+      casteCode,
+      birthDate,
+      vaccines = {},
+      purnaKhop = false,
+      remarks = '',
+    } = req.body;
 
-    if (!Array.isArray(childs)) {
-      return res.status(400).json({ error: 'Invalid Child data' });
+    const combinedFullName = `${fullName || ''} ${lastName || ''}`.trim();
+    if (!combinedFullName) {
+      return res.status(400).json({ error: 'Full name is required' });
     }
 
-    const createdChilds = [];
+    const parsedSewaDartaNumber = parseInt(sewaDartaNumber, 10);
+    const parsedCasteCode = parseInt(casteCode, 10);
+    const parsedWardNumber = parseInt(wardNumber, 10);
 
-    for (const c of childs) {
-      const fullName = ((c.fullName || '') + ' ' + (c.lastName || '')).trim();
-      if (!fullName) continue; // skip empty
+    const vaccinationCreateData = Object.entries(vaccines).flatMap(
+      ([vaccineName, doses]) => {
+        const vaccineTypeEnum = mapVaccineNameToEnum(vaccineName);
+        const schedule = vaccineSchedule[vaccineTypeEnum] || [];
 
-      const wardNumber = c.wardNumber;
-      const casteCode = Number(c.casteCode);
-      const birthDate = new Date(c.birthDate);
+        return doses
+          .map((dateGiven, idx) => {
+            if (!dateGiven) return null;
+            const doseNumber = idx + 1;
+            const doseSchedule = schedule.find((d) => d.dose === doseNumber);
+            const recommendedAtMonths = doseSchedule
+              ? Math.round(toMonths(doseSchedule) * 100) / 100
+              : 0;
 
-      // Prepare vaccinations array with recommendedAtMonths included
-      const vaccinationCreateData = Object.entries(c.vaccines).flatMap(
-        ([vaccineName, doses]) => {
-          const vaccineTypeEnum = mapVaccineNameToEnum(vaccineName);
+            return {
+              vaccineType: vaccineTypeEnum,
+              doseNumber,
+              dateGiven: new Date(dateGiven),
+              isComplete: true,
+              recommendedAtMonths,
+            };
+          })
+          .filter(Boolean);
+      },
+    );
 
-          // get vaccine schedule for this vaccine enum key
-          const schedule = vaccineSchedule[vaccineTypeEnum] || [];
-
-          return doses
-            .map((dateGiven, idx) => {
-              if (!dateGiven) return null;
-
-              // Dose numbers start at 1
-              const doseNumber = idx + 1;
-
-              // Find matching dose schedule for recommended time
-              const doseSchedule = schedule.find((d) => d.dose === doseNumber);
-
-              if (!doseSchedule) {
-                // For unknown doses, use 0 as fallback
-                return {
-                  vaccineType: vaccineTypeEnum,
-                  doseNumber,
-                  dateGiven: new Date(dateGiven),
-                  isComplete: true,
-                  recommendedAtMonths: 0,
-                };
-              }
-
-              // Calculate recommendedAtMonths for this dose
-              const recommendedAtMonths =
-                Math.round(toMonths(doseSchedule) * 100) / 100;
-
-              return {
-                vaccineType: vaccineTypeEnum,
-                doseNumber,
-                dateGiven: new Date(dateGiven),
-                isComplete: true,
-                recommendedAtMonths,
-              };
-            })
-            .filter(Boolean);
+    const child = await prisma.child.create({
+      data: {
+        sewaDartaNumber: parsedSewaDartaNumber,
+        fullName: combinedFullName,
+        wardNumber: parsedWardNumber,
+        parentName: parentName?.trim() || '',
+        tole: tole?.trim() || '',
+        phoneNumber: phoneNumber?.trim() || '',
+        gender,
+        casteCode: parsedCasteCode,
+        birthDate: new Date(birthDate),
+        createdById: req.user.id,
+        vaccinations: {
+          create: vaccinationCreateData,
         },
-      );
+        purnaKhop,
+        remarks,
+      },
+      include: { vaccinations: true },
+    });
 
-      const child = await prisma.child.create({
-        data: {
-          fullName,
-          wardNumber,
-          parentName: (c.parentName || '').trim(),
-          tole: (c.tole || '').trim(),
-          phoneNumber: (c.phoneNumber || '').trim(),
-          gender: c.gender,
-          casteCode,
-          birthDate,
-          createdById: req.user.id,
-          vaccinations: {
-            create: vaccinationCreateData,
-          },
-          purnaKhop: c.purnaKhop || false,
-          remarks: c.remarks || '',
-        },
-        include: { vaccinations: true },
-      });
-
-      createdChilds.push(child);
-    }
-
-    res.status(201).json(createdChilds);
+    res.status(201).json(child);
   } catch (error) {
-    console.error(error);
-    res.status(500);
-    console.log.json({
+    console.error('Child creation error:', error);
+    res.status(500).json({
       error: 'Child creation failed',
+      details: error.message,
+    });
+  }
+};
+// Controller to get all children, including their vaccination records
+export const getAllChildren = async (req, res) => {
+  try {
+    // Find all children in the database
+    // The `include` option ensures that each child's vaccination history is also retrieved
+    const children = await prisma.child.findMany({
+      include: {
+        vaccinations: true,
+      },
+    });
+
+    if (!children) {
+      return res.status(404).json({ error: 'No children found' });
+    }
+
+    res.status(200).json(children);
+  } catch (error) {
+    console.error('Error fetching all children:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve children data',
+      details: error.message,
+    });
+  }
+};
+
+// Controller to get a single child by ID, including their vaccination records
+export const getChild = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ error: 'Child ID is required' });
+    }
+
+    // Find a unique child record by ID
+    const child = await prisma.child.findUnique({
+      where: {
+        id: id,
+      },
+      include: {
+        vaccinations: true, // This includes all vaccination records for the child
+      },
+    });
+
+    if (!child) {
+      return res.status(404).json({ error: 'Child not found' });
+    }
+
+    res.status(200).json(child);
+  } catch (error) {
+    console.error('Error fetching single child:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve child data',
       details: error.message,
     });
   }
