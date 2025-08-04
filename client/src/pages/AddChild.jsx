@@ -44,7 +44,8 @@ export default function AddChild() {
       };
 
       const res = await axiosClient.post('/api/child', formatted);
-      toast.success('छोराछोरीको डेटा सफलतापूर्वक सेभ भयो!');
+      toast.success('बालबालिका डेटा सफलतापूर्वक सेभ भयो!');
+
       console.log('Response:', res.data);
 
       reset(); // Reset form after successful submission
@@ -68,7 +69,7 @@ export default function AddChild() {
       >
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl sm:text-3xl font-semibold text-gray-800 tracking-tight">
-            छोराछोरी थप्नुहोस्
+            बालबालिका थप्नुहोस्
           </h1>
           <button
             type="button"
@@ -81,7 +82,7 @@ export default function AddChild() {
         </div>
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="sm:col-span-2 lg:col-span-3">
+          <div className="sm:col-span-1 lg:col-span-1">
             <label
               className="block text-sm font-medium text-gray-700 mb-1"
               htmlFor="sewaDartaNumber"

@@ -106,7 +106,7 @@ export default function Profile() {
 
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-6">
-      <div className="max-w-2xl w-full mx-auto p-6 sm:p-8 bg-white rounded-xl shadow-sm border border-gray-100">
+      <div className="max-w-2xl w-full mx-auto p-6 sm:p-8 bg-white rounded-xl shadow-lg border border-gray-100">
         {/* Profile Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl sm:text-3xl font-semibold text-gray-800 tracking-tight">
@@ -122,9 +122,9 @@ export default function Profile() {
         </div>
 
         {/* Profile Card */}
-        <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-gray-50 rounded-lg border border-gray-100 shadow-sm mb-6">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-blue-50 rounded-lg border border-blue-100 shadow-sm mb-6">
           <div className="flex-shrink-0 mb-4 sm:mb-0 sm:mr-6">
-            <FaUserCircle className="text-6xl text-blue-400" />
+            <FaUserCircle className="text-6xl text-blue-600" />
           </div>
           <div className="flex-grow text-center sm:text-left">
             <h3 className="text-xl sm:text-2xl font-medium text-gray-800 mb-1">
@@ -136,7 +136,7 @@ export default function Profile() {
                 setIsEditingProfile(!isEditingProfile);
                 setIsEditingPassword(false);
               }}
-              className="flex items-center justify-center space-x-2 bg-blue-100 hover:bg-blue-200 text-blue-600 font-medium py-2 px-4 rounded-md shadow-sm transition-colors duration-200"
+              className="flex items-center justify-center space-x-2 bg-blue-200 hover:bg-blue-300 text-blue-800 font-medium py-2 px-4 rounded-full shadow-sm transition-colors duration-200"
             >
               <FaEdit />
               <span>{isEditingProfile ? 'Cancel' : 'Edit Profile'}</span>
@@ -164,7 +164,7 @@ export default function Profile() {
                       name="name"
                       value={profileData.name}
                       onChange={handleProfileInputChange}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                       placeholder="तपाईंको नाम"
                       required
                     />
@@ -181,7 +181,7 @@ export default function Profile() {
                       name="email"
                       value={profileData.email}
                       onChange={handleProfileInputChange}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                       placeholder="तपाईंको इमेल"
                       required
                     />
@@ -198,7 +198,7 @@ export default function Profile() {
                       name="ward"
                       value={profileData.ward}
                       onChange={handleProfileInputChange}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                       placeholder="वार्ड नम्बर (वैकल्पिक)"
                     />
                   </div>
@@ -210,14 +210,14 @@ export default function Profile() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition-colors duration-200 disabled:opacity-50"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-full shadow-sm transition-colors duration-200 disabled:opacity-50 transform hover:scale-105"
                   >
                     {isSubmitting ? 'Saving...' : 'Save Profile'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsEditingProfile(false)}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-md shadow-sm transition-colors duration-200"
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-full shadow-sm transition-colors duration-200 transform hover:scale-105"
                   >
                     Cancel
                   </button>
@@ -226,17 +226,17 @@ export default function Profile() {
             ) : (
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
-                  <FaUser className="text-blue-400" />
+                  <FaUser className="text-blue-600" />
                   <span className="font-medium text-gray-700">नाम:</span>
                   <span className="text-gray-600">{profileUser.name}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <FaEnvelope className="text-blue-400" />
+                  <FaEnvelope className="text-blue-600" />
                   <span className="font-medium text-gray-700">इमेल:</span>
                   <span className="text-gray-600">{profileUser.email}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <FaBuilding className="text-blue-400" />
+                  <FaBuilding className="text-blue-600" />
                   <span className="font-medium text-gray-700">वार्ड:</span>
                   <span className="text-gray-600">
                     {profileUser.ward || 'Not set'}
@@ -270,7 +270,7 @@ export default function Profile() {
                       name="currentPassword"
                       value={passwordData.currentPassword}
                       onChange={handlePasswordInputChange}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                       placeholder="हालको पासवर्ड"
                       required
                     />
@@ -287,7 +287,7 @@ export default function Profile() {
                       name="newPassword"
                       value={passwordData.newPassword}
                       onChange={handlePasswordInputChange}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                       placeholder="नयाँ पासवर्ड"
                       required
                     />
@@ -304,17 +304,17 @@ export default function Profile() {
                       name="confirmPassword"
                       value={passwordData.confirmPassword}
                       onChange={handlePasswordInputChange}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                       placeholder="पासवर्ड पुष्टि गर्नुहोस्"
                       required
                     />
                   </div>
-                  {errors.confirmPassword && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors.confirmPassword}
-                    </p>
-                  )}
                 </div>
+                {errors.confirmPassword && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.confirmPassword}
+                  </p>
+                )}
                 {errors.server && (
                   <p className="text-red-500 text-xs mt-1">{errors.server}</p>
                 )}
@@ -322,14 +322,14 @@ export default function Profile() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition-colors duration-200 disabled:opacity-50"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-full shadow-sm transition-colors duration-200 disabled:opacity-50 transform hover:scale-105"
                   >
                     {isSubmitting ? 'Saving...' : 'Save Password'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsEditingPassword(false)}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-md shadow-sm transition-colors duration-200"
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-full shadow-sm transition-colors duration-200 transform hover:scale-105"
                   >
                     Cancel
                   </button>
@@ -341,7 +341,7 @@ export default function Profile() {
                   setIsEditingPassword(true);
                   setIsEditingProfile(false);
                 }}
-                className="w-full bg-blue-100 hover:bg-blue-200 text-blue-600 font-medium py-2 px-4 rounded-md shadow-sm transition-colors duration-200"
+                className="w-full bg-blue-200 hover:bg-blue-300 text-blue-800 font-medium py-2 px-4 rounded-full shadow-sm transition-colors duration-200 transform hover:scale-105"
               >
                 Change Password
               </button>
