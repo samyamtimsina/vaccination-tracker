@@ -1,7 +1,9 @@
+import React from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
+import { FaUser, FaEnvelope, FaLock, FaBuilding } from 'react-icons/fa';
 
 export default function Register() {
   const {
@@ -22,87 +24,89 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <div className="w-full max-w-md bg-white shadow-lg rounded-2xl p-8">
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
+    <div className="min-h-screen flex items-center justify-center bg-base-200 px-4">
+      <div className="w-full max-w-md bg-base-100 shadow-xl card rounded-2xl p-8">
+        <h2 className="text-3xl font-bold text-center text-base-content mb-6">
           Register
         </h2>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          <div>
-            <label
-              htmlFor="name"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Full Name
+          {/* Full Name Input */}
+          <div className="form-control w-full">
+            <label htmlFor="name" className="label">
+              <span className="label-text">Full Name</span>
             </label>
-            <input
-              {...register('name')}
-              id="name"
-              placeholder="Your full name"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
+            <div className="relative">
+              <FaUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary" />
+              <input
+                {...register('name', { required: true })}
+                id="name"
+                type="text"
+                placeholder="Your full name"
+                className="input input-bordered w-full pl-10"
+              />
+            </div>
           </div>
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Email
+          {/* Email Input */}
+          <div className="form-control w-full">
+            <label htmlFor="email" className="label">
+              <span className="label-text">Email</span>
             </label>
-            <input
-              {...register('email')}
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
+            <div className="relative">
+              <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary" />
+              <input
+                {...register('email', { required: true })}
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                className="input input-bordered w-full pl-10"
+              />
+            </div>
           </div>
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Password
+          {/* Password Input */}
+          <div className="form-control w-full">
+            <label htmlFor="password" className="label">
+              <span className="label-text">Password</span>
             </label>
-            <input
-              {...register('password')}
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
+            <div className="relative">
+              <FaLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary" />
+              <input
+                {...register('password', { required: true })}
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                className="input input-bordered w-full pl-10"
+              />
+            </div>
           </div>
-          <div>
-            <label
-              htmlFor="wardId"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Ward ID (optional)
+          {/* Ward ID Input */}
+          <div className="form-control w-full">
+            <label htmlFor="wardId" className="label">
+              <span className="label-text">Ward ID (optional)</span>
             </label>
-            <input
-              {...register('wardId')}
-              id="wardId"
-              type="number"
-              placeholder="Enter ward ID"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="relative">
+              <FaBuilding className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary" />
+              <input
+                {...register('wardId')}
+                id="wardId"
+                type="number"
+                placeholder="Enter ward ID"
+                className="input input-bordered w-full pl-10"
+              />
+            </div>
           </div>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition disabled:opacity-60"
+            className="btn btn-primary w-full"
           >
             {isSubmitting ? 'Registering...' : 'Register'}
           </button>
         </form>
-        <p className="text-center mt-5 text-sm text-gray-600">
+        <p className="text-center mt-5 text-sm text-base-content text-opacity-70">
           Already signed up?{' '}
           <Link
             to="/login"
-            className="text-blue-600 hover:underline font-medium"
+            className="text-primary hover:underline font-medium"
           >
             Login here
           </Link>

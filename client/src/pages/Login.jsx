@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import axiosClient from '../api/axiosClient';
 import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
@@ -25,65 +25,62 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <div className="w-full max-w-md bg-white shadow-lg rounded-2xl p-8">
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
-          Login
-        </h2>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-1"
+    <>
+      <ToastContainer position="top-right" autoClose={3000} />
+      <div className="min-h-screen flex items-center justify-center bg-base-200 px-4">
+        <div className="card w-full max-w-md bg-base-100 shadow-xl p-8">
+          <h2 className="card-title text-3xl font-bold text-center text-base-content mb-6">
+            Login
+          </h2>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <div className="form-control">
+              <label htmlFor="email" className="label">
+                <span className="label-text">Email</span>
+              </label>
+              <input
+                {...register('email')}
+                id="email"
+                type="email"
+                required
+                className="input input-bordered w-full"
+                placeholder="you@example.com"
+              />
+            </div>
+
+            <div className="form-control">
+              <label htmlFor="password" className="label">
+                <span className="label-text">Password</span>
+              </label>
+              <input
+                {...register('password')}
+                id="password"
+                type="password"
+                required
+                className="input input-bordered w-full"
+                placeholder="••••••••"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="btn btn-primary w-full transform transition disabled:opacity-60 hover:scale-105"
             >
-              Email
-            </label>
-            <input
-              {...register('email')}
-              id="email"
-              type="email"
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="you@example.com"
-            />
-          </div>
+              {isSubmitting ? 'Logging in...' : 'Login'}
+            </button>
+          </form>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
+          <p className="text-center mt-5 text-sm text-base-content text-opacity-80">
+            Don't have an account?{' '}
+            <Link
+              to="/register"
+              className="link link-hover link-primary font-medium"
             >
-              Password
-            </label>
-            <input
-              {...register('password')}
-              id="password"
-              type="password"
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="••••••••"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition disabled:opacity-60"
-          >
-            {isSubmitting ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
-
-        <p className="text-center mt-5 text-sm text-gray-600">
-          Don't have an account?{' '}
-          <Link
-            to="/register"
-            className="text-blue-600 hover:underline font-medium"
-          >
-            Register here
-          </Link>
-        </p>
+              Register here
+            </Link>
+          </p>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -40,5 +40,5 @@ export const vaccineSchedule = {
 
   TCV: [{ dose: 1, recommendedAtMonths: 15 }],
 
-  HPV: [],
+  HPV: [{ dose: 1, recommendedAtMonths: 120 }],
 };

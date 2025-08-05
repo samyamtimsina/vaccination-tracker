@@ -10,6 +10,8 @@ import {
   FaSignInAlt,
   FaUserPlus,
   FaCog,
+  FaSun,
+  FaMoon,
 } from 'react-icons/fa';
 
 export default function Navbar() {
@@ -19,16 +21,34 @@ export default function Navbar() {
   const profileRef = useRef(null);
   const menuRef = useRef(null);
 
+  // State to manage the theme, initialized from local storage or 'light'
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+
+  // Handles the logout functionality
   const handleLogout = () => {
     logout();
     navigate('/', { replace: true });
     setIsMenuOpen(false);
   };
 
+  // Toggles the mobile menu open/closed
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
+  // Toggles between light and dark themes and saves to local storage
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
+
+  // Effect to apply the theme to the <html> tag
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  // Effect to handle clicks outside the menu to close it
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -41,13 +61,13 @@ export default function Navbar() {
         setIsMenuOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
+  // Effect to close the mobile menu on resize for desktop view
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 768) {
@@ -69,8 +89,19 @@ export default function Navbar() {
           खोप अनुगमन प्रणाली
         </Link>
 
-        {/* Mobile Menu Button */}
+        {/* Mobile Menu Button and Theme Toggle */}
         <div className="md:hidden flex items-center space-x-4">
+          <button
+            onClick={toggleTheme}
+            className="cursor-pointer text-white hover:text-blue-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 rounded p-2"
+            aria-label="Toggle theme"
+          >
+            {theme === 'light' ? (
+              <FaMoon className="w-6 h-6" />
+            ) : (
+              <FaSun className="w-6 h-6" />
+            )}
+          </button>
           <button
             onClick={toggleMenu}
             className="text-white hover:text-blue-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 rounded p-2"
@@ -86,6 +117,25 @@ export default function Navbar() {
 
         {/* Desktop Menu & Profile */}
         <div className="hidden md:flex items-center space-x-6">
+          {/* Theme Toggle Button for Desktop */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center space-x-2 py-2 px-4 text-white font-medium rounded-full hover:bg-white hover:text-blue-700 transition duration-200 group transform hover:scale-105 cursor-pointer"
+            aria-label="Toggle theme"
+          >
+            {theme === 'light' ? (
+              <>
+                <FaMoon className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                <span>Dark Mode</span>
+              </>
+            ) : (
+              <>
+                <FaSun className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                <span>Light Mode</span>
+              </>
+            )}
+          </button>
+
           {!user ? (
             <>
               <Link
@@ -136,18 +186,18 @@ export default function Navbar() {
                   </svg>
                 </button>
                 {isMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl py-2 z-10 border border-gray-200 animate-fade-in-down">
-                    <div className="px-4 py-3 text-sm text-gray-700 border-b border-gray-100">
-                      <p className="font-semibold text-blue-700">
+                  <div className="absolute right-0 mt-2 w-64 bg-base-100 rounded-lg shadow-xl py-2 z-10 border border-base-200 animate-fade-in-down">
+                    <div className="px-4 py-3 text-sm text-base-content border-b border-base-200">
+                      <p className="font-semibold text-primary">
                         {user.name || 'User'}
                       </p>
-                      <p className="text-xs text-gray-500 truncate">
+                      <p className="text-xs text-base-content-secondary truncate">
                         {user.email}
                       </p>
                     </div>
                     <Link
                       to="/profile"
-                      className="flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200"
+                      className="flex items-center space-x-3 px-4 py-2 text-sm text-base-content hover:bg-base-200 hover:text-primary transition-colors duration-200"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       <FaCog className="w-4 h-4" />
@@ -170,14 +220,14 @@ export default function Navbar() {
         {/* Mobile Dropdown Menu (Toggle from hamburger) */}
         {isMenuOpen && (
           <div
-            className="md:hidden absolute top-full left-0 w-full bg-white border-t border-gray-200 shadow-lg py-2 animate-fade-in-down"
+            className="md:hidden absolute top-full left-0 w-full bg-base-100 border-t border-base-200 shadow-lg py-2 animate-fade-in-down"
             ref={menuRef}
           >
             {!user ? (
               <>
                 <Link
                   to="/login"
-                  className="flex items-center space-x-3 px-4 py-3 text-gray-700 font-medium hover:bg-blue-50 hover:text-blue-600 transition duration-200"
+                  className="flex items-center space-x-3 px-4 py-3 text-base-content font-medium hover:bg-base-200 hover:text-primary transition duration-200"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <FaSignInAlt className="w-5 h-5" />
@@ -185,7 +235,7 @@ export default function Navbar() {
                 </Link>
                 <Link
                   to="/register"
-                  className="flex items-center space-x-3 px-4 py-3 text-gray-700 font-medium hover:bg-blue-50 hover:text-blue-600 transition duration-200"
+                  className="flex items-center space-x-3 px-4 py-3 text-base-content font-medium hover:bg-base-200 hover:text-primary transition duration-200"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <FaUserPlus className="w-5 h-5" />
@@ -194,15 +244,17 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <div className="px-4 py-3 text-sm text-gray-700 border-b border-gray-100">
-                  <p className="font-semibold text-blue-700">
+                <div className="px-4 py-3 text-sm text-base-content border-b border-base-200">
+                  <p className="font-semibold text-primary">
                     {user.name || 'User'}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                  <p className="text-xs text-base-content-secondary truncate">
+                    {user.email}
+                  </p>
                 </div>
                 <Link
                   to="/dashboard"
-                  className="flex items-center space-x-3 px-4 py-3 text-gray-700 font-medium hover:bg-blue-50 hover:text-blue-600 transition duration-200"
+                  className="flex items-center space-x-3 px-4 py-3 text-base-content font-medium hover:bg-base-200 hover:text-primary transition duration-200"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <FaHome className="w-5 h-5" />
@@ -210,7 +262,7 @@ export default function Navbar() {
                 </Link>
                 <Link
                   to="/profile"
-                  className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-200"
+                  className="flex items-center space-x-3 px-4 py-3 text-base-content hover:bg-base-200 hover:text-primary transition duration-200"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <FaCog className="w-5 h-5" />

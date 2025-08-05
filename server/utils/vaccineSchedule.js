@@ -1,5 +1,3 @@
-// src/utils/vaccineSchedule.js
-
 export const vaccineSchedule = {
   BCG: [
     { dose: 1, recommendedAtDays: 0 }, // At birth
@@ -31,7 +29,7 @@ export const vaccineSchedule = {
     { dose: 1, recommendedAtMonths: 9 },
     { dose: 2, recommendedAtMonths: 15 },
   ],
-  JE: [{ dose: 1, recommendedAtMonths: 15 }],
+  JE: [{ dose: 1, recommendedAtMonths: 12 }],
   TCV: [{ dose: 1, recommendedAtMonths: 15 }],
   OTHERS: [], // For custom cases
 };
