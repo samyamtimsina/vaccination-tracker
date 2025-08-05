@@ -89,7 +89,6 @@ enum VaccineType {
   JE
   TCV
   HPV // Added HPV based on your React doses
-  OTHERS
 }
 
 model NotificationLog {

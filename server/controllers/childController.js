@@ -1,128 +1,89 @@
 import { prisma } from '../utils/prisma.js';
 import { vaccineSchedule } from '../utils/vaccineSchedule.js';
+import { createChildSchema } from '../schemas/childSchema.js'; // Import the Zod schema
+import { toMonths, mapVaccineNameToEnum } from '../utils/helpers.js'; // We'll move these here
 
-// Helper to convert days/weeks/months to months (approximate)
-function toMonths({
-  recommendedAtDays = 0,
-  recommendedAtWeeks = 0,
-  recommendedAtMonths = 0,
-}) {
-  return (
-    recommendedAtMonths + recommendedAtWeeks / 4.345 + recommendedAtDays / 30.44
-  );
+// Function to prepare vaccination data - extracted for clarity
+function prepareVaccinationCreateData(vaccines) {
+  if (!vaccines) return [];
+
+  return Object.entries(vaccines).flatMap(([vaccineName, doses]) => {
+    const vaccineTypeEnum = mapVaccineNameToEnum(vaccineName);
+    const schedule = vaccineSchedule[vaccineTypeEnum] || [];
+
+    return doses
+      .map((dateGiven, idx) => {
+        if (!dateGiven) return null;
+        const doseNumber = idx + 1;
+        const doseSchedule = schedule.find((d) => d.dose === doseNumber);
+        const recommendedAtMonths = doseSchedule
+          ? Math.round(toMonths(doseSchedule) * 100) / 100
+          : 0;
+
+        return {
+          vaccineType: vaccineTypeEnum,
+          doseNumber,
+          dateGiven: new Date(dateGiven),
+          isComplete: true,
+          recommendedAtMonths,
+        };
+      })
+      .filter(Boolean);
+  });
 }
 
-function mapVaccineNameToEnum(name) {
-  if (!name) return 'OTHERS';
-  const normalized = name.toLowerCase();
-
-  switch (normalized) {
-    case 'bcg':
-      return 'BCG';
-    case 'rota':
-      return 'ROTA';
-    case 'polio':
-    case 'opv': // added here
-      return 'OPV';
-    case 'fipv':
-      return 'fIPV';
-    case 'pcv':
-      return 'PCV';
-    case 'dpt-hepb-hib':
-    case 'dpt_hepb_hib':
-    case 'dpthepbhib':
-      return 'DPT_HepB_hib';
-    case 'mr':
-      return 'MR';
-    case 'je':
-      return 'JE';
-    case 'tcv':
-      return 'TCV';
-    case 'hpv':
-      return 'HPV';
-    default:
-      return 'OTHERS';
-  }
-}
-
-//create child
 export const createChild = async (req, res) => {
   try {
-    const {
-      sewaDartaNumber,
-      fullName,
-      lastName,
-      wardNumber,
-      parentName,
-      tole,
-      phoneNumber,
-      gender,
-      casteCode,
-      birthDate,
-      vaccines = {},
-      purnaKhop = false,
-      remarks = '',
-    } = req.body;
+    // 1. Validate the request body using Zod
+    const validationResult = createChildSchema.safeParse(req.body);
+    console.log('validation result', validationResult);
 
-    const combinedFullName = `${fullName || ''} ${lastName || ''}`.trim();
-    if (!combinedFullName) {
-      return res.status(400).json({ error: 'Full name is required' });
+    if (!validationResult.success) {
+      // Return a 400 with detailed Zod errors
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: validationResult.error.errors,
+      });
     }
 
-    const parsedSewaDartaNumber = parseInt(sewaDartaNumber, 10);
-    const parsedCasteCode = parseInt(casteCode, 10);
-    const parsedWardNumber = parseInt(wardNumber, 10);
+    const validatedData = validationResult.data;
 
-    const vaccinationCreateData = Object.entries(vaccines).flatMap(
-      ([vaccineName, doses]) => {
-        const vaccineTypeEnum = mapVaccineNameToEnum(vaccineName);
-        const schedule = vaccineSchedule[vaccineTypeEnum] || [];
+    // 2. Combine full name
+    const combinedFullName =
+      `${validatedData.fullName} ${validatedData.lastName || ''}`.trim();
 
-        return doses
-          .map((dateGiven, idx) => {
-            if (!dateGiven) return null;
-            const doseNumber = idx + 1;
-            const doseSchedule = schedule.find((d) => d.dose === doseNumber);
-            const recommendedAtMonths = doseSchedule
-              ? Math.round(toMonths(doseSchedule) * 100) / 100
-              : 0;
-
-            return {
-              vaccineType: vaccineTypeEnum,
-              doseNumber,
-              dateGiven: new Date(dateGiven),
-              isComplete: true,
-              recommendedAtMonths,
-            };
-          })
-          .filter(Boolean);
-      },
+    // 3. Prepare vaccination data using the extracted helper function
+    const vaccinationCreateData = prepareVaccinationCreateData(
+      validatedData.vaccines,
     );
 
+    // 4. Create the child record in the database
     const child = await prisma.child.create({
       data: {
-        sewaDartaNumber: parsedSewaDartaNumber,
+        sewaDartaNumber: parseInt(validatedData.sewaDartaNumber, 10),
         fullName: combinedFullName,
-        wardNumber: parsedWardNumber,
-        parentName: parentName?.trim() || '',
-        tole: tole?.trim() || '',
-        phoneNumber: phoneNumber?.trim() || '',
-        gender,
-        casteCode: parsedCasteCode,
-        birthDate: new Date(birthDate),
+        wardNumber: parseInt(validatedData.wardNumber, 10),
+        parentName: validatedData.parentName || '',
+        tole: validatedData.tole || '',
+        phoneNumber: validatedData.phoneNumber || '',
+        gender: validatedData.gender,
+        casteCode: parseInt(validatedData.casteCode, 10),
+        birthDate: new Date(validatedData.birthDate),
         createdById: req.user.id,
+        purnaKhop: validatedData.purnaKhop,
+        remarks: validatedData.remarks || '',
         vaccinations: {
           create: vaccinationCreateData,
         },
-        purnaKhop,
-        remarks,
       },
       include: { vaccinations: true },
     });
 
+    // 5. Send a successful response
     res.status(201).json(child);
   } catch (error) {
     console.error('Child creation error:', error);
+    // You could also check for specific Prisma errors here
     res.status(500).json({
       error: 'Child creation failed',
       details: error.message,
