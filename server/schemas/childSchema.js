@@ -1,20 +1,8 @@
-// src/schemas/childSchema.js
 import { z } from 'zod';
 
-const numericString = z
-  .union([z.string(), z.number()])
-  .transform((val, ctx) => {
-    const parsed = parseInt(String(val), 10);
-    if (isNaN(parsed)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Value must be a valid number',
-      });
-      return z.NEVER;
-    }
-    return parsed;
-  })
-  .refine((val) => val > 0, { message: 'Value must be a positive number' });
+const numericString = z.coerce.number().refine((val) => val > 0, {
+  message: 'Value must be a positive number',
+});
 
 export const createChildSchema = z.object({
   sewaDartaNumber: numericString,

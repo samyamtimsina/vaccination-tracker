@@ -8,6 +8,8 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaArrowLeft } from 'react-icons/fa';
 import NepaliDate from 'nepali-date-converter';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { createChildSchema } from '../schemas/childSchema.js'; // Assuming schema file location
 
 // Utility function to calculate age in days, weeks, and months from Nepali date
 function calculateAge(birthDate) {
@@ -16,12 +18,10 @@ function calculateAge(birthDate) {
     typeof birthDate !== 'string' ||
     !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)
   ) {
-    console.log('Invalid or missing birthDate:', birthDate);
     return { days: 0, weeks: 0, months: 0 };
   }
 
   try {
-    // Parse Nepali date (BS) in format "YYYY-MM-DD"
     const [year, month, day] = birthDate.split('-').map(Number);
     if (
       isNaN(year) ||
@@ -34,19 +34,14 @@ function calculateAge(birthDate) {
     ) {
       throw new Error('Invalid date components');
     }
-    const nepaliBirthDate = new NepaliDate(year, month - 1, day); // 0-based month
-
-    // Get current Nepali date
+    const nepaliBirthDate = new NepaliDate(year, month - 1, day);
     const currentNepaliDate = new NepaliDate();
 
-    // Calculate difference
-    let diffYears = currentNepaliDate.getYear() - nepaliBirthDate.getYear();
     let diffMonths =
-      diffYears * 12 +
+      (currentNepaliDate.getYear() - nepaliBirthDate.getYear()) * 12 +
       (currentNepaliDate.getMonth() - nepaliBirthDate.getMonth());
     let diffDays = currentNepaliDate.getDate() - nepaliBirthDate.getDate();
 
-    // Adjust months and days if necessary
     if (diffDays < 0) {
       diffMonths -= 1;
       const lastMonth = new NepaliDate(
@@ -57,11 +52,9 @@ function calculateAge(birthDate) {
       diffDays += lastMonth.getDate();
     }
     if (diffMonths < 0) {
-      diffYears -= 1;
       diffMonths += 12;
     }
 
-    // Calculate total days using Gregorian conversion
     const birthGregorian = nepaliBirthDate.toJsDate();
     const currentGregorian = currentNepaliDate.toJsDate();
     const totalDays = Math.floor(
@@ -70,16 +63,11 @@ function calculateAge(birthDate) {
     );
 
     const age = {
-      days: Math.max(totalDays, 0), // Ensure non-negative
+      days: Math.max(totalDays, 0),
       weeks: Math.floor(Math.max(totalDays, 0) / 7),
       months: Math.max(diffMonths, 0),
     };
 
-    console.log('Calculated age:', {
-      birthDate,
-      age,
-      currentDate: currentNepaliDate.format('YYYY-MM-DD'),
-    });
     return age;
   } catch (err) {
     console.error('Error calculating age:', err);
@@ -96,8 +84,9 @@ export default function AddChild() {
     reset,
     setValue,
   } = useForm({
+    resolver: zodResolver(createChildSchema),
     defaultValues: {
-      birthDate: '', // Explicitly empty
+      birthDate: '',
       vaccines: Object.fromEntries(
         Object.entries(vaccineSchedule).map(([vaccineName, doses]) => [
           vaccineName,
@@ -119,25 +108,10 @@ export default function AddChild() {
     defaultValue: '',
   });
 
-  console.log('Watched birthDate:', birthDate); // Debug log
-
   const onSubmit = async (data) => {
     try {
-      const formatted = {
-        ...data,
-        vaccines: Object.fromEntries(
-          Object.entries(data.vaccines || {}).map(
-            ([vaccineName, doseArray]) => [
-              vaccineName,
-              doseArray.map((d) => (d === '' ? null : d)),
-            ],
-          ),
-        ),
-      };
-
-      const res = await axiosClient.post('/api/child', formatted);
+      const res = await axiosClient.post('/api/child', data);
       toast.success('बालबालिका डेटा सफलतापूर्वक सेभ भयो!');
-      console.log('Response:', res.data);
       reset();
     } catch (err) {
       console.error('Submission failed:', err);
@@ -145,15 +119,12 @@ export default function AddChild() {
     }
   };
 
-  // Calculate child's age
   const age = calculateAge(birthDate);
 
-  // Filter out HPV for non-females
   const vaccineEntries = Object.entries(vaccineSchedule).filter(
-    ([name]) => !(name === 'HPV' && gender !== 'female'),
+    ([name]) => !(name === 'HPV' && gender !== 'FEMALE'),
   );
 
-  // Function to check if a dose is accessible based on age
   const isDoseAccessible = (dose) => {
     let accessible = false;
     if (dose.recommendedAtDays !== undefined) {
@@ -163,7 +134,6 @@ export default function AddChild() {
     } else if (dose.recommendedAtMonths !== undefined) {
       accessible = age.months >= dose.recommendedAtMonths;
     }
-    console.log('Dose accessibility:', { vaccine: dose, age, accessible });
     return accessible;
   };
 
@@ -202,6 +172,13 @@ export default function AddChild() {
               className="input input-bordered w-full text-base-content"
               placeholder="सेवा दर्ता नम्बर"
             />
+            {errors.sewaDartaNumber && (
+              <label className="label">
+                <span className="label-text-alt text-error">
+                  {errors.sewaDartaNumber.message}
+                </span>
+              </label>
+            )}
           </div>
 
           <div className="form-control">
@@ -212,14 +189,14 @@ export default function AddChild() {
             </label>
             <input
               id="fullName"
-              {...register('fullName', { required: true })}
+              {...register('fullName')}
               className="input input-bordered w-full text-base-content"
               placeholder="पहिलो नाम"
             />
             {errors.fullName && (
               <label className="label">
                 <span className="label-text-alt text-error">
-                  पहिलो नाम आवश्यक छ
+                  {errors.fullName.message}
                 </span>
               </label>
             )}
@@ -235,6 +212,13 @@ export default function AddChild() {
               className="input input-bordered w-full text-base-content"
               placeholder="थर"
             />
+            {errors.lastName && (
+              <label className="label">
+                <span className="label-text-alt text-error">
+                  {errors.lastName.message}
+                </span>
+              </label>
+            )}
           </div>
 
           <div className="form-control">
@@ -245,14 +229,14 @@ export default function AddChild() {
             </label>
             <input
               id="wardNumber"
-              {...register('wardNumber', { required: true })}
+              {...register('wardNumber')}
               className="input input-bordered w-full text-base-content"
               placeholder="वडा नम्बर"
             />
             {errors.wardNumber && (
               <label className="label">
                 <span className="label-text-alt text-error">
-                  वडा नम्बर आवश्यक छ
+                  {errors.wardNumber.message}
                 </span>
               </label>
             )}
@@ -267,17 +251,14 @@ export default function AddChild() {
             <input
               id="casteCode"
               type="number"
-              {...register('casteCode', {
-                required: true,
-                valueAsNumber: true,
-              })}
+              {...register('casteCode')}
               className="input input-bordered w-full text-base-content"
               placeholder="जात कोड"
             />
             {errors.casteCode && (
               <label className="label">
                 <span className="label-text-alt text-error">
-                  जात कोड आवश्यक छ
+                  {errors.casteCode.message}
                 </span>
               </label>
             )}
@@ -291,18 +272,18 @@ export default function AddChild() {
             </label>
             <select
               id="gender"
-              {...register('gender', { required: true })}
+              {...register('gender')}
               className="select select-bordered w-full text-base-content"
             >
               <option value="">लिङ्ग छान्नुहोस्</option>
-              <option value="male">पुरुष</option>
-              <option value="female">महिला</option>
-              <option value="other">अन्य</option>
+              <option value="MALE">पुरुष</option>
+              <option value="FEMALE">महिला</option>
+              <option value="OTHER">अन्य</option>
             </select>
             {errors.gender && (
               <label className="label">
                 <span className="label-text-alt text-error">
-                  लिङ्ग आवश्यक छ
+                  {errors.gender.message}
                 </span>
               </label>
             )}
@@ -311,7 +292,7 @@ export default function AddChild() {
           <div className="form-control">
             <label className="label" htmlFor="parentName">
               <span className="label-text text-base-content">
-                अभिभावकको नाम
+                अभिभावकको नाम<span className="text-error">*</span>
               </span>
             </label>
             <input
@@ -320,11 +301,20 @@ export default function AddChild() {
               className="input input-bordered w-full text-base-content"
               placeholder="अभिभावकको नाम"
             />
+            {errors.parentName && (
+              <label className="label">
+                <span className="label-text-alt text-error">
+                  {errors.parentName.message}
+                </span>
+              </label>
+            )}
           </div>
 
           <div className="form-control">
             <label className="label" htmlFor="tole">
-              <span className="label-text text-base-content">टोल</span>
+              <span className="label-text text-base-content">
+                टोल<span className="text-error">*</span>
+              </span>
             </label>
             <input
               id="tole"
@@ -332,6 +322,13 @@ export default function AddChild() {
               className="input input-bordered w-full text-base-content"
               placeholder="टोल"
             />
+            {errors.tole && (
+              <label className="label">
+                <span className="label-text-alt text-error">
+                  {errors.tole.message}
+                </span>
+              </label>
+            )}
           </div>
 
           <div className="form-control">
@@ -344,6 +341,13 @@ export default function AddChild() {
               className="input input-bordered w-full text-base-content"
               placeholder="फोन नम्बर"
             />
+            {errors.phoneNumber && (
+              <label className="label">
+                <span className="label-text-alt text-error">
+                  {errors.phoneNumber.message}
+                </span>
+              </label>
+            )}
           </div>
 
           <div className="form-control">
@@ -356,7 +360,6 @@ export default function AddChild() {
               <Controller
                 name="birthDate"
                 control={control}
-                rules={{ required: true }}
                 render={({ field }) => (
                   <>
                     <NepaliDatePicker
@@ -364,20 +367,15 @@ export default function AddChild() {
                       inputClassName="input input-bordered w-full pr-12 text-base-content"
                       value={field.value || ''}
                       onChange={(value) => {
-                        console.log('Birth date changed:', value);
                         field.onChange(value);
                       }}
                       language="ne"
-                      // Setting theme to light to match DaisyUI's light mode
                       theme="light"
                     />
                     {field.value && (
                       <button
                         type="button"
                         onClick={() => {
-                          console.log(
-                            'Clear button clicked, resetting birthDate',
-                          );
                           setValue('birthDate', '');
                         }}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 text-lg text-error hover:text-error-focus hover:bg-error/10 rounded-full focus:outline-none cursor-pointer"
@@ -393,7 +391,7 @@ export default function AddChild() {
             {errors.birthDate && (
               <label className="label">
                 <span className="label-text-alt text-error">
-                  जन्म मिति आवश्यक छ
+                  {errors.birthDate.message}
                 </span>
               </label>
             )}
@@ -459,10 +457,6 @@ export default function AddChild() {
                                     inputClassName="input input-bordered w-full pr-12 text-base-content"
                                     value={field.value || ''}
                                     onChange={(value) => {
-                                      console.log(
-                                        `Vaccine ${vaccineName} dose ${idx + 1} changed:`,
-                                        value,
-                                      );
                                       field.onChange(value);
                                     }}
                                     language="ne"
@@ -487,7 +481,6 @@ export default function AddChild() {
                               ) : (
                                 <input
                                   type="text"
-                                  // Replaced custom bg-gray-200 with DaisyUI's theme-friendly bg-base-200
                                   className="input input-bordered w-full bg-base-200 cursor-not-allowed text-base-content"
                                   value={field.value || ''}
                                   disabled
@@ -501,7 +494,6 @@ export default function AddChild() {
                       </div>
                       {!isAccessible && (
                         <label className="label">
-                          {/* Replaced custom text-gray-700 with DaisyUI's text-base-content and added opacity for a softer look */}
                           <span className="label-text-alt text-base-content text-opacity-70">
                             यो खोपको लागि उमेर पुगेको छैन
                           </span>
@@ -532,9 +524,9 @@ export default function AddChild() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`btn flex-1 text-base font-semibold transition-all duration-300 ease-in-out
-            ${isSubmitting ? 'btn-disabled' : 'btn-primary'}
-            hover:-translate-y-0.5 hover:shadow-md active:translate-y-0`}
+            className={`btn flex-1 text-base font-semibold transition-all duration-300 ease-in-out 
+              ${isSubmitting ? 'btn-disabled' : 'btn-primary'} 
+              hover:-translate-y-0.5 hover:shadow-md active:translate-y-0`}
           >
             {isSubmitting ? 'सेभ हुँदैछ...' : 'सेभ गर्नुहोस्'}
           </button>
