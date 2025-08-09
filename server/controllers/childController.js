@@ -36,7 +36,6 @@ export const createChild = async (req, res) => {
   try {
     // 1. Validate the request body using Zod
     const validationResult = createChildSchema.safeParse(req.body);
-    console.log('validation result', validationResult);
 
     if (!validationResult.success) {
       // Return a 400 with detailed Zod errors

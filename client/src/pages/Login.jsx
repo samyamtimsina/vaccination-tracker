@@ -71,16 +71,6 @@ export default function Login() {
               {isSubmitting ? 'Logging in...' : 'Login'}
             </button>
           </form>
-
-          <p className="text-center mt-5 text-sm text-base-content text-opacity-80">
-            Don't have an account?{' '}
-            <Link
-              to="/register"
-              className="link link-hover link-primary font-medium"
-            >
-              Register here
-            </Link>
-          </p>
         </div>
       </div>
     </>

@@ -1,6 +1,5 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { Prisma } from '@prisma/client'; // Import Prisma to check for specific errors
 import { prisma } from '../utils/prisma.js';
 import { registerSchema, loginSchema } from '../schemas/userSchema.js';
 
@@ -121,9 +120,20 @@ export const login = async (req, res) => {
     });
   } catch (error) {
     console.error('Login failed:', error);
-    // Note: It's important to use 'error' instead of 'err' in the catch block for consistency.
     res
       .status(500)
       .json({ error: 'Login failed unexpectedly.', details: error.message });
   }
+};
+export const logout = (req, res) => {
+  // Clear the token cookie by setting its expiration to a past date
+  res.cookie('token', '', {
+    httpOnly: true,
+    expires: new Date(0), // Sets the expiration to the epoch (January 1, 1970)
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+  });
+
+  // Send a success response
+  res.status(200).json({ message: 'Logged out successfully' });
 };

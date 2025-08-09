@@ -20,7 +20,6 @@ export default function AddMother() {
 
   const onSubmit = async (data) => {
     try {
-      console.log(data);
       await axiosClient.post('/api/mothers', data);
       toast.success('आमा को विवरण सफलतापूर्वक थपियो');
       reset();

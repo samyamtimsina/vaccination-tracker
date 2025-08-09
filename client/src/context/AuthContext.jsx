@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
   async function logout() {
     try {
       // Tell the server to clear the httpOnly cookie.
-      await axios.post('/api/auth/logout');
+      await axiosClient.post('/api/auth/logout');
       setUser(null);
     } catch (error) {
       console.error('Logout failed:', error);
