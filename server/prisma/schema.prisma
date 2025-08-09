@@ -43,26 +43,28 @@ model Child {
   vaccinations    VaccinationRecord[]
   createdAt       DateTime            @default(now())
   NotificationLog NotificationLog[]
+  isFromOtherMunicipality Boolean @default(false)
 }
 
 model Mother {
-  id                   String    @id @default(uuid())
-  sewaDartaNumber      Int
-  name                 String
-  casteCode            Int
-  age                  Int
-  phoneNumber          String
-  tole                 String
-  wardNumber           Int
-  pregnancyCount       Int
-  previousTDTakenCount Int
-  tdDose1              DateTime?
-  tdDose2              DateTime?
-  tdDose2Plus          DateTime?
-  remarks              String?
-  createdAt            DateTime  @default(now())
-  createdById          Int
-  createdBy            User      @relation(fields: [createdById], references: [id])
+  id                      String    @id @default(uuid())
+  sewaDartaNumber         Int
+  name                    String
+  casteCode               Int
+  age                     Int
+  phoneNumber             String
+  tole                    String
+  wardNumber              Int
+  pregnancyCount          Int
+  previousTDTakenCount    Int
+  tdDose1                 DateTime?
+  tdDose2                 DateTime?
+  tdDose2Plus             DateTime?
+  remarks                 String?
+  createdAt               DateTime  @default(now())
+  createdById             Int
+  createdBy               User      @relation(fields: [createdById], references: [id])
+  isFromOtherMunicipality Boolean   @default(false)
 }
 
 model VaccinationRecord {

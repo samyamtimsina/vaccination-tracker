@@ -86,6 +86,7 @@ export default function AddChild() {
   } = useForm({
     resolver: zodResolver(createChildSchema),
     defaultValues: {
+      isFromOtherMunicipality: false, // Set default value for the new field
       birthDate: '',
       vaccines: Object.fromEntries(
         Object.entries(vaccineSchedule).map(([vaccineName, doses]) => [
@@ -110,7 +111,24 @@ export default function AddChild() {
 
   const onSubmit = async (data) => {
     try {
-      const res = await axiosClient.post('/api/child', data);
+      // You may need to handle the Nepali date conversion here before sending to the backend
+      const adBirthDate = data.birthDate
+        ? new NepaliDate(data.birthDate).toJsDate()
+        : null;
+      console.log('adBirthDate', adBirthDate);
+      const vaccinesGregorian = Object.fromEntries(
+        Object.entries(data.vaccines).map(([vaccineName, doses]) => [
+          vaccineName,
+          doses.map((date) => (date ? new NepaliDate(date).toJsDate() : null)),
+        ]),
+      );
+      const payload = {
+        ...data,
+        birthDate: adBirthDate,
+        vaccines: vaccinesGregorian,
+      };
+
+      const res = await axiosClient.post('/api/child', payload);
       toast.success('बालबालिका डेटा सफलतापूर्वक सेभ भयो!');
       reset();
     } catch (err) {
@@ -157,6 +175,32 @@ export default function AddChild() {
             <span>ड्यासबोर्डमा फर्कनुहोस्</span>
           </button>
         </div>
+
+        {/* --- New Field at the top --- */}
+        <section className="sm:col-span-1 lg:col-span-1 form-control">
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              {...register('isFromOtherMunicipality')}
+              id="isFromOtherMunicipality"
+              className="checkbox"
+            />
+            <label
+              htmlFor="isFromOtherMunicipality"
+              className="select-none text-base-content"
+            >
+              बाहिरको नगरपालिकाबाट आएको हो
+            </label>
+          </div>
+          {errors.isFromOtherMunicipality && (
+            <label className="label">
+              <span className="label-text-alt text-error">
+                {errors.isFromOtherMunicipality.message}
+              </span>
+            </label>
+          )}
+        </section>
+        {/* --- End of New Field --- */}
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="sm:col-span-1 lg:col-span-1 form-control">
@@ -417,7 +461,7 @@ export default function AddChild() {
 
         <section className="card p-5 space-y-6 bg-base-200 shadow-sm mt-6">
           <h3 className="text-xl font-semibold mb-4 text-center text-base-content">
-            खोपहरु
+            खोपहरू
           </h3>
 
           {vaccineEntries.map(([vaccineName, doses]) => (

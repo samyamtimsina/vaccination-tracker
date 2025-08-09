@@ -4,21 +4,39 @@ const numericString = z.coerce.number().refine((val) => val > 0, {
   message: 'Value must be a positive number',
 });
 
+// A new schema for dates that can handle both formats
+const dateSchema = z
+  .union([
+    z
+      .string()
+      .regex(
+        /^\d{4}-\d{2}-\d{2}$/,
+        'Invalid date format. Please use "YYYY-MM-DD"',
+      ),
+    z
+      .string()
+      .regex(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+        'Invalid ISO date format',
+      ),
+  ])
+  .transform((val) => {
+    // Take the first 10 characters to get the "YYYY-MM-DD" part
+    return val.substring(0, 10);
+  })
+  .or(z.date()); // Also allow Date objects
+
 export const createChildSchema = z.object({
   sewaDartaNumber: numericString,
   wardNumber: numericString,
   casteCode: numericString,
 
-  birthDate: z
-    .string()
-    .regex(
-      /^\d{4}-\d{2}-\d{2}$/,
-      'Invalid date format. Please use "YYYY-MM-DD"',
-    )
-    .transform((val) => new Date(val))
-    .refine((date) => !isNaN(date.getTime()), {
-      message: 'Invalid date',
-    }),
+  birthDate: dateSchema.pipe(
+    // You can add more refinements or transformations here if needed
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format after transformation'),
+  ),
 
   gender: z
     .string()
@@ -47,14 +65,7 @@ export const createChildSchema = z.object({
         'HPV',
       ]),
       z.array(
-        z
-          .string()
-          .regex(
-            /^\d{4}-\d{2}-\d{2}$/,
-            'Invalid date format. Please use "YYYY-MM-DD"',
-          )
-          .optional()
-          .nullable(),
+        z.union([dateSchema, z.string().nullable().optional()]).nullable(),
       ),
     )
     .optional()
