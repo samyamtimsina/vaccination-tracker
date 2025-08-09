@@ -3,13 +3,12 @@ import jwt from 'jsonwebtoken';
 //Middleware: check JWT
 export const authenticate = (req, res, next) => {
   const jwtSecret = process.env.JWT_SECRET;
-  const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader?.toLowerCase().startsWith('bearer')) {
-    return res.status(401).json({ error: 'No token provided' });
+  token = req.cookies.token;
+
+  if (!token) {
+    return res.status(401).json({ error: 'Authenication token not found' });
   }
-
-  const token = authHeader.split(' ')[1];
 
   try {
     const decoded = jwt.verify(token, jwtSecret);

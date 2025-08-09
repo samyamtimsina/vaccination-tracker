@@ -100,9 +100,16 @@ export const login = async (req, res) => {
       JWT_SECRET,
       { expiresIn: '7d' },
     );
+    //sending token in and htttpOnly cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
 
     res.status(200).json({
-      token,
       user: {
         id: user.id,
         name: user.name,
@@ -110,6 +117,7 @@ export const login = async (req, res) => {
         role: user.role,
         wardId: user.wardId,
       },
+      message: 'Login successful',
     });
   } catch (error) {
     console.error('Login failed:', error);

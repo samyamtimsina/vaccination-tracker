@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { authenticate, authorize } from './middlewares/auth.js';
 import authRoutes from './routes/authRoutes.js';
 import childRoutes from './routes/childRoutes.js';
+import cookieParser from 'cookie-parser';
 
 import motherRoutes from './routes/motherRoutes.js';
 // import './jobs/smsCronJob.js';
@@ -11,28 +12,31 @@ import motherRoutes from './routes/motherRoutes.js';
 dotenv.config();
 
 const app = express();
+
+// Configure CORS
+const corsOptions = {
+  origin: 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cookieParser());
+app.use(cors(corsOptions));
+
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
 app.use(express.json());
 
 //Routes
-app.use(authRoutes);
+app.use('/api/auth', authRoutes);
 
 //child routes
 app.use('/api/child', childRoutes);
 
 //mother routes
 app.use('/api/mothers', motherRoutes);
-
-app.get('/api/protected', authenticate, (req, res) => {
-  res.json({ message: `Hello, ${req.user.role}! You are authenticated.` });
-});
-
-app.get('/api/admin-only', authenticate, authorize('admin'), (req, res) => {
-  res.json({ message: 'Welcome Admin!' });
-});
 
 app.get('/', (req, res) => {
   res.send('Vaccination API running');

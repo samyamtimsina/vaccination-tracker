@@ -11,6 +11,7 @@ import './index.css'; // Assuming you have a global CSS file
 import AddChild from './pages/AddChild';
 import AddMother from './pages/AddMother';
 import ViewChildren from './pages/ViewChildren';
+import ViewMothers from './pages/ViewMothers.jsx';
 import Profile from './pages/Profile.jsx';
 
 function App() {
@@ -21,11 +22,46 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/add-child" element={<AddChild />} />
-          <Route path="/add-mother" element={<AddMother />} />
-          <Route path="/view-children" element={<ViewChildren />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route
+            path="/add-child"
+            element={
+              <ProtectedRoute>
+                <AddChild />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/add-mother"
+            element={
+              <ProtectedRoute>
+                <AddMother />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/view-children"
+            element={
+              <ProtectedRoute>
+                <ViewChildren />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/view-mothers"
+            element={
+              <ProtectedRoute>
+                <ViewMothers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/dashboard"
             element={

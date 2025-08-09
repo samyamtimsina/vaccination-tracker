@@ -145,13 +145,6 @@ export default function Navbar() {
                 <FaSignInAlt className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
                 <span>Login</span>
               </Link>
-              <Link
-                to="/register"
-                className="flex items-center space-x-2 py-2 px-4 border border-white text-white font-medium rounded-full hover:bg-white hover:text-blue-700 transition duration-200 group transform hover:scale-105"
-              >
-                <FaUserPlus className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                <span>Register</span>
-              </Link>
             </>
           ) : (
             <>

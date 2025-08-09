@@ -10,16 +10,18 @@ export default function Login() {
     handleSubmit,
     formState: { isSubmitting },
   } = useForm();
-  const navigate = useNavigate();
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const onSubmit = async (data) => {
     try {
-      const res = await axiosClient.post('/login', data);
-      login(res.data.user, res.data.token);
+      await axiosClient.post('/api/auth/login', data);
+      await login(data.email, data.password);
+
       toast.success('Login successful');
       navigate('/dashboard');
     } catch (err) {
+      console.error(err);
       toast.error(err?.response?.data?.message || 'Invalid credentials');
     }
   };

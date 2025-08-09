@@ -1,47 +1,63 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import axiosClient from '../api/axiosClient';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Load token and user from localStorage on mount
-  useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+  const checkAuthentication = async () => {
+    try {
+      const response = await axiosClient.get('/api/auth/me', {
+        withCredentials: true,
+      });
+      setUser(response.data.user); // The server should return the user's data
+    } catch (error) {
+      console.error('Authentication check failed:', error);
+      setUser(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  // Run the check when the component first mounts.
+  useEffect(() => {
+    checkAuthentication();
   }, []);
 
-  // Save/remove token and user to/from localStorage when changed
-  useEffect(() => {
-    if (token && user) {
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+  async function login(email, password) {
+    try {
+      setLoading(true);
+      const response = await axiosClient.post(
+        '/api/auth/login',
+        { email, password },
+        { withCredentials: true },
+      );
+      setUser(response.data.user);
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error; // Propagate the error for the component to handle
+    } finally {
+      setLoading(false);
     }
-  }, [token, user]);
-
-  function login(userData, token) {
-    setUser(userData);
-    setToken(token);
   }
 
-  function logout() {
-    setUser(null);
-    setToken(null);
+  // Logout function must now make an API call to clear the cookie.
+  async function logout() {
+    try {
+      // Tell the server to clear the httpOnly cookie.
+      await axios.post('/api/auth/logout');
+      setUser(null);
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider
+      value={{ user, login, logout, loading, isAuthenticated: !!user }}
+    >
       {children}
     </AuthContext.Provider>
   );
