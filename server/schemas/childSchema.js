@@ -30,6 +30,7 @@ export const createChildSchema = z.object({
   sewaDartaNumber: numericString,
   wardNumber: numericString,
   casteCode: numericString,
+  isFromOtherMunicipality: z.boolean().default(false),
 
   birthDate: dateSchema.pipe(
     // You can add more refinements or transformations here if needed

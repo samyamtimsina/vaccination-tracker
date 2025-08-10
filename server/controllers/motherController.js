@@ -4,7 +4,6 @@ import { createMotherSchema } from '../schemas/motherSchema.js'; // Import the n
 export const createMother = async (req, res) => {
   // Use Zod's safeParse to validate the request body
   const validationResult = createMotherSchema.safeParse(req.body);
-  console.log('validation result mother schema', validationResult);
 
   if (!validationResult.success) {
     return res.status(400).json({

@@ -34,10 +34,8 @@ function prepareVaccinationCreateData(vaccines) {
 
 export const createChild = async (req, res) => {
   try {
-    console.log(req.body, 'req.body');
     // 1. Validate the request body using Zod
     const validationResult = createChildSchema.safeParse(req.body);
-    console.log('validation result', validationResult);
 
     if (!validationResult.success) {
       // Return a 400 with detailed Zod errors
@@ -63,6 +61,7 @@ export const createChild = async (req, res) => {
       data: {
         sewaDartaNumber: parseInt(validatedData.sewaDartaNumber, 10),
         fullName: combinedFullName,
+        isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
         wardNumber: parseInt(validatedData.wardNumber, 10),
         parentName: validatedData.parentName || '',
         tole: validatedData.tole || '',

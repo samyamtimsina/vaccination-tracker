@@ -116,17 +116,11 @@ export default function AddChild() {
         ? new NepaliDate(data.birthDate).toJsDate()
         : null;
       console.log('adBirthDate', adBirthDate);
-      const vaccinesGregorian = Object.fromEntries(
-        Object.entries(data.vaccines).map(([vaccineName, doses]) => [
-          vaccineName,
-          doses.map((date) => (date ? new NepaliDate(date).toJsDate() : null)),
-        ]),
-      );
       const payload = {
         ...data,
         birthDate: adBirthDate,
-        vaccines: vaccinesGregorian,
       };
+      console.log('payload', payload);
 
       const res = await axiosClient.post('/api/child', payload);
       toast.success('बालबालिका डेटा सफलतापूर्वक सेभ भयो!');

@@ -12,7 +12,6 @@ if (!JWT_SECRET) {
 // Register a new user
 export const register = async (req, res) => {
   const validationResult = registerSchema.safeParse(req.body);
-  console.log(validationResult, 'validation result');
 
   if (!validationResult.success) {
     // Return detailed Zod validation errors
