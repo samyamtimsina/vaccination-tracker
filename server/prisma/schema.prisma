@@ -15,35 +15,37 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         String
-  wardId       Int?
-  Child        Child[]
-  Mother       Mother[]
+  id                Int                 @id @default(autoincrement())
+  name              String
+  email             String              @unique
+  passwordHash      String
+  role              String
+  wardId            Int?
+  Child             Child[]
+  Mother            Mother[]
+  VaccinationRecord VaccinationRecord[]
+AuditLogs    AuditLog[] 
 }
 
 model Child {
-  id              String              @id @default(uuid())
-  sewaDartaNumber Int
-  fullName        String // Combined full name (first + last)
-  wardNumber      Int
-  casteCode       Int
-  gender          String
-  parentName      String
-  tole            String
-  phoneNumber     String
-  birthDate       DateTime
-  purnaKhop       Boolean             @default(false)
-  remarks         String?
-  createdById     Int
-  createdBy       User                @relation(fields: [createdById], references: [id])
-  vaccinations    VaccinationRecord[]
-  createdAt       DateTime            @default(now())
-  NotificationLog NotificationLog[]
-  isFromOtherMunicipality Boolean @default(false)
+  id                      String              @id @default(uuid())
+  sewaDartaNumber         Int
+  fullName                String // Combined full name (first + last)
+  wardNumber              Int
+  casteCode               Int
+  gender                  String
+  parentName              String
+  tole                    String
+  phoneNumber             String
+  birthDate               DateTime
+  purnaKhop               Boolean             @default(false)
+  remarks                 String?
+  createdById             Int
+  createdBy               User                @relation(fields: [createdById], references: [id])
+  vaccinations            VaccinationRecord[]
+  createdAt               DateTime            @default(now())
+  NotificationLog         NotificationLog[]
+  isFromOtherMunicipality Boolean             @default(false)
 }
 
 model Mother {
@@ -78,6 +80,9 @@ model VaccinationRecord {
   recommendedAtMonths Int
   customVaccineName   String? // keep optional for "OTHERS" type
   child               Child       @relation(fields: [citizenId], references: [id])
+  createdById         Int
+  createdBy           User        @relation(fields: [createdById], references: [id])
+  createdAt           DateTime    @default(now())
 }
 
 enum VaccineType {
@@ -101,4 +106,32 @@ model NotificationLog {
   sentAt      DateTime    @default(now())
   type        String // "due" or "oneWeekBefore"
   child       Child       @relation(fields: [citizenId], references: [id])
+}
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  action    String   // 'create_child', 'create_vaccination', 'generate_certificate', 'correction_request', etc.
+  meta      Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model CorrectionRequest {
+  id              Int      @id @default(autoincrement())
+  vaccinationId   String
+  requestedById   Int
+  reason          String
+  status          String   @default("pending") // pending, approved, rejected
+  createdAt       DateTime @default(now())
+  processedById   Int?
+  processedAt     DateTime?
+}
+
+model Certificate {
+  id           Int      @id @default(autoincrement())
+  childId      String
+  issuedById   Int
+  issuedAt     DateTime @default(now())
+  token        String   @unique // UUID or secure token
+  pdfPath      String?  // optional if you store pdfs
 }

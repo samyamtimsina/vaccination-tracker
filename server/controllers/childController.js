@@ -38,7 +38,7 @@ function parseBsDateString(bsDateStr) {
 }
 
 // Updated function to prepare vaccination data with BS date conversion
-function prepareVaccinationCreateData(vaccines) {
+function prepareVaccinationCreateData(vaccines, user) {
   if (!vaccines) return [];
 
   return Object.entries(vaccines).flatMap(([vaccineName, doses]) => {
@@ -70,6 +70,11 @@ function prepareVaccinationCreateData(vaccines) {
           dateGiven: adDateGiven, // Use the converted AD date
           isComplete: true,
           recommendedAtMonths,
+          createdBy: {
+            connect: {
+              id: user.id,
+            },
+          },
         };
       })
       .filter(Boolean);
@@ -105,6 +110,7 @@ export const createChild = async (req, res) => {
     // 3. Prepare vaccination data (now handles BS dates)
     const vaccinationCreateData = prepareVaccinationCreateData(
       validatedData.vaccines,
+      req.user,
     );
 
     // 4. Create the child record in the database

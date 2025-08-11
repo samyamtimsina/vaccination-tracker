@@ -13,6 +13,8 @@ if (!JWT_SECRET) {
 export const register = async (req, res) => {
   const validationResult = registerSchema.safeParse(req.body);
 
+  console.log(validationResult);
+
   if (!validationResult.success) {
     // Return detailed Zod validation errors
     return res.status(400).json({
@@ -47,7 +49,7 @@ export const register = async (req, res) => {
   } catch (error) {
     // Handle specific Prisma unique constraint error for email
     if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error instanceof prisma.PrismaClientKnownRequestError &&
       error.code === 'P2002'
     ) {
       return res.status(409).json({ error: 'This email is already in use.' });
