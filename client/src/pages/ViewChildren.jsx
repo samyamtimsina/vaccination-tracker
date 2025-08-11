@@ -22,8 +22,9 @@ export default function AllChildren() {
   useEffect(() => {
     const fetchChildren = async () => {
       try {
-        const response = await axiosClient.get('/api/child');
-        console.log('Raw API response:', response.data);
+        const response = await axiosClient.get('/api/child/ward');
+        debugger; // Set a breakpoint here to inspect the response
+        console.log('Raw API response:', response);
         setChildren(response.data);
         setError(null);
       } catch (err) {

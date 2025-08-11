@@ -59,8 +59,6 @@ export function safeGregorianToNepali(dateInput) {
       return 'Invalid Date';
     }
 
-    console.log('Converting AD to BS:', { year, month, day });
-
     const nepali = ADToBS(year, month, day);
     const pad = (n) => n.toString().padStart(2, '0');
 

@@ -3,11 +3,13 @@ import {
   createChild,
   getAllChildren,
   getChild,
+  getWardChildren,
 } from '../controllers/childController.js';
 import { authenticate, authorize } from '../middlewares/auth.js';
 
 const router = express.Router();
 
+//get all children
 router.get(
   '/',
   authenticate,
@@ -15,6 +17,15 @@ router.get(
   getAllChildren,
 );
 
+// Get all children belonging to the authenticated ward officer's ward
+router.get(
+  '/ward',
+  authenticate,
+  authorize('admin', 'ward_officer'),
+  getWardChildren,
+);
+
+//get specific child by ID
 router.get('/:id', authenticate, authorize('admin', 'ward_officer'), getChild);
 
 // Route to create one or more new child records

@@ -115,7 +115,6 @@ export default function AddChild() {
         ...data,
       };
 
-      console.log('payload', payload);
       const res = await axiosClient.post('/api/child', payload);
       toast.success('बालबालिका डेटा सफलतापूर्वक सेभ भयो!');
       reset();

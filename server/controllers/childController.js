@@ -4,7 +4,40 @@ import { createChildSchema } from '../schemas/childSchema.js';
 import { toMonths, mapVaccineNameToEnum } from '../utils/helpers.js';
 import { bsToAd } from '@sbmdkl/nepali-date-converter';
 
-// Function to prepare vaccination data - extracted for clarity
+// Helper function to convert BS date string to JS Date object
+function parseBsDateString(bsDateStr) {
+  if (!bsDateStr) return null;
+  try {
+    // Expect bsDateStr in 'YYYY-MM-DD' format
+    const [yearStr, monthStr, dayStr] = bsDateStr.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const day = parseInt(dayStr, 10);
+
+    if (!year || !month || !day || isNaN(year) || isNaN(month) || isNaN(day)) {
+      throw new Error('Invalid date components');
+    }
+
+    // Convert BS to AD using bsToAd function
+    const formattedBsDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    const adDateStr = bsToAd(formattedBsDate);
+
+    // Convert the AD date string to a Date object
+    const adDate = new Date(adDateStr);
+
+    // Validate the resulting date
+    if (isNaN(adDate.getTime())) {
+      throw new Error('Invalid AD date generated');
+    }
+
+    return adDate;
+  } catch (error) {
+    console.error('Invalid BS date string:', bsDateStr, error);
+    return null;
+  }
+}
+
+// Updated function to prepare vaccination data with BS date conversion
 function prepareVaccinationCreateData(vaccines) {
   if (!vaccines) return [];
 
@@ -15,6 +48,16 @@ function prepareVaccinationCreateData(vaccines) {
     return doses
       .map((dateGiven, idx) => {
         if (!dateGiven) return null;
+
+        // Convert BS vaccination date to AD
+        const adDateGiven = parseBsDateString(dateGiven);
+        if (!adDateGiven) {
+          console.error(
+            `Invalid vaccination date for ${vaccineName} dose ${idx + 1}`,
+          );
+          return null;
+        }
+
         const doseNumber = idx + 1;
         const doseSchedule = schedule.find((d) => d.dose === doseNumber);
         const recommendedAtMonths = doseSchedule
@@ -24,7 +67,7 @@ function prepareVaccinationCreateData(vaccines) {
         return {
           vaccineType: vaccineTypeEnum,
           doseNumber,
-          dateGiven: new Date(dateGiven),
+          dateGiven: adDateGiven, // Use the converted AD date
           isComplete: true,
           recommendedAtMonths,
         };
@@ -37,7 +80,6 @@ export const createChild = async (req, res) => {
   try {
     // 1. Validate the request body using Zod
     const validationResult = createChildSchema.safeParse(req.body);
-    console.log('validation result', validationResult);
 
     if (!validationResult.success) {
       return res.status(400).json({
@@ -48,64 +90,19 @@ export const createChild = async (req, res) => {
 
     const validatedData = validationResult.data;
 
-    // Parse BS date string to AD Date object using @sbmdkl/nepali-date-converter
-    function parseBsDateString(bsDateStr) {
-      if (!bsDateStr) return null;
-      try {
-        // Expect bsDateStr in 'YYYY-MM-DD' format
-        const [yearStr, monthStr, dayStr] = bsDateStr.split('-');
-        const year = parseInt(yearStr, 10);
-        const month = parseInt(monthStr, 10); // 1-based (e.g., 4 = Shrawan)
-        const day = parseInt(dayStr, 10);
-
-        if (
-          !year ||
-          !month ||
-          !day ||
-          isNaN(year) ||
-          isNaN(month) ||
-          isNaN(day)
-        ) {
-          throw new Error('Invalid date components');
-        }
-
-        // Log input for debugging
-        console.log('BS date input:', { year, month, day });
-
-        // Convert BS to AD using bsToAd function
-        const formattedBsDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-        const adDateStr = bsToAd(formattedBsDate);
-
-        // Convert the AD date string to a Date object
-        const adDate = new Date(adDateStr);
-
-        // Validate the resulting date
-        if (isNaN(adDate.getTime())) {
-          throw new Error('Invalid AD date generated');
-        }
-
-        return adDate;
-      } catch (error) {
-        console.error('Invalid BS date string:', bsDateStr, error);
-        return null;
-      }
-    }
-
-    // Usage
-    const bsBirthDateStr = validatedData.birthDate; // e.g., '2082-04-01'
+    // Convert BS birth date to AD
+    const bsBirthDateStr = validatedData.birthDate;
     const adBirthDate = parseBsDateString(bsBirthDateStr);
 
     if (!adBirthDate) {
       return res.status(400).json({ error: 'Invalid BS birthDate string' });
     }
 
-    console.log('AD birthDate:', adBirthDate);
-
     // 2. Combine full name
     const combinedFullName =
       `${validatedData.fullName} ${validatedData.lastName || ''}`.trim();
 
-    // 3. Prepare vaccination data using the extracted helper function
+    // 3. Prepare vaccination data (now handles BS dates)
     const vaccinationCreateData = prepareVaccinationCreateData(
       validatedData.vaccines,
     );
@@ -114,6 +111,7 @@ export const createChild = async (req, res) => {
     const child = await prisma.child.create({
       data: {
         sewaDartaNumber: parseInt(validatedData.sewaDartaNumber, 10),
+        isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
         fullName: combinedFullName,
         wardNumber: parseInt(validatedData.wardNumber, 10),
         parentName: validatedData.parentName || '',
@@ -121,7 +119,7 @@ export const createChild = async (req, res) => {
         phoneNumber: validatedData.phoneNumber || '',
         gender: validatedData.gender,
         casteCode: parseInt(validatedData.casteCode, 10),
-        birthDate: adBirthDate, // Use the converted AD date
+        birthDate: adBirthDate,
         createdById: req.user.id,
         purnaKhop: validatedData.purnaKhop,
         remarks: validatedData.remarks || '',
@@ -143,6 +141,8 @@ export const createChild = async (req, res) => {
   }
 };
 
+// Rest of your controllers (getAllChildren, getChild) remain the same
+
 // Controller to get all children, including their vaccination records
 export const getAllChildren = async (req, res) => {
   try {
@@ -163,6 +163,35 @@ export const getAllChildren = async (req, res) => {
       error: 'Failed to retrieve children data',
       details: error.message,
     });
+  }
+};
+export const getWardChildren = async (req, res) => {
+  try {
+    // Check if the user is authenticated and has a wardId
+    if (!req.user || !req.user.wardId) {
+      return res
+        .status(401)
+        .json({ error: 'Unauthorized. User or wardId not found.' });
+    }
+
+    // Get the wardId from the authenticated user object
+    const { wardId } = req.user;
+    console.log('Ward ID from user:', wardId);
+
+    // Use the user's wardId in the Prisma query to filter the children
+    const children = await prisma.child.findMany({
+      where: {
+        wardNumber: wardId,
+      },
+    });
+
+    console.log(children, 'children');
+    // Send a successful response with the children data
+    return res.status(200).json(children);
+  } catch (error) {
+    // Handle any server-side errors
+    console.error(error); // Log the error for debugging purposes
+    return res.status(500).json({ error: 'Something went wrong.' });
   }
 };
 
