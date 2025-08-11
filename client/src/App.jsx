@@ -12,6 +12,7 @@ import ViewMothers from './pages/ViewMothers.jsx';
 import Profile from './pages/Profile.jsx';
 import Layout from './components/Layout.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
+import PrintCardWrapper from './components/printdata.jsx';
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route path="/print" element={<PrintCardWrapper />} />
               <Route
                 path="/dashboard"
                 element={

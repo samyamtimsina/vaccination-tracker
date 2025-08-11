@@ -153,7 +153,6 @@ export const getWardChildren = async (req, res) => {
 
     // Get the wardId from the authenticated user object
     const { wardId } = req.user;
-    console.log('Ward ID from user:', wardId);
 
     // Use the user's wardId in the Prisma query to filter the children
     const children = await prisma.child.findMany({

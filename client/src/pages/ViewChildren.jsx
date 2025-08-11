@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import axiosClient from '../api/axiosClient';
 import {
   FaSpinner,
@@ -41,7 +41,7 @@ export default function AllChildren() {
   useEffect(() => {
     const fetchChildren = async () => {
       try {
-        const response = await axiosClient.get('/api/child/ward');
+        const response = await axiosClient.get('/api/child');
         console.log('Raw API response:', response.data);
         setChildren(response.data);
         setError(null);
@@ -57,12 +57,14 @@ export default function AllChildren() {
     fetchChildren();
   }, []);
 
-  const filteredChildren = children.filter(
-    (child) =>
-      child.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (child.lastName &&
-        child.lastName.toLowerCase().includes(searchTerm.toLowerCase())),
-  );
+  const filteredChildren = useMemo(() => {
+    return children.filter(
+      (child) =>
+        child.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (child.lastName &&
+          child.lastName.toLowerCase().includes(searchTerm.toLowerCase())),
+    );
+  }, [children, searchTerm]);
 
   if (isLoading) {
     return (
@@ -172,7 +174,7 @@ export default function AllChildren() {
           <div className="max-w-7xl mx-auto px-4 py-3">
             <button
               onClick={() => setSelectedChild(null)}
-              className="inline-flex items-center space-x-2 text-primary hover:text-primary-focus transition-colors font-medium cursor-pointer"
+              className="inline-flex items-center space-x-2 text-primary hover:text-primary-focus transition-colors font-medium"
             >
               <FaChevronLeft className="text-sm" />
               <span>Back to All Children</span>
@@ -649,7 +651,7 @@ export default function AllChildren() {
               return (
                 <div
                   key={child.id}
-                  className="bg-base-100 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 border border-base-300 overflow-hidden group "
+                  className="bg-base-100 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 border border-base-300 overflow-hidden group cursor-pointer"
                   onClick={() => setSelectedChild(child)}
                 >
                   {/* Card Header */}
@@ -706,7 +708,7 @@ export default function AllChildren() {
                       </div>
                     </div>
 
-                    <button className="w-full bg-base-200 hover:bg-primary hover:text-primary-content text-base-content py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 group-hover:bg-primary group-hover:text-primary-content cursor-pointer">
+                    <button className="w-full bg-base-200 hover:bg-primary hover:text-primary-content text-base-content py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 group-hover:bg-primary group-hover:text-primary-content">
                       <FaEye />
                       <span>View Details</span>
                     </button>
