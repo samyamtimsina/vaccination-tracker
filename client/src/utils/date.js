@@ -220,3 +220,20 @@ export function nepaliToGregorianDate(nepaliDateString) {
     return null;
   }
 }
+export function safeFormatDateYYMMDD(isoString) {
+  try {
+    if (!isoString) return 'No Date';
+
+    const parsed = parseISOString(isoString);
+    if (!parsed) return 'Invalid Date';
+
+    const year = parsed.year.toString();
+    const month = parsed.month.toString().padStart(2, '0');
+    const day = parsed.day.toString().padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  } catch (err) {
+    console.error('Error in safeFormatDateYYMMDD:', err, 'Input:', isoString);
+    return 'Format Error';
+  }
+}

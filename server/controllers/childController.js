@@ -1,41 +1,11 @@
 import { prisma } from '../utils/prisma.js';
 import { vaccineSchedule } from '../utils/vaccineSchedule.js';
 import { createChildSchema } from '../schemas/childSchema.js';
-import { toMonths, mapVaccineNameToEnum } from '../utils/helpers.js';
-import { bsToAd } from '@sbmdkl/nepali-date-converter';
-
-// Helper function to convert BS date string to JS Date object
-function parseBsDateString(bsDateStr) {
-  if (!bsDateStr) return null;
-  try {
-    // Expect bsDateStr in 'YYYY-MM-DD' format
-    const [yearStr, monthStr, dayStr] = bsDateStr.split('-');
-    const year = parseInt(yearStr, 10);
-    const month = parseInt(monthStr, 10);
-    const day = parseInt(dayStr, 10);
-
-    if (!year || !month || !day || isNaN(year) || isNaN(month) || isNaN(day)) {
-      throw new Error('Invalid date components');
-    }
-
-    // Convert BS to AD using bsToAd function
-    const formattedBsDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-    const adDateStr = bsToAd(formattedBsDate);
-
-    // Convert the AD date string to a Date object
-    const adDate = new Date(adDateStr);
-
-    // Validate the resulting date
-    if (isNaN(adDate.getTime())) {
-      throw new Error('Invalid AD date generated');
-    }
-
-    return adDate;
-  } catch (error) {
-    console.error('Invalid BS date string:', bsDateStr, error);
-    return null;
-  }
-}
+import {
+  toMonths,
+  mapVaccineNameToEnum,
+  parseBsDateString,
+} from '../utils/helpers.js';
 
 // Updated function to prepare vaccination data with BS date conversion
 function prepareVaccinationCreateData(vaccines, user) {
@@ -97,6 +67,7 @@ export const createChild = async (req, res) => {
 
     // Convert BS birth date to AD
     const bsBirthDateStr = validatedData.birthDate;
+    console.log(bsBirthDateStr, 'bsdate');
     const adBirthDate = parseBsDateString(bsBirthDateStr);
 
     if (!adBirthDate) {
@@ -189,9 +160,12 @@ export const getWardChildren = async (req, res) => {
       where: {
         wardNumber: wardId,
       },
+
+      include: {
+        vaccinations: true,
+      },
     });
 
-    console.log(children, 'children');
     // Send a successful response with the children data
     return res.status(200).json(children);
   } catch (error) {

@@ -24,15 +24,12 @@ export default function AddMother() {
       // Create a payload and convert Nepali dates to standard JavaScript Date objects
       const payload = {
         ...data,
-        tdDose1: data.dose1 ? new NepaliDate(data.dose1).toJsDate() : null,
-        tdDose2: data.dose2 ? new NepaliDate(data.dose2).toJsDate() : null,
-        tdDose2Plus: data.dose2Plus
-          ? new NepaliDate(data.dose2Plus).toJsDate()
-          : null,
       };
 
-      await axiosClient.post('/api/mothers', payload);
-      console.log(payload);
+      console.log('payload', payload);
+      const response = await axiosClient.post('/api/mothers', payload);
+
+      console.log('response', response);
       toast.success('आमा को विवरण सफलतापूर्वक थपियो');
       reset();
     } catch (err) {
@@ -273,12 +270,12 @@ export default function AddMother() {
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="form-control">
-              <label className="label" htmlFor="dose1">
+              <label className="label" htmlFor="tdDose1">
                 <span className="label-text">खुराक १</span>
               </label>
               <div className="relative flex items-center">
                 <Controller
-                  name="dose1"
+                  name="tdDose1"
                   control={control}
                   render={({ field }) => (
                     <>
@@ -294,7 +291,7 @@ export default function AddMother() {
                       {field.value && (
                         <button
                           type="button"
-                          onClick={() => setValue('dose1', '')}
+                          onClick={() => setValue('tdDose1', '')}
                           className="absolute right-3 top-1/2 flex h-6 w-6 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
                           title="मिति मेट्नुहोस्"
                         >
@@ -307,12 +304,12 @@ export default function AddMother() {
               </div>
             </div>
             <div className="form-control">
-              <label className="label" htmlFor="dose2">
+              <label className="label" htmlFor="tdDose2">
                 <span className="label-text">खुराक २</span>
               </label>
               <div className="relative flex items-center">
                 <Controller
-                  name="dose2"
+                  name="tdDose2"
                   control={control}
                   render={({ field }) => (
                     <>
@@ -327,7 +324,7 @@ export default function AddMother() {
                       {field.value && (
                         <button
                           type="button"
-                          onClick={() => setValue('dose2', '')}
+                          onClick={() => setValue('tdDose2', '')}
                           className="absolute right-3 top-1/2 flex h-6 w-6 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
                           title="मिति मेट्नुहोस्"
                         >
@@ -340,12 +337,12 @@ export default function AddMother() {
               </div>
             </div>
             <div className="form-control">
-              <label className="label" htmlFor="dose2Plus">
+              <label className="label" htmlFor="tdDose2Plus">
                 <span className="label-text">खुराक २+</span>
               </label>
               <div className="relative flex items-center">
                 <Controller
-                  name="dose2Plus"
+                  name="tdDose2Plus"
                   control={control}
                   render={({ field }) => (
                     <>
@@ -360,7 +357,7 @@ export default function AddMother() {
                       {field.value && (
                         <button
                           type="button"
-                          onClick={() => setValue('dose2Plus', '')}
+                          onClick={() => setValue('tdDose2Plus', '')}
                           className="absolute right-3 top-1/2 flex h-6 w-6 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
                           title="मिति मेट्नुहोस्"
                         >

@@ -18,10 +18,11 @@ import {
   FaGripVertical,
 } from 'react-icons/fa';
 
+import { useAuth } from '../context/AuthContext';
+
 // Placeholder contexts to make this example runnable.
 // In your actual app, these should be from your AuthContext and ThemeContext files.
 const AuthContext = createContext(null);
-const useAuth = () => useContext(AuthContext);
 const ThemeContext = createContext(null);
 const useTheme = () => useContext(ThemeContext);
 
@@ -62,10 +63,12 @@ const menuItems = [
 ];
 
 export default function SidebarNav() {
+  const { logout } = useAuth();
   const location = useLocation();
   // Using placeholder logout function for this example
-  const logout = () => {
-    console.log('User logged out');
+  const handleLogout = () => {
+    logout();
+    navigate('/', { replace: true });
   };
 
   const [sidebarWidth, setSidebarWidth] = useState(256);
@@ -152,7 +155,7 @@ export default function SidebarNav() {
                 : 'text-base-content/70 hover:bg-base-200 hover:text-base-content'
             }`;
 
-            const buttonClasses = `group flex items-center p-3 rounded-lg w-full ${
+            const buttonClasses = `group flex items-center p-3 rounded-lg w-full cursor-pointer ${
               showText ? 'gap-3' : 'justify-center'
             } bg-error text-error-content font-semibold hover:bg-error-focus`;
 
@@ -175,7 +178,11 @@ export default function SidebarNav() {
                 )}
               </Link>
             ) : (
-              <button key={label} onClick={logout} className={buttonClasses}>
+              <button
+                key={label}
+                onClick={handleLogout}
+                className={buttonClasses}
+              >
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-error-content/20">
                   <span className="text-sm">{icon}</span>
                 </div>

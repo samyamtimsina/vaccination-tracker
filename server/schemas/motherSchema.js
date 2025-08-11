@@ -1,8 +1,23 @@
 import { z } from 'zod';
 
+// Reusing the same numericString validation logic
 const numericString = z.coerce.number().refine((val) => val > 0, {
   message: 'Value must be a positive number',
 });
+
+// Reusing the same BS date schema for consistent validation
+const bsDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in "YYYY-MM-DD" BS format')
+  .refine(
+    (val) => {
+      const [year, month, day] = val.split('-').map(Number);
+      return year >= 2000 && month >= 1 && month <= 12 && day >= 1 && day <= 32;
+    },
+    {
+      message: 'Invalid BS date values',
+    },
+  );
 
 export const createMotherSchema = z.object({
   sewaDartaNumber: numericString.refine((val) => val > 0, {
@@ -24,19 +39,10 @@ export const createMotherSchema = z.object({
   pregnancyCount: numericString.optional(),
   previousTDTakenCount: numericString.optional(),
 
-  // Transform date string to Date object for optional fields
-  tdDose1: z
-    .string()
-    .transform((val) => new Date(val))
-    .optional(),
-  tdDose2: z
-    .string()
-    .transform((val) => new Date(val))
-    .optional(),
-  tdDose2Plus: z
-    .string()
-    .transform((val) => new Date(val))
-    .optional(),
+  // The date fields now use the same bsDateSchema for validation
+  tdDose1: bsDateSchema.optional().nullable(),
+  tdDose2: bsDateSchema.optional().nullable(),
+  tdDose2Plus: bsDateSchema.optional().nullable(),
 
   remarks: z.string().optional(),
 });
