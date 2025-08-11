@@ -1,7 +1,8 @@
 import { prisma } from '../utils/prisma.js';
 import { vaccineSchedule } from '../utils/vaccineSchedule.js';
-import { createChildSchema } from '../schemas/childSchema.js'; // Import the Zod schema
-import { toMonths, mapVaccineNameToEnum } from '../utils/helpers.js'; // We'll move these here
+import { createChildSchema } from '../schemas/childSchema.js';
+import { toMonths, mapVaccineNameToEnum } from '../utils/helpers.js';
+import { bsToAd } from '@sbmdkl/nepali-date-converter';
 
 // Function to prepare vaccination data - extracted for clarity
 function prepareVaccinationCreateData(vaccines) {
@@ -36,9 +37,9 @@ export const createChild = async (req, res) => {
   try {
     // 1. Validate the request body using Zod
     const validationResult = createChildSchema.safeParse(req.body);
+    console.log('validation result', validationResult);
 
     if (!validationResult.success) {
-      // Return a 400 with detailed Zod errors
       return res.status(400).json({
         error: 'Validation failed',
         details: validationResult.error.errors,
@@ -46,6 +47,59 @@ export const createChild = async (req, res) => {
     }
 
     const validatedData = validationResult.data;
+
+    // Parse BS date string to AD Date object using @sbmdkl/nepali-date-converter
+    function parseBsDateString(bsDateStr) {
+      if (!bsDateStr) return null;
+      try {
+        // Expect bsDateStr in 'YYYY-MM-DD' format
+        const [yearStr, monthStr, dayStr] = bsDateStr.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10); // 1-based (e.g., 4 = Shrawan)
+        const day = parseInt(dayStr, 10);
+
+        if (
+          !year ||
+          !month ||
+          !day ||
+          isNaN(year) ||
+          isNaN(month) ||
+          isNaN(day)
+        ) {
+          throw new Error('Invalid date components');
+        }
+
+        // Log input for debugging
+        console.log('BS date input:', { year, month, day });
+
+        // Convert BS to AD using bsToAd function
+        const formattedBsDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+        const adDateStr = bsToAd(formattedBsDate);
+
+        // Convert the AD date string to a Date object
+        const adDate = new Date(adDateStr);
+
+        // Validate the resulting date
+        if (isNaN(adDate.getTime())) {
+          throw new Error('Invalid AD date generated');
+        }
+
+        return adDate;
+      } catch (error) {
+        console.error('Invalid BS date string:', bsDateStr, error);
+        return null;
+      }
+    }
+
+    // Usage
+    const bsBirthDateStr = validatedData.birthDate; // e.g., '2082-04-01'
+    const adBirthDate = parseBsDateString(bsBirthDateStr);
+
+    if (!adBirthDate) {
+      return res.status(400).json({ error: 'Invalid BS birthDate string' });
+    }
+
+    console.log('AD birthDate:', adBirthDate);
 
     // 2. Combine full name
     const combinedFullName =
@@ -61,14 +115,13 @@ export const createChild = async (req, res) => {
       data: {
         sewaDartaNumber: parseInt(validatedData.sewaDartaNumber, 10),
         fullName: combinedFullName,
-        isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
         wardNumber: parseInt(validatedData.wardNumber, 10),
         parentName: validatedData.parentName || '',
         tole: validatedData.tole || '',
         phoneNumber: validatedData.phoneNumber || '',
         gender: validatedData.gender,
         casteCode: parseInt(validatedData.casteCode, 10),
-        birthDate: new Date(validatedData.birthDate),
+        birthDate: adBirthDate, // Use the converted AD date
         createdById: req.user.id,
         purnaKhop: validatedData.purnaKhop,
         remarks: validatedData.remarks || '',
@@ -83,18 +136,16 @@ export const createChild = async (req, res) => {
     res.status(201).json(child);
   } catch (error) {
     console.error('Child creation error:', error);
-    // You could also check for specific Prisma errors here
     res.status(500).json({
       error: 'Child creation failed',
       details: error.message,
     });
   }
 };
+
 // Controller to get all children, including their vaccination records
 export const getAllChildren = async (req, res) => {
   try {
-    // Find all children in the database
-    // The `include` option ensures that each child's vaccination history is also retrieved
     const children = await prisma.child.findMany({
       include: {
         vaccinations: true,
@@ -124,13 +175,12 @@ export const getChild = async (req, res) => {
       return res.status(400).json({ error: 'Child ID is required' });
     }
 
-    // Find a unique child record by ID
     const child = await prisma.child.findUnique({
       where: {
         id: id,
       },
       include: {
-        vaccinations: true, // This includes all vaccination records for the child
+        vaccinations: true,
       },
     });
 

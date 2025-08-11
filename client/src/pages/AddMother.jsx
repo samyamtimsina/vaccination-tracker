@@ -6,6 +6,7 @@ import { NepaliDatePicker } from 'nepali-datepicker-reactjs';
 import 'nepali-datepicker-reactjs/dist/index.css';
 import { FaArrowLeft } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import NepaliDate from 'nepali-date-converter'; // Import NepaliDate for conversion
 
 export default function AddMother() {
   const {
@@ -20,7 +21,18 @@ export default function AddMother() {
 
   const onSubmit = async (data) => {
     try {
-      await axiosClient.post('/api/mothers', data);
+      // Create a payload and convert Nepali dates to standard JavaScript Date objects
+      const payload = {
+        ...data,
+        tdDose1: data.dose1 ? new NepaliDate(data.dose1).toJsDate() : null,
+        tdDose2: data.dose2 ? new NepaliDate(data.dose2).toJsDate() : null,
+        tdDose2Plus: data.dose2Plus
+          ? new NepaliDate(data.dose2Plus).toJsDate()
+          : null,
+      };
+
+      await axiosClient.post('/api/mothers', payload);
+      console.log(payload);
       toast.success('आमा को विवरण सफलतापूर्वक थपियो');
       reset();
     } catch (err) {
@@ -244,7 +256,7 @@ export default function AddMother() {
                 className="input input-bordered w-full"
                 placeholder="यस अघि TD खोप लिएको पटक"
               />
-              {errors.previousTdTakenCount && (
+              {errors.previousTDTakenCount && (
                 <label className="label">
                   <span className="label-text-alt text-error">
                     TD खोपको पटक आवश्यक छ

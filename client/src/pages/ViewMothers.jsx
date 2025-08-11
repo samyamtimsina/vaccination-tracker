@@ -68,7 +68,7 @@ export default function AllChildren() {
     // Function to fetch data from the backend
     const fetchChildren = async () => {
       try {
-        const response = await axiosClient.get('/api/child');
+        const response = await axiosClient.get('/api/mothers');
         setChildren(response.data);
         setError(null);
       } catch (err) {

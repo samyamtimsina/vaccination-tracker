@@ -4,40 +4,25 @@ const numericString = z.coerce.number().refine((val) => val > 0, {
   message: 'Value must be a positive number',
 });
 
-// A new schema for dates that can handle both formats
-const dateSchema = z
-  .union([
-    z
-      .string()
-      .regex(
-        /^\d{4}-\d{2}-\d{2}$/,
-        'Invalid date format. Please use "YYYY-MM-DD"',
-      ),
-    z
-      .string()
-      .regex(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
-        'Invalid ISO date format',
-      ),
-  ])
-  .transform((val) => {
-    // Take the first 10 characters to get the "YYYY-MM-DD" part
-    return val.substring(0, 10);
-  })
-  .or(z.date()); // Also allow Date objects
+const bsDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in "YYYY-MM-DD" BS format')
+  .refine(
+    (val) => {
+      const [year, month, day] = val.split('-').map(Number);
+      return year >= 2000 && month >= 1 && month <= 12 && day >= 1 && day <= 32;
+    },
+    {
+      message: 'Invalid BS date values',
+    },
+  );
 
 export const createChildSchema = z.object({
+  birthDate: bsDateSchema,
   sewaDartaNumber: numericString,
   wardNumber: numericString,
   casteCode: numericString,
   isFromOtherMunicipality: z.boolean().default(false),
-
-  birthDate: dateSchema.pipe(
-    // You can add more refinements or transformations here if needed
-    z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format after transformation'),
-  ),
 
   gender: z
     .string()
@@ -65,9 +50,7 @@ export const createChildSchema = z.object({
         'TCV',
         'HPV',
       ]),
-      z.array(
-        z.union([dateSchema, z.string().nullable().optional()]).nullable(),
-      ),
+      z.array(bsDateSchema.nullable()), //
     )
     .optional()
     .transform((val) => {

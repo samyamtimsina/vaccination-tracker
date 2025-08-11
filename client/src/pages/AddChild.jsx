@@ -9,7 +9,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { FaArrowLeft } from 'react-icons/fa';
 import NepaliDate from 'nepali-date-converter';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { createChildSchema } from '../schemas/childSchema.js'; // Assuming schema file location
+import { createChildSchema } from '../schemas/childSchema.js';
 
 // Utility function to calculate age in days, weeks, and months from Nepali date
 function calculateAge(birthDate) {
@@ -86,7 +86,7 @@ export default function AddChild() {
   } = useForm({
     resolver: zodResolver(createChildSchema),
     defaultValues: {
-      isFromOtherMunicipality: false, // Set default value for the new field
+      isFromOtherMunicipality: false,
       birthDate: '',
       vaccines: Object.fromEntries(
         Object.entries(vaccineSchedule).map(([vaccineName, doses]) => [
@@ -111,17 +111,11 @@ export default function AddChild() {
 
   const onSubmit = async (data) => {
     try {
-      // You may need to handle the Nepali date conversion here before sending to the backend
-      const adBirthDate = data.birthDate
-        ? new NepaliDate(data.birthDate).toJsDate()
-        : null;
-      console.log('adBirthDate', adBirthDate);
       const payload = {
         ...data,
-        birthDate: adBirthDate,
       };
-      console.log('payload', payload);
 
+      console.log('payload', payload);
       const res = await axiosClient.post('/api/child', payload);
       toast.success('बालबालिका डेटा सफलतापूर्वक सेभ भयो!');
       reset();
@@ -170,7 +164,6 @@ export default function AddChild() {
           </button>
         </div>
 
-        {/* --- New Field at the top --- */}
         <section className="sm:col-span-1 lg:col-span-1 form-control">
           <div className="flex items-center space-x-2">
             <input
@@ -194,7 +187,6 @@ export default function AddChild() {
             </label>
           )}
         </section>
-        {/* --- End of New Field --- */}
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="sm:col-span-1 lg:col-span-1 form-control">

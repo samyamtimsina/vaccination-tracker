@@ -259,7 +259,7 @@ export default function Home() {
             isDark
               ? 'bg-gray-800/80 hover:bg-gray-700/80 border-gray-600/50'
               : 'bg-white/80 hover:bg-blue-50/80 border-blue-200/50'
-          } backdrop-blur-md border shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105`}
+          } backdrop-blur-md border shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 cursor-pointer`}
           aria-label="Toggle Theme"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>

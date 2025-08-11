@@ -21,13 +21,16 @@ const dateSchema = z
       invalid_type_error: 'मिति मिति प्रकारको हुनुपर्छ',
     }),
   ])
+
   .transform((val) => {
-    // Handle Date objects
     if (val instanceof Date) {
-      const nepDate = new NepaliDate(val);
+      // Get UTC date parts to avoid timezone shift
+      const year = val.getUTCFullYear();
+      const month = val.getUTCMonth(); // still 0-indexed
+      const day = val.getUTCDate();
+      const nepDate = new NepaliDate(year, month, day);
       return `${nepDate.getYear()}-${String(nepDate.getMonth() + 1).padStart(2, '0')}-${String(nepDate.getDate()).padStart(2, '0')}`;
     }
-    // Handle string dates
     return val;
   })
   .pipe(
