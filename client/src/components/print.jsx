@@ -1,73 +1,202 @@
-import React, { forwardRef } from 'react';
+import React from 'react';
+import { BsFillCheckSquareFill } from 'react-icons/bs';
 
-const VaccinationCard = forwardRef(({ data }, ref) => {
+// Helper function to get the date parts as an object
+const getFormattedNepaliDateParts = (dateString) => {
+  if (!dateString) return { day: '', month: '', year: '' };
+
+  const [year, month, day] = dateString.split('-');
+
+  const toNepaliNumerals = (numString) => {
+    const nepaliNumerals = {
+      0: '०',
+      1: '१',
+      2: '२',
+      3: '३',
+      4: '४',
+      5: '५',
+      6: '६',
+      7: '७',
+      8: '८',
+      9: '९',
+    };
+    return numString
+      .split('')
+      .map((digit) => nepaliNumerals[digit] || digit)
+      .join('');
+  };
+
+  const nepaliDay = toNepaliNumerals(day);
+  const nepaliMonth = toNepaliNumerals(month);
+  const nepaliYear = toNepaliNumerals(year);
+
+  return { day: nepaliDay, month: nepaliMonth, year: nepaliYear };
+};
+
+export default function VaccinationCardOverlay({ data }) {
+  // Log the received data for debugging
+  console.log('Rendering VaccinationCardOverlay with data:', data);
+
+  // Get the separate date parts
+  const birthDateParts = getFormattedNepaliDateParts(data.birthDate);
+
   return (
     <div
-      ref={ref}
-      className="w-[21cm] h-[15cm] border border-black p-4 font-sans text-[12px] flex flex-col justify-between"
+      className="relative print-page"
+      style={{
+        width: '16cm',
+        height: '21.5cm',
+        backgroundImage: "url('/assets/page1.jpg')",
+        backgroundSize: '100% 100%',
+        backgroundRepeat: 'no-repeat',
+        fontFamily: "'Noto Sans Devanagari', sans-serif",
+      }}
     >
-      {/* --- FRONT SIDE --- */}
-      <div className="flex justify-between items-start border-b border-black pb-2">
-        <img src="/images/gov-logo.png" alt="Gov Logo" className="w-14 h-14" />
-        <div className="text-center">
-          <h1 className="font-bold text-[14px]">
-            नवजात शिशु तथा बाल रोगको खोप कार्ड
-          </h1>
-          <p>नेपाल सरकार - स्वास्थ्य तथा जनसंख्या मन्त्रालय</p>
+      {/* Name */}
+      <div
+        style={{
+          color: 'black',
+          position: 'absolute',
+          top: '5.8cm',
+          left: '3.9cm',
+          fontSize: '20px',
+        }}
+      >
+        {data.fullName}
+      </div>
+
+      {/* Birth Date - Day */}
+      <div
+        style={{
+          color: 'black',
+          position: 'absolute',
+          top: '6.6cm',
+          left: '2.9cm', // Adjust this left position for the day
+          fontSize: '20px',
+        }}
+      >
+        {birthDateParts.day}
+      </div>
+
+      {/* Birth Date - Month */}
+      <div
+        style={{
+          color: 'black',
+          position: 'absolute',
+          top: '6.6cm',
+          left: '3.9cm', // Adjust this left position for the month
+          fontSize: '20px',
+        }}
+      >
+        {birthDateParts.month}
+      </div>
+
+      {/* Birth Date - Year */}
+      <div
+        style={{
+          color: 'black',
+          position: 'absolute',
+          top: '6.6cm',
+          left: '4.9cm', // Adjust this left position for the year
+          fontSize: '20px',
+        }}
+      >
+        {birthDateParts.year}
+      </div>
+      {/* Gender - Male Tick Mark */}
+      <div
+        style={{
+          color: 'black',
+          position: 'absolute',
+          top: '6.1cm', // Adjust these values to the correct vertical position
+          left: '13.3cm', // Adjust this value to the correct horizontal position for MALE
+          fontSize: '14px',
+          fontWeight: 'bold',
+        }}
+      >
+        {data.gender === 'MALE' ? <BsFillCheckSquareFill size="14" /> : ''}
+      </div>
+
+      {/* Gender - Female Tick Mark */}
+      <div
+        style={{
+          color: 'black',
+          position: 'absolute',
+          top: '6.1cm', // Adjust these values to the correct vertical position
+          left: '11.3cm', // Adjust this value to the correct horizontal position for FEMALE
+          fontSize: '14px',
+          fontWeight: 'bold',
+        }}
+      >
+        {data.gender === 'FEMALE' ? <BsFillCheckSquareFill size="16" /> : ''}
+      </div>
+
+      {/* Address (Tole, Ward Number) */}
+      <div
+        style={{
+          color: 'black',
+          position: 'absolute',
+          top: '3.5cm',
+          left: '3.4cm',
+          fontSize: '12px',
+        }}
+      >
+        {`${data.tole}`}
+      </div>
+
+      <div
+        style={{
+          color: 'black',
+          position: 'absolute',
+          top: '4.5cm',
+          left: '3.4cm',
+          fontSize: '12px',
+        }}
+      >
+        {`वडा नं. ${data.wardNumber}`}
+      </div>
+
+      {/* Parent Name */}
+      <div
+        style={{
+          color: 'black',
+          position: 'absolute',
+          top: '7.2cm',
+          left: '3.8cm',
+          fontSize: '12px',
+        }}
+      >
+        {data.parentName}
+      </div>
+
+      {/* Mobile Number */}
+      <div
+        style={{
+          color: 'black',
+          position: 'absolute',
+          top: '9.7cm',
+          left: '10.5cm',
+          fontSize: '20px',
+        }}
+      >
+        {data.phoneNumber}
+      </div>
+
+      {/* Vaccination List */}
+      {data.vaccinations.map((vaccine, index) => (
+        <div
+          key={vaccine.id}
+          style={{
+            color: 'black',
+            position: 'absolute',
+            top: `${10 + index * 0.5}cm`,
+            left: '1cm',
+            fontSize: '12px',
+          }}
+        >
+          {`${vaccine.vaccineType}: ${getFormattedNepaliDateParts(vaccine.dateGiven).day}/${getFormattedNepaliDateParts(vaccine.dateGiven).month}/${getFormattedNepaliDateParts(vaccine.dateGiven).year}`}
         </div>
-        <img src="/images/seal.png" alt="Seal" className="w-14 h-14" />
-      </div>
-
-      {/* Info Fields */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
-        <div>बच्चाको नाम: {data.fullName}</div>
-        <div>जन्म मिति: {data.birthDate}</div>
-        <div>लिङ्ग: {data.gender}</div>
-        <div>बुवाको नाम: {data.fatherName}</div>
-        <div>आमाको नाम: {data.motherName}</div>
-        <div>ठेगाना: {data.address}</div>
-        <div>वडा नं.: {data.wardNumber}</div>
-        <div>स्वास्थ्य संस्थाको नाम: {data.healthPost}</div>
-        <div>स्वास्थ्यकर्मीको नाम: {data.healthWorker}</div>
-        <div>कार्ड जारी मिति: {data.issueDate}</div>
-      </div>
-
-      {/* Small Notes */}
-      <div className="border border-black mt-2 p-1 text-[10px] leading-tight">
-        यो कार्ड सुरक्षित राख्नुहोस् र प्रत्येक खोप लगाउँदा स्वास्थ्यकर्मीलाई
-        देखाउनुहोस्।
-      </div>
-
-      {/* --- BACK SIDE --- */}
-      <div className="mt-4">
-        <h2 className="font-bold text-center mb-1">
-          खोप तालिका / Immunization Schedule
-        </h2>
-        <table className="w-full border border-black text-[10px]">
-          <thead>
-            <tr>
-              <th className="border border-black p-1">खोप</th>
-              <th className="border border-black p-1">खोप दिने उमेर</th>
-              <th className="border border-black p-1">मिति</th>
-              <th className="border border-black p-1">
-                स्वास्थ्यकर्मीको हस्ताक्षर
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.vaccinations.map((v, idx) => (
-              <tr key={idx}>
-                <td className="border border-black p-1">{v.name}</td>
-                <td className="border border-black p-1">{v.age}</td>
-                <td className="border border-black p-1">{v.date}</td>
-                <td className="border border-black p-1">{v.signedBy}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      ))}
     </div>
   );
-});
-
-export default VaccinationCard;
+}

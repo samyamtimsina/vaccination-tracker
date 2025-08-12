@@ -11,7 +11,7 @@ import {
   FaMapMarkerAlt,
   FaShieldAlt,
   FaSyringe,
-  FaCalendarAlt,
+  FaPrint,
   FaCheckCircle,
   FaTimesCircle,
   FaPlus,
@@ -30,6 +30,7 @@ import {
 } from '../utils/date.js';
 import { vaccineSchedule } from '../utils/vaccineSchedule.js';
 import { adToBs } from '@sbmdkl/nepali-date-converter';
+import VaccinationCardOverlay from '../components/print';
 
 export default function AllChildren() {
   const [children, setChildren] = useState([]);
@@ -37,6 +38,7 @@ export default function AllChildren() {
   const [error, setError] = useState(null);
   const [selectedChild, setSelectedChild] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showPrintComponent, setShowPrintComponent] = useState(false);
 
   useEffect(() => {
     const fetchChildren = async () => {
@@ -171,381 +173,398 @@ export default function AllChildren() {
       <div className="min-h-screen bg-base-200">
         {/* Compact Header */}
         <div className="bg-base-100 shadow-sm border-b border-base-300">
-          <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between">
             <button
               onClick={() => setSelectedChild(null)}
-              className="inline-flex items-center space-x-2 text-primary hover:text-primary-focus transition-colors font-medium"
+              className="inline-flex items-center space-x-2 text-primary hover:text-primary-focus transition-colors font-medium cursor-pointer"
             >
               <FaChevronLeft className="text-sm" />
               <span>Back to All Children</span>
             </button>
+
+            <button
+              onClick={() => setShowPrintComponent(!showPrintComponent)}
+              className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-content transition-all duration-200 hover:bg-primary-focus hover:shadow-lg cursor-pointer"
+            >
+              <FaPrint className="text-lg" />
+              <span>Print Record</span>
+            </button>
           </div>
         </div>
 
-        {/* Main Content - Two Column Layout */}
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-            {/* Left Column - Child Info (4 columns on xl screens) */}
-            <div className="xl:col-span-4 space-y-4">
-              {/* Child Header Card */}
-              <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden">
-                <div className="bg-gradient-to-r from-primary to-secondary text-white p-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="bg-white/20 p-2 rounded-lg">
-                      <FaBaby className="text-lg" />
-                    </div>
-                    <div className="flex-1">
-                      <h1 className="text-xl font-bold">
-                        {selectedChild.fullName} {selectedChild.lastName || ''}
-                      </h1>
-                      <p className="text-white/90 text-sm">
-                        {age.formatted} old
-                      </p>
-                      <div className="flex items-center space-x-3 mt-2 text-xs">
-                        <span className="flex items-center space-x-1">
-                          <FaMapMarkerAlt />
-                          <span>Ward {selectedChild.wardNumber}</span>
-                        </span>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            selectedChild.purnaKhop
-                              ? 'bg-success text-success-content'
-                              : 'bg-warning text-warning-content'
-                          }`}
-                        >
-                          {selectedChild.purnaKhop
-                            ? 'Fully Vaccinated'
-                            : 'Incomplete'}
-                        </span>
+        {/* This is the corrected block */}
+        {showPrintComponent ? (
+          <VaccinationCardOverlay
+            data={{
+              ...selectedChild,
+              birthDate: adToBs(safeFormatDateYYMMDD(selectedChild.birthDate)),
+              vaccinations: selectedChild.vaccinations.map((vaccine) => ({
+                ...vaccine,
+                dateGiven: adToBs(safeFormatDateYYMMDD(vaccine.dateGiven)),
+              })),
+            }}
+          />
+        ) : (
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+              {/* Left Column - Child Info (4 columns on xl screens) */}
+              <div className="xl:col-span-4 space-y-4">
+                {/* Child Header Card */}
+                <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden">
+                  <div className="bg-gradient-to-r from-primary to-secondary text-white p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="bg-white/20 p-2 rounded-lg">
+                        <FaBaby className="text-lg" />
+                      </div>
+                      <div className="flex-1">
+                        <h1 className="text-xl font-bold">
+                          {selectedChild.fullName}{' '}
+                          {selectedChild.lastName || ''}
+                        </h1>
+                        <p className="text-white/90 text-sm">
+                          {age.formatted} old
+                        </p>
+                        <div className="flex items-center space-x-3 mt-2 text-xs">
+                          <span className="flex items-center space-x-1">
+                            <FaMapMarkerAlt />
+                            <span>Ward {selectedChild.wardNumber}</span>
+                          </span>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              selectedChild.purnaKhop
+                                ? 'bg-success text-success-content'
+                                : 'bg-warning text-warning-content'
+                            }`}
+                          >
+                            {selectedChild.purnaKhop
+                              ? 'Fully Vaccinated'
+                              : 'Incomplete'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Personal Information */}
-              <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
-                <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
-                  <FaUser className="text-primary" />
-                  <span>Personal Information</span>
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                      <FaIdCard className="text-xs" />
-                      <span>Service Registration</span>
-                    </label>
-                    <p className="font-semibold text-base-content mt-1">
-                      #{selectedChild.sewaDartaNumber}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                      <FaVenusMars className="text-xs" />
-                      <span>Gender</span>
-                    </label>
-                    <p className="font-semibold text-base-content mt-1">
-                      {selectedChild.gender}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                      <FaUser className="text-xs" />
-                      <span>Parent Name</span>
-                    </label>
-                    <p className="font-semibold text-base-content mt-1">
-                      {selectedChild.parentName}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                      <FaHome className="text-xs" />
-                      <span>Tole</span>
-                    </label>
-                    <p className="font-semibold text-base-content mt-1">
-                      {selectedChild.tole}
-                    </p>
-                  </div>
-
-                  {selectedChild.phoneNumber && (
-                    <div>
-                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                        <FaPhone className="text-xs" />
-                        <span>Phone</span>
-                      </label>
-                      <p className="font-semibold text-base-content mt-1">
-                        {selectedChild.phoneNumber}
-                      </p>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                      <FaBuilding className="text-xs" />
-                      <span>Municipality</span>
-                    </label>
-                    <p className="font-semibold text-base-content mt-1">
-                      {selectedChild.isFromOtherMunicipality
-                        ? 'Other Municipality'
-                        : 'Local Municipality'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
-                      Caste Code
-                    </label>
-                    <p className="font-semibold text-base-content mt-1">
-                      {selectedChild.casteCode}
-                    </p>
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                      <FaBirthdayCake className="text-xs" />
-                      <span>Birth Date</span>
-                    </label>
-                    <div className="flex space-x-4 mt-1">
-                      <span className="font-semibold text-base-content">
-                        B.S:{' '}
-                        {adToBs(safeFormatDateYYMMDD(selectedChild.birthDate))}
-                      </span>
-                      <span className="font-semibold text-base-content">
-                        A.D: {safeFormatDate(selectedChild.birthDate)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Overall Vaccination Summary */}
-              <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
-                <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
-                  <FaShieldAlt className="text-primary" />
-                  <span>Vaccination Summary</span>
-                </h3>
-
-                {/* Progress Circle */}
-                <div className="flex items-center space-x-4 mb-4">
-                  <div className="relative w-16 h-16">
-                    <svg
-                      className="w-16 h-16 transform -rotate-90"
-                      viewBox="0 0 36 36"
-                    >
-                      <path
-                        className="text-base-300"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        fill="transparent"
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      />
-                      <path
-                        className={
-                          vaccinationStats.overallPercentage === 100
-                            ? 'text-success'
-                            : 'text-primary'
-                        }
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        strokeDasharray={`${vaccinationStats.overallPercentage}, 100`}
-                        strokeLinecap="round"
-                        fill="transparent"
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span
-                        className={`text-sm font-bold ${vaccinationStats.overallPercentage === 100 ? 'text-success' : 'text-primary'}`}
-                      >
-                        {vaccinationStats.overallPercentage}%
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex-1">
-                    <p className="text-sm text-base-content/70">
-                      Overall Progress
-                    </p>
-                    <p className="font-semibold text-base-content">
-                      {vaccinationStats.totalGiven} of{' '}
-                      {vaccinationStats.totalRequired} doses given
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 text-center text-sm">
-                  <div className="bg-success/10 rounded-lg p-2">
-                    <p className="text-xl font-bold text-success">
-                      {vaccinationStats.completeVaccines}
-                    </p>
-                    <p className="text-xs text-base-content/80">Complete</p>
-                  </div>
-                  <div className="bg-warning/10 rounded-lg p-2">
-                    <p className="text-xl font-bold text-warning">
-                      {vaccinationStats.inProgressVaccines}
-                    </p>
-                    <p className="text-xs text-base-content/80">Progress</p>
-                  </div>
-                  <div className="bg-base-300 rounded-lg p-2">
-                    <p className="text-xl font-bold text-base-content">
-                      {vaccinationStats.notStartedVaccines}
-                    </p>
-                    <p className="text-xs text-base-content/80">Pending</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Remarks */}
-              {selectedChild.remarks && (
+                {/* Personal Information */}
                 <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                   <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
-                    <FaStickyNote className="text-primary" />
-                    <span>Notes</span>
+                    <FaUser className="text-primary" />
+                    <span>Personal Information</span>
                   </h3>
-                  <div className="bg-warning/10 border border-warning/20 rounded-lg p-3">
-                    <p className="text-base-content text-sm leading-relaxed">
-                      {selectedChild.remarks}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right Column - Vaccination Records (8 columns on xl screens) */}
-            <div className="xl:col-span-8">
-              <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden">
-                <div className="bg-gradient-to-r from-success to-info text-white px-4 py-3">
-                  <div className="flex items-center justify-between">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div>
-                      <h2 className="text-lg font-bold flex items-center space-x-2">
-                        <FaSyringe />
-                        <span>Vaccination Records</span>
-                      </h2>
-                      <p className="text-white/90 text-xs mt-1">
-                        Detailed immunization tracking
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
+                        <FaIdCard className="text-xs" />
+                        <span>Service Registration</span>
+                      </label>
+                      <p className="font-semibold text-base-content mt-1">
+                        #{selectedChild.sewaDartaNumber}
                       </p>
                     </div>
-                    <div className="flex items-center space-x-4 text-xs">
-                      <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                        <span>Given</span>
+
+                    <div>
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
+                        <FaVenusMars className="text-xs" />
+                        <span>Gender</span>
+                      </label>
+                      <p className="font-semibold text-base-content mt-1">
+                        {selectedChild.gender}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
+                        <FaUser className="text-xs" />
+                        <span>Parent Name</span>
+                      </label>
+                      <p className="font-semibold text-base-content mt-1">
+                        {selectedChild.parentName}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
+                        <FaHome className="text-xs" />
+                        <span>Tole</span>
+                      </label>
+                      <p className="font-semibold text-base-content mt-1">
+                        {selectedChild.tole}
+                      </p>
+                    </div>
+
+                    {selectedChild.phoneNumber && (
+                      <div>
+                        <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
+                          <FaPhone className="text-xs" />
+                          <span>Phone</span>
+                        </label>
+                        <p className="font-semibold text-base-content mt-1">
+                          {selectedChild.phoneNumber}
+                        </p>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-white/40 rounded-full"></div>
-                        <span>Pending</span>
+                    )}
+
+                    <div>
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
+                        <FaBuilding className="text-xs" />
+                        <span>Municipality</span>
+                      </label>
+                      <p className="font-semibold text-base-content mt-1">
+                        {selectedChild.isFromOtherMunicipality
+                          ? 'Other Municipality'
+                          : 'Local Municipality'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
+                        Caste Code
+                      </label>
+                      <p className="font-semibold text-base-content mt-1">
+                        {selectedChild.casteCode}
+                      </p>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
+                        <FaBirthdayCake className="text-xs" />
+                        <span>Birth Date</span>
+                      </label>
+                      <div className="flex space-x-4 mt-1">
+                        <span className="font-semibold text-base-content">
+                          B.S:{' '}
+                          {adToBs(
+                            safeFormatDateYYMMDD(selectedChild.birthDate),
+                          )}
+                        </span>
+                        <span className="font-semibold text-base-content">
+                          A.D: {safeFormatDate(selectedChild.birthDate)}
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-4">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {Object.entries(vaccineSchedule).map(
-                      ([vaccineName, schedule]) => {
-                        const givenDoses = vaccinationMap[vaccineName] || [];
-                        const totalGiven = givenDoses.length;
-                        const totalRequired = schedule.length;
-                        const completionPercentage = Math.round(
-                          (totalGiven / totalRequired) * 100,
-                        );
+                {/* Overall Vaccination Summary */}
+                <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
+                  <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
+                    <FaShieldAlt className="text-primary" />
+                    <span>Vaccination Summary</span>
+                  </h3>
+                  <div className="flex items-center space-x-4 mb-4">
+                    <div className="relative w-16 h-16">
+                      <svg
+                        className="w-16 h-16 transform -rotate-90"
+                        viewBox="0 0 36 36"
+                      >
+                        <path
+                          className="text-base-300"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          fill="transparent"
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        />
+                        <path
+                          className={
+                            vaccinationStats.overallPercentage === 100
+                              ? 'text-success'
+                              : 'text-primary'
+                          }
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeDasharray={`${vaccinationStats.overallPercentage}, 100`}
+                          strokeLinecap="round"
+                          fill="transparent"
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span
+                          className={`text-sm font-bold ${vaccinationStats.overallPercentage === 100 ? 'text-success' : 'text-primary'}`}
+                        >
+                          {vaccinationStats.overallPercentage}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-base-content/70">
+                        Overall Progress
+                      </p>
+                      <p className="font-semibold text-base-content">
+                        {vaccinationStats.totalGiven} of{' '}
+                        {vaccinationStats.totalRequired} doses given
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 text-center text-sm">
+                    <div className="bg-success/10 rounded-lg p-2">
+                      <p className="text-xl font-bold text-success">
+                        {vaccinationStats.completeVaccines}
+                      </p>
+                      <p className="text-xs text-base-content/80">Complete</p>
+                    </div>
+                    <div className="bg-warning/10 rounded-lg p-2">
+                      <p className="text-xl font-bold text-warning">
+                        {vaccinationStats.inProgressVaccines}
+                      </p>
+                      <p className="text-xs text-base-content/80">Progress</p>
+                    </div>
+                    <div className="bg-base-300 rounded-lg p-2">
+                      <p className="text-xl font-bold text-base-content">
+                        {vaccinationStats.notStartedVaccines}
+                      </p>
+                      <p className="text-xs text-base-content/80">Pending</p>
+                    </div>
+                  </div>
+                </div>
 
-                        return (
-                          <div
-                            key={vaccineName}
-                            className="border border-base-300 rounded-lg p-3 bg-base-50"
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-bold text-base-content text-sm">
-                                {vaccineName}
-                              </h4>
-                              <div className="flex items-center space-x-2">
-                                <span
-                                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    totalGiven === totalRequired
-                                      ? 'bg-success/20 text-success'
-                                      : totalGiven > 0
-                                        ? 'bg-warning/20 text-warning'
-                                        : 'bg-base-300 text-base-content'
+                {/* Remarks */}
+                {selectedChild.remarks && (
+                  <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
+                    <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
+                      <FaStickyNote className="text-primary" />
+                      <span>Notes</span>
+                    </h3>
+                    <div className="bg-warning/10 border border-warning/20 rounded-lg p-3">
+                      <p className="text-base-content text-sm leading-relaxed">
+                        {selectedChild.remarks}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column - Vaccination Records (8 columns on xl screens) */}
+              <div className="xl:col-span-8">
+                <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden">
+                  <div className="bg-gradient-to-r from-success to-info text-white px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-bold flex items-center space-x-2">
+                          <FaSyringe />
+                          <span>Vaccination Records</span>
+                        </h2>
+                        <p className="text-white/90 text-xs mt-1">
+                          Detailed immunization tracking
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-4 text-xs">
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                          <span>Given</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-white/40 rounded-full"></div>
+                          <span>Pending</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      {Object.entries(vaccineSchedule).map(
+                        ([vaccineName, schedule]) => {
+                          const givenDoses = vaccinationMap[vaccineName] || [];
+                          const totalGiven = givenDoses.length;
+                          const totalRequired = schedule.length;
+                          const completionPercentage = Math.round(
+                            (totalGiven / totalRequired) * 100,
+                          );
+
+                          return (
+                            <div
+                              key={vaccineName}
+                              className="border border-base-300 rounded-lg p-3 bg-base-50"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-bold text-base-content text-sm">
+                                  {vaccineName}
+                                </h4>
+                                <div className="flex items-center space-x-2">
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      totalGiven === totalRequired
+                                        ? 'bg-success/20 text-success'
+                                        : totalGiven > 0
+                                          ? 'bg-warning/20 text-warning'
+                                          : 'bg-base-300 text-base-content'
+                                    }`}
+                                  >
+                                    {totalGiven}/{totalRequired}
+                                  </span>
+                                  <span className="text-xs font-medium text-base-content">
+                                    {completionPercentage}%
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="w-full bg-base-300 rounded-full h-1 mb-3">
+                                <div
+                                  className={`h-1 rounded-full transition-all ${
+                                    completionPercentage === 100
+                                      ? 'bg-success'
+                                      : 'bg-primary'
                                   }`}
-                                >
-                                  {totalGiven}/{totalRequired}
-                                </span>
-                                <span className="text-xs font-medium text-base-content">
-                                  {completionPercentage}%
-                                </span>
+                                  style={{ width: `${completionPercentage}%` }}
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                {schedule.map((scheduleItem, index) => {
+                                  const dose = givenDoses[index];
+                                  const isGiven = dose !== undefined;
+
+                                  return (
+                                    <div
+                                      key={index}
+                                      className="flex items-center justify-between text-xs py-1 px-2 bg-base-200 rounded"
+                                    >
+                                      <div className="flex items-center space-x-2">
+                                        <div
+                                          className={`w-1.5 h-1.5 rounded-full ${isGiven ? 'bg-success' : 'bg-base-content/30'}`}
+                                        />
+                                        <span className="font-medium">
+                                          Dose {scheduleItem.dose}
+                                        </span>
+                                        <span className="text-base-content/60 bg-base-300 px-1 py-0.5 rounded text-xs">
+                                          {getRecommendedAgeText(scheduleItem)}
+                                        </span>
+                                      </div>
+                                      <div className="text-right">
+                                        {isGiven ? (
+                                          <div>
+                                            <p className="font-medium text-base-content">
+                                              {adToBs(
+                                                safeFormatDateYYMMDD(dose.date),
+                                              )}
+                                            </p>
+                                            <p className="text-base-content/60">
+                                              {safeFormatDate(dose.date)}
+                                            </p>
+                                          </div>
+                                        ) : (
+                                          <span className="text-base-content/50 italic">
+                                            Pending
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
-
-                            {/* Progress Bar */}
-                            <div className="w-full bg-base-300 rounded-full h-1 mb-3">
-                              <div
-                                className={`h-1 rounded-full transition-all ${
-                                  completionPercentage === 100
-                                    ? 'bg-success'
-                                    : 'bg-primary'
-                                }`}
-                                style={{ width: `${completionPercentage}%` }}
-                              />
-                            </div>
-
-                            {/* Doses */}
-                            <div className="space-y-1">
-                              {schedule.map((scheduleItem, index) => {
-                                const dose = givenDoses[index];
-                                const isGiven = dose !== undefined;
-
-                                return (
-                                  <div
-                                    key={index}
-                                    className="flex items-center justify-between text-xs py-1 px-2 bg-base-200 rounded"
-                                  >
-                                    <div className="flex items-center space-x-2">
-                                      <div
-                                        className={`w-1.5 h-1.5 rounded-full ${isGiven ? 'bg-success' : 'bg-base-content/30'}`}
-                                      />
-                                      <span className="font-medium">
-                                        Dose {scheduleItem.dose}
-                                      </span>
-                                      <span className="text-base-content/60 bg-base-300 px-1 py-0.5 rounded text-xs">
-                                        {getRecommendedAgeText(scheduleItem)}
-                                      </span>
-                                    </div>
-                                    <div className="text-right">
-                                      {isGiven ? (
-                                        <div>
-                                          <p className="font-medium text-base-content">
-                                            {adToBs(
-                                              safeFormatDateYYMMDD(dose.date),
-                                            )}
-                                          </p>
-                                          <p className="text-base-content/60">
-                                            {safeFormatDate(dose.date)}
-                                          </p>
-                                        </div>
-                                      ) : (
-                                        <span className="text-base-content/50 italic">
-                                          Pending
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      },
-                    )}
+                          );
+                        },
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }
