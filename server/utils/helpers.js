@@ -9,6 +9,7 @@ export function toMonths({
     recommendedAtMonths + recommendedAtWeeks / 4.345 + recommendedAtDays / 30.44
   );
 }
+import { faker } from '@faker-js/faker';
 
 // Maps a vaccine name string to a standardized enum-like string
 export function mapVaccineNameToEnum(name) {
@@ -76,3 +77,17 @@ export function parseBsDateString(bsDateStr) {
     return null;
   }
 }
+export const generateRandomBsDate = () => {
+  // Generate a random AD date in the past 10 years to ensure a plausible birth date
+  const randomAdDate = faker.date.past({ years: 10 });
+  const year = randomAdDate.getFullYear();
+  const month = (randomAdDate.getMonth() + 1).toString().padStart(2, '0');
+  const day = randomAdDate.getDate().toString().padStart(2, '0');
+  const adDateString = `${year}-${month}-${day}`;
+
+  // Convert the valid AD date string to a BS date string
+  const bsDateString = adToBs(adDateString);
+
+  // Return the BS date string in 'YYYY-MM-DD' format
+  return bsDateString;
+};

@@ -13,17 +13,12 @@ import {
   FaSyringe,
   FaPrint,
   FaCheckCircle,
-  FaTimesCircle,
   FaPlus,
   FaSearch,
-  FaIdCard,
-  FaBuilding,
   FaStickyNote,
-  FaHome,
   FaVenusMars,
 } from 'react-icons/fa';
 import {
-  safeGregorianToNepali,
   safeCalculateAge,
   safeFormatDate,
   safeFormatDateYYMMDD,
@@ -39,16 +34,16 @@ export default function AllChildren() {
   const [selectedChild, setSelectedChild] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showPrintComponent, setShowPrintComponent] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     const fetchChildren = async () => {
       try {
         const response = await axiosClient.get('/api/child');
-        console.log('Raw API response:', response.data);
         setChildren(response.data);
         setError(null);
       } catch (err) {
-        console.error('Error fetching children:', err);
         setError(
           err.response?.data?.message || 'Could not load children data.',
         );
@@ -60,6 +55,9 @@ export default function AllChildren() {
   }, []);
 
   const filteredChildren = useMemo(() => {
+    if (!children) {
+      return [];
+    }
     return children.filter(
       (child) =>
         child.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -68,32 +66,20 @@ export default function AllChildren() {
     );
   }, [children, searchTerm]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-base-200">
-        <div className="text-center">
-          <FaSpinner className="animate-spin text-4xl text-primary mx-auto mb-3" />
-          <p className="text-base-content">Loading children records...</p>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const totalPages = Math.ceil(filteredChildren.length / itemsPerPage);
+    if (currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages));
+    }
+  }, [filteredChildren, currentPage, itemsPerPage]);
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-base-200">
-        <div className="bg-base-100 p-6 rounded-xl shadow-lg border border-error/20 max-w-md mx-4">
-          <div className="text-center">
-            <FaTimesCircle className="text-3xl text-error mx-auto mb-3" />
-            <h2 className="text-lg font-bold text-base-content mb-2">
-              Error Loading Data
-            </h2>
-            <p className="text-base-content text-sm">{error}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const currentChildren = useMemo(() => {
+    const indexOfLast = currentPage * itemsPerPage;
+    const indexOfFirst = indexOfLast - itemsPerPage;
+    return filteredChildren.slice(indexOfFirst, indexOfLast);
+  }, [filteredChildren, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredChildren.length / itemsPerPage);
 
   const getRecommendedAgeText = (scheduleItem) => {
     if (scheduleItem.recommendedAtDays !== undefined) {
@@ -110,10 +96,9 @@ export default function AllChildren() {
     return 'Unknown';
   };
 
-  const processVaccinationData = (child) => {
+  const getOverallVaccinationStats = (child) => {
     const givenVaccinations = child.vaccinations || [];
     const vaccinationMap = {};
-
     givenVaccinations.forEach((vacc) => {
       const vaccineType = vacc.vaccineType;
       if (!vaccinationMap[vaccineType]) {
@@ -131,10 +116,6 @@ export default function AllChildren() {
       );
     });
 
-    return { vaccinationMap };
-  };
-
-  const getOverallVaccinationStats = (vaccinationMap) => {
     let totalGiven = 0;
     let totalRequired = 0;
     let completeVaccines = 0;
@@ -161,17 +142,43 @@ export default function AllChildren() {
       inProgressVaccines,
       notStartedVaccines,
       overallPercentage: Math.round((totalGiven / totalRequired) * 100) || 0,
+      vaccinationMap,
     };
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-base-200">
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-4xl text-primary mx-auto mb-3" />
+          <p className="text-base-content">Loading children records...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-base-200">
+        <div className="bg-base-100 p-6 rounded-xl shadow-lg border border-error/20 max-w-md mx-4">
+          <div className="text-center">
+            <h2 className="text-lg font-bold text-base-content mb-2">
+              Error Loading Data
+            </h2>
+            <p className="text-base-content text-sm">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (selectedChild) {
     const age = safeCalculateAge(selectedChild.birthDate);
-    const { vaccinationMap } = processVaccinationData(selectedChild);
-    const vaccinationStats = getOverallVaccinationStats(vaccinationMap);
+    const vaccinationStats = getOverallVaccinationStats(selectedChild);
+    const { vaccinationMap } = vaccinationStats;
 
     return (
       <div className="min-h-screen bg-base-200">
-        {/* Compact Header */}
         <div className="bg-base-100 shadow-sm border-b border-base-300">
           <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between">
             <button
@@ -192,7 +199,6 @@ export default function AllChildren() {
           </div>
         </div>
 
-        {/* This is the corrected block */}
         {showPrintComponent ? (
           <VaccinationCardOverlay
             data={{
@@ -207,11 +213,9 @@ export default function AllChildren() {
         ) : (
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-              {/* Left Column - Child Info (4 columns on xl screens) */}
               <div className="xl:col-span-4 space-y-4">
-                {/* Child Header Card */}
                 <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden">
-                  <div className="bg-gradient-to-r from-primary to-secondary text-white p-4">
+                  <div className="bg-primary text-primary-content p-4">
                     <div className="flex items-center space-x-3">
                       <div className="bg-white/20 p-2 rounded-lg">
                         <FaBaby className="text-lg" />
@@ -221,7 +225,7 @@ export default function AllChildren() {
                           {selectedChild.fullName}{' '}
                           {selectedChild.lastName || ''}
                         </h1>
-                        <p className="text-white/90 text-sm">
+                        <p className="text-primary-content/90 text-sm">
                           {age.formatted} old
                         </p>
                         <div className="flex items-center space-x-3 mt-2 text-xs">
@@ -246,7 +250,6 @@ export default function AllChildren() {
                   </div>
                 </div>
 
-                {/* Personal Information */}
                 <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                   <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
                     <FaUser className="text-primary" />
@@ -254,9 +257,8 @@ export default function AllChildren() {
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div>
-                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                        <FaIdCard className="text-xs" />
-                        <span>Service Registration</span>
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
+                        Service Registration
                       </label>
                       <p className="font-semibold text-base-content mt-1">
                         #{selectedChild.sewaDartaNumber}
@@ -274,9 +276,8 @@ export default function AllChildren() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                        <FaUser className="text-xs" />
-                        <span>Parent Name</span>
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
+                        Parent Name
                       </label>
                       <p className="font-semibold text-base-content mt-1">
                         {selectedChild.parentName}
@@ -284,9 +285,8 @@ export default function AllChildren() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                        <FaHome className="text-xs" />
-                        <span>Tole</span>
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
+                        Tole
                       </label>
                       <p className="font-semibold text-base-content mt-1">
                         {selectedChild.tole}
@@ -295,9 +295,8 @@ export default function AllChildren() {
 
                     {selectedChild.phoneNumber && (
                       <div>
-                        <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                          <FaPhone className="text-xs" />
-                          <span>Phone</span>
+                        <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
+                          Phone
                         </label>
                         <p className="font-semibold text-base-content mt-1">
                           {selectedChild.phoneNumber}
@@ -306,9 +305,8 @@ export default function AllChildren() {
                     )}
 
                     <div>
-                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
-                        <FaBuilding className="text-xs" />
-                        <span>Municipality</span>
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
+                        Municipality
                       </label>
                       <p className="font-semibold text-base-content mt-1">
                         {selectedChild.isFromOtherMunicipality
@@ -346,7 +344,6 @@ export default function AllChildren() {
                   </div>
                 </div>
 
-                {/* Overall Vaccination Summary */}
                 <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                   <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
                     <FaShieldAlt className="text-primary" />
@@ -419,7 +416,6 @@ export default function AllChildren() {
                   </div>
                 </div>
 
-                {/* Remarks */}
                 {selectedChild.remarks && (
                   <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                     <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
@@ -435,17 +431,16 @@ export default function AllChildren() {
                 )}
               </div>
 
-              {/* Right Column - Vaccination Records (8 columns on xl screens) */}
               <div className="xl:col-span-8">
                 <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden">
-                  <div className="bg-gradient-to-r from-success to-info text-white px-4 py-3">
+                  <div className="bg-primary text-primary-content px-4 py-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-lg font-bold flex items-center space-x-2">
                           <FaSyringe />
                           <span>Vaccination Records</span>
                         </h2>
-                        <p className="text-white/90 text-xs mt-1">
+                        <p className="text-primary-content/90 text-xs mt-1">
                           Detailed immunization tracking
                         </p>
                       </div>
@@ -571,12 +566,11 @@ export default function AllChildren() {
 
   return (
     <div className="min-h-screen bg-base-200">
-      {/* Header */}
       <div className="bg-base-100 shadow-sm border-b border-base-300">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0">
             <div>
-              <h1 className="text-3xl font-bold text-base-content mb-1">
+              <h1 className="text-2xl font-bold text-base-content mb-1">
                 Children Health Records
               </h1>
               <p className="text-base-content/70 text-sm">
@@ -584,7 +578,7 @@ export default function AllChildren() {
                 records
               </p>
             </div>
-            <button className="inline-flex items-center space-x-2 bg-primary hover:bg-primary-focus text-primary-content px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-md hover:shadow-lg">
+            <button className="inline-flex items-center space-x-2 bg-primary hover:bg-primary-focus text-primary-content px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-sm hover:shadow-md">
               <FaPlus />
               <span>Add New Child</span>
             </button>
@@ -592,10 +586,8 @@ export default function AllChildren() {
         </div>
       </div>
 
-      {/* Search and Stats */}
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-          {/* Search */}
           <div className="lg:col-span-2">
             <div className="relative">
               <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-base-content/50" />
@@ -609,7 +601,6 @@ export default function AllChildren() {
             </div>
           </div>
 
-          {/* Quick Stats */}
           <div className="bg-base-100 rounded-lg p-4 shadow-sm border border-base-300">
             <div className="flex items-center space-x-3">
               <div className="bg-primary/10 p-2 rounded-lg">
@@ -639,9 +630,8 @@ export default function AllChildren() {
           </div>
         </div>
 
-        {/* Children Cards */}
         {filteredChildren.length === 0 ? (
-          <div className="bg-base-100 rounded-xl shadow-lg border border-base-300 p-8 text-center">
+          <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-8 text-center">
             <FaBaby className="text-4xl text-base-content/40 mx-auto mb-3" />
             <h2 className="text-xl font-bold text-base-content mb-2">
               {searchTerm
@@ -663,79 +653,97 @@ export default function AllChildren() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredChildren.map((child) => {
-              const age = safeCalculateAge(child.birthDate);
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {currentChildren.map((child) => {
+                const age = safeCalculateAge(child.birthDate);
 
-              return (
-                <div
-                  key={child.id}
-                  className="bg-base-100 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 border border-base-300 overflow-hidden group cursor-pointer"
-                  onClick={() => setSelectedChild(child)}
+                return (
+                  <div
+                    key={child.id}
+                    className="bg-base-100 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 border border-base-300 overflow-hidden group cursor-pointer"
+                    onClick={() => setSelectedChild(child)}
+                  >
+                    <div className="bg-base-200 border-b border-base-300 p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="bg-primary/10 p-2 rounded-lg">
+                          <FaBaby className="text-primary" />
+                        </div>
+                        <div
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            child.purnaKhop
+                              ? 'bg-success/20 text-success border border-success/30'
+                              : 'bg-warning/20 text-warning border border-warning/30'
+                          }`}
+                        >
+                          {child.purnaKhop ? 'Vaccinated' : 'Pending'}
+                        </div>
+                      </div>
+                      <h3 className="text-lg font-bold mb-1 text-base-content">
+                        {child.fullName} {child.lastName || ''}
+                      </h3>
+                      <p className="text-base-content/70 text-sm">
+                        {age.formatted}
+                      </p>
+                    </div>
+                    <div className="p-4">
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-base-content/70">
+                            Birth Date (B.S.)
+                          </span>
+                          <span className="font-medium text-base-content">
+                            {adToBs(safeFormatDateYYMMDD(child.birthDate))}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-base-content/70">
+                            Birth Date (A.D.)
+                          </span>
+                          <span className="font-medium text-base-content">
+                            {safeFormatDate(child.birthDate)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-base-content/70">Ward</span>
+                          <span className="font-medium text-base-content">
+                            {child.wardNumber}
+                          </span>
+                        </div>
+                      </div>
+                      <button className="w-full bg-base-200 hover:bg-primary hover:text-primary-content text-base-content py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 border border-base-300 group-hover:bg-primary group-hover:text-primary-content">
+                        <FaEye />
+                        <span>View Details</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center space-x-4 mt-6">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="btn btn-primary disabled:opacity-50"
                 >
-                  {/* Card Header */}
-                  <div className="bg-gradient-to-r from-primary to-secondary text-primary-content p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="bg-primary-content/20 p-2 rounded-lg">
-                        <FaBaby className="text-base" />
-                      </div>
-                      <div
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          child.purnaKhop
-                            ? 'bg-success text-success-content'
-                            : 'bg-warning text-warning-content'
-                        }`}
-                      >
-                        {child.purnaKhop ? 'Vaccinated' : 'Pending'}
-                      </div>
-                    </div>
-
-                    <h3 className="text-lg font-bold mb-1">
-                      {child.fullName} {child.lastName || ''}
-                    </h3>
-                    <p className="text-primary-content/90 text-sm">
-                      {age.formatted}
-                    </p>
-                  </div>
-
-                  {/* Card Content */}
-                  <div className="p-4">
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-base-content/70">
-                          Birth Date (B.S.)
-                        </span>
-                        <span className="font-medium text-base-content">
-                          {adToBs(safeFormatDateYYMMDD(child.birthDate))}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-base-content/70">
-                          Birth Date (A.D.)
-                        </span>
-                        <span className="font-medium text-base-content">
-                          {safeFormatDate(child.birthDate)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-base-content/70">Ward</span>
-                        <span className="font-medium text-base-content">
-                          {child.wardNumber}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button className="w-full bg-base-200 hover:bg-primary hover:text-primary-content text-base-content py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 group-hover:bg-primary group-hover:text-primary-content">
-                      <FaEye />
-                      <span>View Details</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  Previous
+                </button>
+                <span className="text-base-content">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="btn btn-primary disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
