@@ -26,45 +26,30 @@ import {
 import { vaccineSchedule } from '../utils/vaccineSchedule.js';
 import { adToBs } from '@sbmdkl/nepali-date-converter';
 import VaccinationCardOverlay from '../components/print';
+import { useChildContext } from '../context/ChildContext';
 
 export default function AllChildren() {
-  const [children, setChildren] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [selectedChild, setSelectedChild] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showPrintComponent, setShowPrintComponent] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
-
+  const { childrenData, error, loading, fetchChildren } = useChildContext();
   useEffect(() => {
-    const fetchChildren = async () => {
-      try {
-        const response = await axiosClient.get('/api/child');
-        setChildren(response.data);
-        setError(null);
-      } catch (err) {
-        setError(
-          err.response?.data?.message || 'Could not load children data.',
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchChildren();
-  }, []);
+  }, [fetchChildren]);
 
   const filteredChildren = useMemo(() => {
-    if (!children) {
+    if (!childrenData) {
       return [];
     }
-    return children.filter(
+    return childrenData.filter(
       (child) =>
         child.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (child.lastName &&
           child.lastName.toLowerCase().includes(searchTerm.toLowerCase())),
     );
-  }, [children, searchTerm]);
+  }, [childrenData, searchTerm]);
 
   useEffect(() => {
     const totalPages = Math.ceil(filteredChildren.length / itemsPerPage);
@@ -146,7 +131,7 @@ export default function AllChildren() {
     };
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-200">
         <div className="text-center">
@@ -608,7 +593,7 @@ export default function AllChildren() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-base-content">
-                  {children.length}
+                  {childrenData.length}
                 </p>
                 <p className="text-xs text-base-content/70">Total Children</p>
               </div>
@@ -622,7 +607,7 @@ export default function AllChildren() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-base-content">
-                  {children.filter((child) => child.purnaKhop).length}
+                  {childrenData.filter((child) => child.purnaKhop).length}
                 </p>
                 <p className="text-xs text-base-content/70">Fully Vaccinated</p>
               </div>

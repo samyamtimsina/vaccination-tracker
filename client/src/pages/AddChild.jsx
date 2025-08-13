@@ -116,6 +116,7 @@ export default function AddChild() {
       };
       console.log('payload', payload);
       const res = await axiosClient.post('/api/child', payload);
+      console.log('res', res);
       toast.success('बालबालिका डेटा सफलतापूर्वक सेभ भयो!');
       reset();
     } catch (err) {

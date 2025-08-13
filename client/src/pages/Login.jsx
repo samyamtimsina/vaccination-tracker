@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import axiosClient from '../api/axiosClient';
 import { useNavigate, Link } from 'react-router-dom';
@@ -12,13 +13,20 @@ export default function Login() {
     handleSubmit,
     formState: { isSubmitting },
   } = useForm();
-  const { login } = useAuth();
+  const { login, isAuthenticated, loading } = useAuth(); // Get isAuthenticated and loading
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
 
+  // This useEffect hook handles the redirect if the user is already logged in.
+  useEffect(() => {
+    // Only redirect once the authentication check is complete and the user is authenticated.
+    if (!loading && isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, loading, navigate]);
+
   const onSubmit = async (data) => {
     try {
-      await axiosClient.post('/api/auth/login', data);
       await login(data.email, data.password);
       toast.success('Login successful');
       navigate('/dashboard');

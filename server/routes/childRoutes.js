@@ -6,7 +6,7 @@ import {
   getAllChildren,
   getChild,
   getWardChildren,
-  generateMockData, // Import the new function
+  // generateMockData, // Import the new function
 } from '../controllers/childController.js';
 
 // Import the authentication and authorization middleware
@@ -37,11 +37,11 @@ router.get('/:id', authenticate, authorize('admin', 'ward_officer'), getChild);
 router.post('/', authenticate, authorize('admin', 'ward_officer'), createChild);
 
 // New dedicated route for generating mock data
-router.post(
-  '/generate-mock',
-  authenticate,
-  authorize('admin'),
-  generateMockData,
-);
+// router.post(
+//   '/generate-mock',
+//   authenticate,
+//   authorize('admin'),
+//   generateMockData,
+// );
 
 export default router;
