@@ -36,7 +36,7 @@ export const vaccineSchedule = {
     { dose: 2, recommendedAtMonths: 15 },
   ],
 
-  JE: [{ dose: 1, recommendedAtMonths: 15 }],
+  JE: [{ dose: 1, recommendedAtMonths: 12 }],
 
   TCV: [{ dose: 1, recommendedAtMonths: 15 }],
 

@@ -1,11 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import {
-  useState,
-  useEffect,
-  useCallback,
-  createContext,
-  useContext,
-} from 'react';
+import { useState, useEffect } from 'react';
 import {
   FaChild,
   FaSearch,
@@ -15,16 +9,12 @@ import {
   FaFemale,
   FaSignOutAlt,
   FaTachometerAlt,
-  FaGripVertical,
+  FaBars,
+  FaTimes,
+  FaChevronLeft,
+  FaChevronRight,
 } from 'react-icons/fa';
-
 import { useAuth } from '../context/AuthContext';
-
-// Placeholder contexts to make this example runnable.
-// In your actual app, these should be from your AuthContext and ThemeContext files.
-const AuthContext = createContext(null);
-const ThemeContext = createContext(null);
-const useTheme = () => useContext(ThemeContext);
 
 const menuItems = [
   {
@@ -65,176 +55,193 @@ const menuItems = [
 export default function SidebarNav() {
   const { logout } = useAuth();
   const location = useLocation();
-  // Using placeholder logout function for this example
+
+  const [isMobile, setIsMobile] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const SNAP_POINTS = { COLLAPSED: 72, EXPANDED: 256 };
+  const [sidebarWidth, setSidebarWidth] = useState(SNAP_POINTS.EXPANDED);
+
+  const showText = sidebarWidth > SNAP_POINTS.COLLAPSED;
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
   const handleLogout = () => {
     logout();
     navigate('/', { replace: true });
   };
 
-  const [sidebarWidth, setSidebarWidth] = useState(256);
-  const [isResizing, setIsResizing] = useState(false);
-
-  const SNAP_POINTS = {
-    COLLAPSED: 72,
-    EXPANDED: 256,
+  const toggleSidebar = () => {
+    setSidebarWidth((prev) =>
+      prev === SNAP_POINTS.EXPANDED
+        ? SNAP_POINTS.COLLAPSED
+        : SNAP_POINTS.EXPANDED,
+    );
   };
-  const EXPANDED_THRESHOLD = 160;
 
-  const stopResizing = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  const handleResize = useCallback(
-    (e) => {
-      const newWidth = Math.max(
-        SNAP_POINTS.COLLAPSED,
-        Math.min(e.clientX, 384),
-      );
-      setSidebarWidth(newWidth);
-    },
-    [SNAP_POINTS.COLLAPSED],
+  // Mobile menu toggle (consistent button style)
+  const MobileMenuToggle = () => (
+    <button
+      onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+      className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg shadow-lg bg-base-100 border border-base-300 hover:bg-base-200 transition-colors"
+      aria-label="Toggle menu"
+    >
+      {isMobileMenuOpen ? <FaTimes /> : <FaBars />}
+    </button>
   );
 
-  const startResizing = () => {
-    setIsResizing(true);
-  };
-
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleResize);
-      document.addEventListener('mouseup', stopResizing);
-    }
-    return () => {
-      document.removeEventListener('mousemove', handleResize);
-      document.removeEventListener('mouseup', stopResizing);
-    };
-  }, [isResizing, handleResize, stopResizing]);
-
-  useEffect(() => {
-    if (!isResizing) {
-      const snapTo =
-        sidebarWidth > (SNAP_POINTS.COLLAPSED + SNAP_POINTS.EXPANDED) / 2
-          ? SNAP_POINTS.EXPANDED
-          : SNAP_POINTS.COLLAPSED;
-      setSidebarWidth(snapTo);
-    }
-  }, [isResizing, sidebarWidth, SNAP_POINTS]);
-
-  const showText = sidebarWidth > EXPANDED_THRESHOLD;
-
-  return (
-    <aside
-      className={`min-h-screen flex flex-col relative bg-base-100 border-r border-base-300 ${
-        !isResizing && 'transition-all duration-300 ease-in-out'
-      }`}
-      style={{ width: `${sidebarWidth}px` }}
-    >
-      <div className="relative z-10 flex flex-col h-full p-4 overflow-x-hidden">
-        {/* Header */}
-        {showText && (
-          <div className="mb-8">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-content">
-                <FaTachometerAlt className="text-lg" />
-              </div>
-              <div>
-                <h2 className="font-bold text-base-content">Navigation</h2>
-                <p className="text-xs text-base-content/70">Vaccine System</p>
-              </div>
-            </div>
-          </div>
-        )}
-        <nav className="flex-1 space-y-2">
-          {menuItems.map(({ to, label, icon, type }) => {
-            const isActive = location.pathname === to;
-            const linkClasses = `group flex items-center p-3 rounded-lg w-full ${
-              showText ? 'gap-3' : 'justify-center'
-            } ${
-              isActive
-                ? 'bg-primary text-primary-content font-semibold'
-                : 'text-base-content/70 hover:bg-base-200 hover:text-base-content'
-            }`;
-
-            const buttonClasses = `group flex items-center p-3 rounded-lg w-full cursor-pointer ${
-              showText ? 'gap-3' : 'justify-center'
-            } bg-error text-error-content font-semibold hover:bg-error-focus`;
-
-            const iconContainerClasses = `w-8 h-8 rounded-lg flex items-center justify-center ${
-              isActive
-                ? 'bg-primary-content/20'
-                : 'bg-base-200 group-hover:bg-primary-focus/10 text-base-content/70'
-            }`;
-
-            return type === 'link' ? (
-              <Link key={label} to={to} className={linkClasses}>
-                <div className={iconContainerClasses}>
-                  <span className="text-sm">{icon}</span>
-                </div>
-                {showText && <span className="flex-1 text-sm">{label}</span>}
-                {!showText && (
-                  <div className="absolute left-full ml-3 px-3 py-2 bg-base-200 text-base-content text-sm rounded-lg shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20">
-                    {label}
-                  </div>
-                )}
-              </Link>
-            ) : (
-              <button
-                key={label}
-                onClick={handleLogout}
-                className={buttonClasses}
-              >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-error-content/20">
-                  <span className="text-sm">{icon}</span>
-                </div>
-                {showText && <span className="flex-1 text-sm">{label}</span>}
-                {!showText && (
-                  <div className="absolute left-full ml-3 px-3 py-2 bg-base-200 text-base-content text-sm rounded-lg shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20">
-                    {label}
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-        {/* Footer */}
-        {showText && (
-          <div className="mt-auto pt-6 border-t border-base-300">
-            <div className="text-center">
-              <p className="text-xs font-medium text-base-content/70">
-                Vaccine Tracking System
-              </p>
-              <p className="text-xs mt-1 text-base-content/50">Version 1.0.0</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Resize Handle */}
-      <div
-        className={`absolute top-0 right-0 w-1 h-full group cursor-col-resize ${
-          !isResizing && 'transition-all duration-200'
-        }`}
-        onMouseDown={startResizing}
-      >
+  const MobileSidebar = () => (
+    <>
+      {isMobileMenuOpen && (
         <div
-          className={`w-full h-full ${
-            isResizing ? 'bg-primary' : 'bg-base-300/50 group-hover:bg-primary'
-          } transition-all duration-200`}
-        ></div>
-        {/* Resize grip indicator */}
-        <div className="absolute top-1/2 right-1 transform -translate-y-1/2 translate-x-full opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <div className="bg-base-200 text-base-content p-1 rounded shadow-lg">
-            <FaGripVertical className="text-xs" />
-          </div>
-        </div>
-      </div>
-      {/* Resize overlay */}
-      {isResizing && (
-        <div
-          className="fixed inset-0 cursor-col-resize z-50"
-          onMouseUp={stopResizing}
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
+      <aside
+        className={`fixed top-0 left-0 h-full bg-base-100 border-r border-base-300 z-50 transform transition-transform duration-300 ease-in-out ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+        style={{ width: SNAP_POINTS.EXPANDED }}
+      >
+        <div className="flex flex-col h-full">
+          {/* Header with toggle button */}
+          <div className="flex items-center justify-between p-4 border-b border-base-300">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-content">
+                <FaTachometerAlt />
+              </div>
+              <span className="font-bold">Navigation</span>
+            </div>
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="p-2 rounded-lg hover:bg-base-200"
+            >
+              <FaTimes />
+            </button>
+          </div>
+
+          {/* Nav items */}
+          <nav className="flex-1 p-4 space-y-1">
+            {menuItems.map(({ to, label, icon, type }) => {
+              const isActive = location.pathname === to;
+              const baseClasses =
+                'flex items-center gap-3 p-3 rounded-lg transition-colors';
+              return type === 'link' ? (
+                <Link
+                  key={label}
+                  to={to}
+                  className={`${baseClasses} ${
+                    isActive
+                      ? 'bg-primary text-primary-content'
+                      : 'hover:bg-base-200 text-base-content/80'
+                  }`}
+                >
+                  <div className="w-8 h-8 flex items-center justify-center">
+                    {icon}
+                  </div>
+                  <span>{label}</span>
+                </Link>
+              ) : (
+                <button
+                  key={label}
+                  onClick={handleLogout}
+                  className={`${baseClasses} bg-error text-error-content hover:bg-error-focus w-full`}
+                >
+                  <div className="w-8 h-8 flex items-center justify-center">
+                    {icon}
+                  </div>
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      </aside>
+    </>
+  );
+
+  const DesktopSidebar = () => (
+    <aside
+      className="hidden md:flex flex-col bg-base-100 border-r border-base-300 transition-all duration-300 ease-in-out"
+      style={{ width: `${sidebarWidth}px` }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-base-300">
+        {showText && (
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-content">
+              <FaTachometerAlt />
+            </div>
+            <span className="font-bold">Navigation</span>
+          </div>
+        )}
+        <button
+          onClick={toggleSidebar}
+          className="p-2 rounded-lg hover:bg-base-200 transition-colors"
+        >
+          {showText ? <FaChevronLeft /> : <FaChevronRight />}
+        </button>
+      </div>
+
+      {/* Menu */}
+      <nav className="flex-1 p-2 space-y-1">
+        {menuItems.map(({ to, label, icon, type }) => {
+          const isActive = location.pathname === to;
+          const baseClasses = `flex items-center ${
+            showText ? 'gap-3 p-3' : 'justify-center p-3'
+          } rounded-lg transition-colors`;
+          return type === 'link' ? (
+            <Link
+              key={label}
+              to={to}
+              className={`${baseClasses} ${
+                isActive
+                  ? 'bg-primary text-primary-content'
+                  : 'hover:bg-base-200 text-base-content/80'
+              }`}
+            >
+              <div className="w-8 h-8 flex items-center justify-center">
+                {icon}
+              </div>
+              {showText && <span>{label}</span>}
+            </Link>
+          ) : (
+            <button
+              key={label}
+              onClick={handleLogout}
+              className={`${baseClasses} bg-error text-error-content hover:bg-error-focus w-full`}
+            >
+              <div className="w-8 h-8 flex items-center justify-center">
+                {icon}
+              </div>
+              {showText && <span>{label}</span>}
+            </button>
+          );
+        })}
+      </nav>
     </aside>
+  );
+
+  return (
+    <>
+      {isMobile ? (
+        <>
+          <MobileMenuToggle />
+          <MobileSidebar />
+        </>
+      ) : (
+        <DesktopSidebar />
+      )}
+    </>
   );
 }

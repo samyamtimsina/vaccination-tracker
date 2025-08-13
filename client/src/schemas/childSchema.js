@@ -10,7 +10,6 @@ const numericString = z.coerce
   });
 
 // A robust date schema that accepts either "YYYY-MM-DD" or the full ISO string
-// and then transforms it to "YYYY-MM-DD"
 const dateSchema = z
   .union([
     z.string({
@@ -21,15 +20,17 @@ const dateSchema = z
       invalid_type_error: 'मिति मिति प्रकारको हुनुपर्छ',
     }),
   ])
-
   .transform((val) => {
     if (val instanceof Date) {
       // Get UTC date parts to avoid timezone shift
       const year = val.getUTCFullYear();
-      const month = val.getUTCMonth(); // still 0-indexed
+      const month = val.getUTCMonth();
       const day = val.getUTCDate();
       const nepDate = new NepaliDate(year, month, day);
-      return `${nepDate.getYear()}-${String(nepDate.getMonth() + 1).padStart(2, '0')}-${String(nepDate.getDate()).padStart(2, '0')}`;
+      return `${nepDate.getYear()}-${String(nepDate.getMonth() + 1).padStart(
+        2,
+        '0',
+      )}-${String(nepDate.getDate()).padStart(2, '0')}`;
     }
     return val;
   })
@@ -69,12 +70,26 @@ const dateSchema = z
         },
       ),
   );
-// Schema for a single vaccine dose date
-const vaccineDateSchema = z
-  .union([dateSchema, z.string().length(0)]) // Allow empty string
-  .nullable()
-  .optional()
-  .transform((val) => (val === '' ? null : val));
+
+// New schema for a single vaccine dose with date and optional remarks
+const vaccineDoseSchema = z.object({
+  date: z
+    .union([dateSchema, z.string().length(0)])
+    .nullable()
+    .optional()
+    .transform((val) => (val === '' ? null : val)),
+  remarks: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => (val === '' ? null : val)),
+});
+
+// New schema for a single weight record
+const weightRecordSchema = z.object({
+  date: dateSchema,
+  weight: z.coerce.number().min(0.1, 'तौल ०.१ kg भन्दा बढी हुनुपर्छ'),
+});
 
 export const createChildSchema = z.object({
   sewaDartaNumber: numericString,
@@ -108,25 +123,11 @@ export const createChildSchema = z.object({
         'TCV',
         'HPV',
       ]),
-      z.array(vaccineDateSchema),
+      z.array(vaccineDoseSchema),
     )
-    .optional()
-    .transform((val) => {
-      // Ensure all vaccine keys are present with empty arrays if not provided
-      const defaultVaccines = {
-        BCG: [],
-        ROTA: [],
-        OPV: [],
-        fIPV: [],
-        PCV: [],
-        DPT_HepB_hib: [],
-        MR: [],
-        JE: [],
-        TCV: [],
-        HPV: [],
-      };
-      return { ...defaultVaccines, ...(val || {}) };
-    }),
+    .optional(),
+
+  weightRecords: z.array(weightRecordSchema),
 
   fullName: z.string().min(1, 'पुरा नाम आवश्यक छ'),
   parentName: z.string().min(1, 'अभिभावकको नाम आवश्यक छ'),

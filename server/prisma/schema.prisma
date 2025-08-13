@@ -24,12 +24,13 @@ model User {
   Child             Child[]
   Mother            Mother[]
   VaccinationRecord VaccinationRecord[]
-AuditLogs    AuditLog[] 
+  AuditLogs         AuditLog[]
+  weightRecords     WeightRecord[]
 }
 
 model Child {
   id                      String              @id @default(uuid())
-  sewaDartaNumber         Int
+sewaDartaNumber         Int                 @unique @default(autoincrement())
   fullName                String // Combined full name (first + last)
   wardNumber              Int
   casteCode               Int
@@ -50,7 +51,7 @@ model Child {
 
 model Mother {
   id                      String    @id @default(uuid())
-  sewaDartaNumber         Int
+sewaDartaNumber         Int                 @unique @default(autoincrement())
   name                    String
   casteCode               Int
   age                     Int
@@ -95,7 +96,7 @@ enum VaccineType {
   MR
   JE
   TCV
-  HPV // Added HPV based on your React doses
+  HPV
 }
 
 model NotificationLog {
@@ -107,31 +108,43 @@ model NotificationLog {
   type        String // "due" or "oneWeekBefore"
   child       Child       @relation(fields: [citizenId], references: [id])
 }
+
 model AuditLog {
   id        Int      @id @default(autoincrement())
   userId    Int
-  action    String   // 'create_child', 'create_vaccination', 'generate_certificate', 'correction_request', etc.
+  action    String // 'create_child', 'create_vaccination', 'generate_certificate', 'correction_request', etc.
   meta      Json?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
 }
 
 model CorrectionRequest {
-  id              Int      @id @default(autoincrement())
-  vaccinationId   String
-  requestedById   Int
-  reason          String
-  status          String   @default("pending") // pending, approved, rejected
-  createdAt       DateTime @default(now())
-  processedById   Int?
-  processedAt     DateTime?
+  id            Int       @id @default(autoincrement())
+  vaccinationId String
+  requestedById Int
+  reason        String
+  status        String    @default("pending") // pending, approved, rejected
+  createdAt     DateTime  @default(now())
+  processedById Int?
+  processedAt   DateTime?
 }
 
 model Certificate {
-  id           Int      @id @default(autoincrement())
-  childId      String
-  issuedById   Int
-  issuedAt     DateTime @default(now())
-  token        String   @unique // UUID or secure token
-  pdfPath      String?  // optional if you store pdfs
+  id         Int      @id @default(autoincrement())
+  childId    String
+  issuedById Int
+  issuedAt   DateTime @default(now())
+  token      String   @unique // UUID or secure token
+  pdfPath    String? // optional if you store pdfs
+}
+model WeightRecord {
+  id          String    @id @default(uuid())
+  date        String    
+  weight      Float
+  child       Child     @relation(fields: [childId], references: [id])
+  childId     String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdById Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }

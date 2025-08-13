@@ -8,6 +8,7 @@ import {
 } from '../utils/helpers.js';
 
 // Updated function to prepare vaccination data with BS date conversion
+// Prepare vaccination data from payload
 function prepareVaccinationCreateData(vaccines, user) {
   if (!vaccines) return [];
 
@@ -16,11 +17,10 @@ function prepareVaccinationCreateData(vaccines, user) {
     const schedule = vaccineSchedule[vaccineTypeEnum] || [];
 
     return doses
-      .map((dateGiven, idx) => {
-        if (!dateGiven) return null;
+      .map((doseObj, idx) => {
+        if (!doseObj?.date) return null;
 
-        // Convert BS vaccination date to AD
-        const adDateGiven = parseBsDateString(dateGiven);
+        const adDateGiven = parseBsDateString(doseObj.date);
         if (!adDateGiven) {
           console.error(
             `Invalid vaccination date for ${vaccineName} dose ${idx + 1}`,
@@ -37,14 +37,11 @@ function prepareVaccinationCreateData(vaccines, user) {
         return {
           vaccineType: vaccineTypeEnum,
           doseNumber,
-          dateGiven: adDateGiven, // Use the converted AD date
+          dateGiven: adDateGiven,
           isComplete: true,
           recommendedAtMonths,
-          createdBy: {
-            connect: {
-              id: user.id,
-            },
-          },
+          remarks: doseObj.remarks || null,
+          createdBy: { connect: { id: user.id } },
         };
       })
       .filter(Boolean);
@@ -53,38 +50,35 @@ function prepareVaccinationCreateData(vaccines, user) {
 
 export const createChild = async (req, res) => {
   try {
-    // 1. Validate the request body using Zod
+    // 1️⃣ Validate request body
     const validationResult = createChildSchema.safeParse(req.body);
 
+    console.log('validation result', validationResult);
     if (!validationResult.success) {
       return res.status(400).json({
         error: 'Validation failed',
         details: validationResult.error.errors,
       });
     }
-
     const validatedData = validationResult.data;
 
-    // Convert BS birth date to AD
-    const bsBirthDateStr = validatedData.birthDate;
-    console.log(bsBirthDateStr, 'bsdate');
-    const adBirthDate = parseBsDateString(bsBirthDateStr);
-
+    // 2️⃣ Convert BS birth date to AD
+    const adBirthDate = parseBsDateString(validatedData.birthDate);
     if (!adBirthDate) {
       return res.status(400).json({ error: 'Invalid BS birthDate string' });
     }
 
-    // 2. Combine full name
+    // 3️⃣ Combine full name
     const combinedFullName =
       `${validatedData.fullName} ${validatedData.lastName || ''}`.trim();
 
-    // 3. Prepare vaccination data (now handles BS dates)
+    // 4️⃣ Prepare vaccinations
     const vaccinationCreateData = prepareVaccinationCreateData(
       validatedData.vaccines,
       req.user,
     );
 
-    // 4. Create the child record in the database
+    // 5️⃣ Create child
     const child = await prisma.child.create({
       data: {
         sewaDartaNumber: parseInt(validatedData.sewaDartaNumber, 10),
@@ -98,16 +92,26 @@ export const createChild = async (req, res) => {
         casteCode: parseInt(validatedData.casteCode, 10),
         birthDate: adBirthDate,
         createdById: req.user.id,
-        purnaKhop: validatedData.purnaKhop,
+        purnaKhop: validatedData.purnaKhop || false,
         remarks: validatedData.remarks || '',
-        vaccinations: {
-          create: vaccinationCreateData,
-        },
+        vaccinations: { create: vaccinationCreateData },
       },
       include: { vaccinations: true },
     });
 
-    // 5. Send a successful response
+    // 6️⃣ Create weight records if any
+    if (validatedData.weightRecords?.length) {
+      const weightCreateData = validatedData.weightRecords.map((w) => ({
+        childId: child.id,
+        weight: w.weight,
+        measuredAt: parseBsDateString(w.date),
+        createdById: req.user.id,
+      }));
+
+      await prisma.weightRecord.createMany({ data: weightCreateData });
+    }
+
+    // 7️⃣ Send response
     res.status(201).json(child);
   } catch (error) {
     console.error('Child creation error:', error);

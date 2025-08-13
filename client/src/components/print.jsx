@@ -34,9 +34,6 @@ const getFormattedNepaliDateParts = (dateString) => {
 };
 
 export default function VaccinationCardOverlay({ data }) {
-  // Log the received data for debugging
-  console.log('Rendering VaccinationCardOverlay with data:', data);
-
   // Get the separate date parts
   const birthDateParts = getFormattedNepaliDateParts(data.birthDate);
 
