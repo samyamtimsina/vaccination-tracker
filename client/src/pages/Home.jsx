@@ -196,242 +196,134 @@ export default function Home() {
 
   return (
     <div
-      className={`min-h-screen relative overflow-hidden ${
-        isDark
-          ? 'bg-gradient-to-br from-gray-900 via-blue-900/20 to-purple-900/20'
-          : 'bg-gradient-to-br from-blue-50 via-white to-purple-50'
-      }`}
+      className={`min-h-screen relative overflow-hidden ${isDark
+          ? 'bg-gray-900'
+          : 'bg-gray-50'
+        }`}
     >
-      {/* Enhanced Animated Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Floating orbs */}
+      {/* Subtle Background */}
+      <div className="absolute inset-0 pointer-events-none">
         <div
-          className={`absolute top-20 left-10 w-72 h-72 ${
-            isDark ? 'bg-blue-500/10' : 'bg-blue-400/20'
-          } rounded-full blur-3xl animate-pulse`}
+          className={`absolute top-24 left-1/2 transform -translate-x-1/2 w-2/3 h-96 ${isDark ? 'bg-blue-900/10' : 'bg-blue-100'
+            } rounded-3xl blur-2xl`}
         ></div>
         <div
-          className={`absolute bottom-20 right-10 w-96 h-96 ${
-            isDark ? 'bg-purple-500/10' : 'bg-purple-400/20'
-          } rounded-full blur-3xl animate-pulse`}
-          style={{ animationDelay: '1s' }}
-        ></div>
-        <div
-          className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 ${
-            isDark ? 'bg-cyan-500/10' : 'bg-cyan-400/20'
-          } rounded-full blur-3xl animate-pulse`}
-          style={{ animationDelay: '0.5s' }}
-        ></div>
-
-        {/* Floating particles */}
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className={`absolute w-2 h-2 ${
-              isDark ? 'bg-white/10' : 'bg-blue-300/30'
-            } rounded-full animate-pulse`}
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${3 + Math.random() * 4}s`,
-            }}
-          />
-        ))}
-
-        {/* Grid pattern */}
-        <div
-          className="absolute inset-0 opacity-30"
+          className="absolute inset-0 opacity-10"
           style={{
-            backgroundImage: `radial-gradient(circle at 1px 1px, ${
-              isDark ? 'rgba(255,255,255,0.1)' : 'rgba(59,130,246,0.1)'
-            } 1px, transparent 0)`,
-            backgroundSize: '50px 50px',
+            backgroundImage: `linear-gradient(90deg, ${isDark ? '#1e293b' : '#e0e7ef'
+              } 1px, transparent 1px), linear-gradient(${isDark ? '#1e293b' : '#e0e7ef'
+              } 1px, transparent 1px)`,
+            backgroundSize: '40px 40px',
           }}
         ></div>
       </div>
 
-      {/* Enhanced Theme Toggle Button */}
+      {/* Theme Toggle Button */}
       <div className="fixed top-6 right-6 z-50">
         <button
           onClick={toggleTheme}
-          className={`relative group p-4 rounded-2xl ${
-            isDark
-              ? 'bg-gray-800/80 hover:bg-gray-700/80 border-gray-600/50'
-              : 'bg-white/80 hover:bg-blue-50/80 border-blue-200/50'
-          } backdrop-blur-md border shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 cursor-pointer`}
+          className={`p-3 rounded-xl border ${isDark
+              ? 'bg-gray-800 border-gray-700'
+              : 'bg-white border-gray-200'
+            } shadow hover:shadow-md transition`}
           aria-label="Toggle Theme"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           {theme === 'light' ? (
-            <FaMoon className="text-blue-600 w-5 h-5 relative z-10" />
+            <FaMoon className="text-blue-600 w-5 h-5" />
           ) : (
-            <FaSun className="text-yellow-400 w-5 h-5 relative z-10" />
+            <FaSun className="text-yellow-400 w-5 h-5" />
           )}
         </button>
       </div>
 
       <main className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-12">
-        <div className="max-w-7xl w-full">
-          {/* Enhanced Hero Section */}
+        <div className="max-w-5xl w-full mx-auto">
+          {/* Hero Section */}
           <div
-            className={`text-center mb-16 transition-all duration-1000 ${
-              isVisible
-                ? 'translate-y-0 opacity-100'
-                : 'translate-y-8 opacity-0'
-            }`}
+            className={`text-center mb-12 transition-all duration-700 ${isVisible ? 'opacity-100' : 'opacity-0'
+              }`}
           >
-            {/* Enhanced Logo */}
-            <div className="relative inline-flex items-center justify-center mb-8">
-              <div className="absolute inset-0 w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-3xl blur-xl opacity-50 animate-pulse"></div>
-              <div className="relative w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-2xl flex items-center justify-center group hover:scale-110 transition-transform duration-300">
-                <FaShieldAlt className="w-10 h-10 text-white group-hover:rotate-12 transition-transform duration-300" />
-                <div className="absolute -inset-2 bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
+            {/* Logo */}
+            <div className="inline-flex items-center justify-center mb-6">
+              <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                <FaShieldAlt className="w-8 h-8 text-white" />
               </div>
             </div>
-
-            {/* Enhanced Title */}
-            <div className="relative">
-              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black mb-6 tracking-tight leading-tight">
-                <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 bg-clip-text text-transparent drop-shadow-sm">
-                  खोप अनुगमन प्रणाली
-                </span>
-                <br />
-                <span
-                  className={`${
-                    isDark ? 'text-gray-100' : 'text-gray-800'
-                  } text-3xl sm:text-4xl lg:text-5xl font-bold`}
-                >
-                  मा स्वागत छ
-                </span>
-              </h1>
-
-              {/* Decorative elements */}
-              <div className="absolute -top-4 -right-4 w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full animate-bounce opacity-70"></div>
-              <div className="absolute -bottom-4 -left-4 w-6 h-6 bg-gradient-to-br from-pink-400 to-red-500 rounded-full animate-pulse opacity-70"></div>
-            </div>
-
-            {/* Enhanced Description */}
+            {/* Title */}
+            <h1 className={`text-4xl sm:text-5xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              खोप अनुगमन प्रणाली
+            </h1>
+            <h2 className={`text-xl font-medium mb-6 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+              मा स्वागत छ
+            </h2>
+            {/* Description */}
             <div
-              className={`relative max-w-4xl mx-auto mb-12 p-6 rounded-2xl ${
-                isDark
-                  ? 'bg-gray-800/30 border-gray-700/50'
-                  : 'bg-white/50 border-blue-200/30'
-              } backdrop-blur-sm border shadow-lg`}
+              className={`max-w-2xl mx-auto mb-8 p-4 rounded-xl border ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                } shadow`}
             >
-              <p
-                className={`text-lg sm:text-xl ${
-                  isDark ? 'text-gray-200' : 'text-gray-700'
-                } leading-relaxed`}
-              >
-                छोराछोरी र आमाहरूको खोप अभिलेख सजिलै व्यवस्थापन गर्नुहोस्।
+              <p className={`text-base ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                बालबालिका र आमाहरूको खोप अभिलेख सजिलै व्यवस्थापन गर्नुहोस्।
                 हाम्रो सहज र सुरक्षित प्लेटफर्मले तपाईंको स्वास्थ्य डेटा
                 व्यवस्थित र पहुँचयोग्य बनाउँछ।
               </p>
             </div>
-
-            {/* Enhanced CTA Button */}
-            <div className="flex justify-center mb-16">
-              <Link
-                to="/login"
-                className="group relative inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold text-lg rounded-2xl shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-2xl blur opacity-50 group-hover:opacity-75 transition-opacity duration-300"></div>
-                <FaShieldAlt className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300 relative z-10" />
-                <span className="relative z-10">सुरु गर्नुहोस्</span>
-                <FaArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300 relative z-10" />
-              </Link>
-            </div>
+            {/* CTA Button */}
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow transition"
+            >
+              <FaShieldAlt className="w-5 h-5" />
+              <span>सुरु गर्नुहोस्</span>
+              <FaArrowRight className="w-4 h-4" />
+            </Link>
           </div>
 
-          {/* Enhanced Features Grid */}
-          <div className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          {/* Features Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
             {features.map((feature, index) => (
               <div
                 key={index}
-                className={`group relative overflow-hidden rounded-3xl ${
-                  isDark
-                    ? 'bg-gray-800/40 hover:bg-gray-700/60 border-gray-600/30'
-                    : 'bg-white/60 hover:bg-white/80 border-blue-200/30'
-                } backdrop-blur-md p-8 border shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105 ${
-                  isVisible
-                    ? 'translate-y-0 opacity-100'
-                    : 'translate-y-8 opacity-0'
-                }`}
+                className={`rounded-xl border ${isDark
+                    ? 'bg-gray-800 border-gray-700'
+                    : 'bg-white border-gray-200'
+                  } shadow-sm hover:shadow-md transition p-6 flex flex-col items-center`}
                 style={{
                   minHeight: `${cardHeight}px`,
-                  transitionDelay: `${index * 100}ms`,
+                  transitionDelay: `${index * 80}ms`,
                 }}
               >
-                {/* Gradient overlay */}
-                <div
-                  className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}
-                ></div>
-
-                {/* Enhanced Icon */}
-                <div className="relative mb-6 flex justify-center">
-                  <div
-                    className={`relative w-16 h-16 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center text-white shadow-lg group-hover:shadow-xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-300`}
-                  >
-                    {feature.icon}
-                    <div
-                      className={`absolute -inset-1 bg-gradient-to-br ${feature.gradient} rounded-2xl blur opacity-50 group-hover:opacity-75 transition-opacity duration-300`}
-                    ></div>
-                  </div>
+                {/* Icon */}
+                <div className="mb-4 flex items-center justify-center w-12 h-12 rounded-lg bg-blue-600 text-white shadow">
+                  {feature.icon}
                 </div>
-
-                {/* Content */}
-                <div className="relative text-center">
-                  <h3
-                    className={`text-xl font-bold ${
-                      isDark ? 'text-white' : 'text-gray-800'
-                    } mb-4 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:${feature.gradient} group-hover:bg-clip-text transition-all duration-300`}
-                  >
-                    {feature.title}
-                  </h3>
-                  <p
-                    className={`${
-                      isDark ? 'text-gray-300' : 'text-gray-600'
-                    } leading-relaxed`}
-                  >
-                    {feature.description}
-                  </p>
-                </div>
-
-                {/* Decorative corner */}
-                <div
-                  className={`absolute top-4 right-4 w-2 h-2 rounded-full bg-gradient-to-br ${feature.gradient} opacity-50 group-hover:opacity-100 transition-opacity duration-300`}
-                ></div>
+                {/* Title */}
+                <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  {feature.title}
+                </h3>
+                {/* Description */}
+                <p className={`text-sm text-center ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                  {feature.description}
+                </p>
               </div>
             ))}
-
-            {/* Enhanced Resize Handle */}
+            {/* Resize Handle */}
             <div
-              className={`absolute bottom-0 left-0 w-full h-2 group cursor-row-resize ${
-                !isResizing && 'transition-all duration-200'
-              }`}
+              className="absolute bottom-0 left-0 w-full h-2 cursor-row-resize"
               onMouseDown={startResizing}
             >
               <div
-                className={`w-full h-full rounded-full ${
-                  isResizing
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg'
-                    : `${isDark ? 'bg-gray-600/50' : 'bg-gray-300/50'} group-hover:bg-gradient-to-r group-hover:from-blue-500 group-hover:to-purple-600 group-hover:shadow-lg`
-                } transition-all duration-200`}
+                className={`w-full h-full rounded-full ${isResizing
+                    ? 'bg-blue-600'
+                    : `${isDark ? 'bg-gray-700' : 'bg-gray-300'}`
+                  } transition`}
               ></div>
               <div className="absolute left-1/2 bottom-2 transform -translate-x-1/2 translate-y-full opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <div
-                  className={`${
-                    isDark ? 'bg-gray-700' : 'bg-gray-800'
-                  } text-white p-2 rounded-lg shadow-lg`}
-                >
+                <div className={`bg-gray-800 text-white p-2 rounded shadow`}>
                   <FaGripHorizontal className="text-xs" />
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Resize overlay */}
           {isResizing && (
             <div
               className="fixed inset-0 cursor-row-resize z-50"
@@ -439,141 +331,93 @@ export default function Home() {
             />
           )}
 
-          {/* Enhanced Stats Section */}
+          {/* Stats Section */}
           <div
-            className={`mt-20 text-center transition-all duration-1000 delay-500 ${
-              isVisible
-                ? 'translate-y-0 opacity-100'
-                : 'translate-y-8 opacity-0'
-            }`}
+            className={`mt-10 text-center transition-all duration-700 ${isVisible ? 'opacity-100' : 'opacity-0'
+              }`}
           >
             <div
-              className={`inline-flex flex-col lg:flex-row gap-6 p-8 rounded-3xl ${
-                isDark
-                  ? 'bg-gray-800/40 border-gray-600/30'
-                  : 'bg-white/60 border-blue-200/30'
-              } backdrop-blur-md border shadow-2xl`}
+              className={`inline-flex flex-col lg:flex-row gap-6 p-6 rounded-xl border ${isDark
+                  ? 'bg-gray-800 border-gray-700'
+                  : 'bg-white border-gray-200'
+                } shadow`}
             >
-              <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10">
-                <div
-                  className={`text-sm font-medium ${
-                    isDark ? 'text-gray-300' : 'text-gray-600'
-                  } mb-2`}
-                >
+              <div className="text-center p-4 rounded-lg bg-blue-50">
+                <div className="text-sm font-medium text-blue-700 mb-1">
                   कुल प्रयोगकर्ता
                 </div>
-                <div className="text-4xl font-black bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent mb-2">
+                <div className="text-2xl font-bold text-blue-600 mb-1">
                   10,000+
                 </div>
-                <div
-                  className={`text-xs ${
-                    isDark ? 'text-gray-400' : 'text-gray-500'
-                  } flex items-center justify-center gap-1`}
-                >
-                  <FaStar className="w-3 h-3 text-yellow-500" />
+                <div className="text-xs text-blue-500 flex items-center justify-center gap-1">
+                  <FaStar className="w-3 h-3" />
                   दैनिक वृद्धि
                 </div>
               </div>
-
-              <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10">
-                <div
-                  className={`text-sm font-medium ${
-                    isDark ? 'text-gray-300' : 'text-gray-600'
-                  } mb-2`}
-                >
+              <div className="text-center p-4 rounded-lg bg-purple-50">
+                <div className="text-sm font-medium text-purple-700 mb-1">
                   खोप रेकर्ड
                 </div>
-                <div className="text-4xl font-black bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent mb-2">
+                <div className="text-2xl font-bold text-purple-600 mb-1">
                   50,000+
                 </div>
-                <div
-                  className={`text-xs ${
-                    isDark ? 'text-gray-400' : 'text-gray-500'
-                  } flex items-center justify-center gap-1`}
-                >
-                  <FaShieldAlt className="w-3 h-3 text-green-500" />
+                <div className="text-xs text-purple-500 flex items-center justify-center gap-1">
+                  <FaShieldAlt className="w-3 h-3" />
                   सुरक्षित भण्डारण
                 </div>
               </div>
-
-              <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-green-500/10 to-teal-500/10">
-                <div
-                  className={`text-sm font-medium ${
-                    isDark ? 'text-gray-300' : 'text-gray-600'
-                  } mb-2`}
-                >
+              <div className="text-center p-4 rounded-lg bg-green-50">
+                <div className="text-sm font-medium text-green-700 mb-1">
                   सेवा उपलब्धता
                 </div>
-                <div className="text-4xl font-black bg-gradient-to-r from-green-500 to-teal-500 bg-clip-text text-transparent mb-2">
+                <div className="text-2xl font-bold text-green-600 mb-1">
                   99.9%
                 </div>
-                <div
-                  className={`text-xs ${
-                    isDark ? 'text-gray-400' : 'text-gray-500'
-                  } flex items-center justify-center gap-1`}
-                >
-                  <FaHeart className="w-3 h-3 text-red-500" />
+                <div className="text-xs text-green-500 flex items-center justify-center gap-1">
+                  <FaHeart className="w-3 h-3" />
                   २४/७ सेवा
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Enhanced CTA Section */}
+          {/* CTA Section */}
           <div
-            className={`mt-20 text-center transition-all duration-1000 delay-700 ${
-              isVisible
-                ? 'translate-y-0 opacity-100'
-                : 'translate-y-8 opacity-0'
-            }`}
+            className={`mt-12 text-center transition-all duration-700 ${isVisible ? 'opacity-100' : 'opacity-0'
+              }`}
           >
             <div
-              className={`relative p-12 rounded-3xl ${
-                isDark
-                  ? 'bg-gray-800/40 border-gray-600/30'
-                  : 'bg-white/60 border-blue-200/30'
-              } backdrop-blur-md border shadow-2xl overflow-hidden`}
+              className={`p-8 rounded-xl border ${isDark
+                  ? 'bg-gray-800 border-gray-700'
+                  : 'bg-white border-gray-200'
+                } shadow`}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-cyan-500/5"></div>
-              <div className="relative">
-                <h2
-                  className={`text-4xl font-black ${
-                    isDark ? 'text-white' : 'text-gray-800'
-                  } mb-6`}
+              <h2 className={`text-2xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                आजै सुरु गर्नुहोस्
+              </h2>
+              <p className={`text-base mb-6 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                तपाईंको परिवारको स्वास्थ्य रेकर्ड व्यवस्थापन गर्न र खोप
+                कार्यक्रम ट्र्याक गर्न आज नै सुरु गर्नुहोस्।
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow transition"
                 >
-                  आजै सुरु गर्नुहोस्
-                </h2>
-                <p
-                  className={`text-lg ${
-                    isDark ? 'text-gray-300' : 'text-gray-600'
-                  } mb-8 max-w-2xl mx-auto leading-relaxed`}
+                  <FaShieldAlt className="w-5 h-5" />
+                  <span>लगिन गर्नुहोस्</span>
+                  <FaArrowRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  to="/register"
+                  className={`inline-flex items-center gap-2 px-6 py-3 ${isDark
+                      ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600'
+                      : 'bg-white hover:bg-gray-100 text-gray-700 border-gray-300'
+                    } font-semibold rounded-xl border shadow transition`}
                 >
-                  तपाईंको परिवारको स्वास्थ्य रेकर्ड व्यवस्थापन गर्न र खोप
-                  कार्यक्रम ट्र्याक गर्न आज नै सुरु गर्नुहोस्।
-                </p>
-
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link
-                    to="/login"
-                    className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
-                  >
-                    <FaShieldAlt className="w-5 h-5" />
-                    <span>लगिन गर्नुहोस्</span>
-                    <FaArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                  </Link>
-
-                  <Link
-                    to="/register"
-                    className={`group relative inline-flex items-center justify-center gap-3 px-8 py-4 ${
-                      isDark
-                        ? 'bg-gray-700/50 hover:bg-gray-600/50 text-white border-gray-600'
-                        : 'bg-white/50 hover:bg-white/70 text-gray-700 border-gray-300'
-                    } font-bold rounded-2xl border backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300`}
-                  >
-                    <FaHeart className="w-5 h-5" />
-                    <span>दर्ता गर्नुहोस्</span>
-                  </Link>
-                </div>
+                  <FaHeart className="w-5 h-5" />
+                  <span>दर्ता गर्नुहोस्</span>
+                </Link>
               </div>
             </div>
           </div>
