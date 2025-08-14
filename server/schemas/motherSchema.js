@@ -20,9 +20,6 @@ const bsDateSchema = z
   );
 
 export const createMotherSchema = z.object({
-  sewaDartaNumber: numericString.refine((val) => val > 0, {
-    message: 'Sewa Darta Number is required',
-  }),
   fullName: z.string().min(1, 'Full name is required'),
   lastName: z.string().optional(),
   casteCode: numericString.refine((val) => val > 0, {

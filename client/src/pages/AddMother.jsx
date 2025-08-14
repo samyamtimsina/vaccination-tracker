@@ -66,18 +66,6 @@ export default function AddMother() {
             व्यक्तिगत जानकारी
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="sm:col-span-2 lg:col-span-3">
-              <label className="label" htmlFor="sewaDartaNumber">
-                <span className="label-text">सेवा दर्ता नम्बर</span>
-              </label>
-              <input
-                id="sewaDartaNumber"
-                type="number"
-                {...register('sewaDartaNumber')}
-                className="input input-bordered w-full"
-                placeholder="सेवा दर्ता नम्बर"
-              />
-            </div>
             <div className="form-control">
               <label className="label" htmlFor="fullName">
                 <span className="label-text">

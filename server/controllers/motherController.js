@@ -33,7 +33,6 @@ export const createMother = async (req, res) => {
 
     const mother = await prisma.mother.create({
       data: {
-        sewaDartaNumber: parseInt(validatedData.sewaDartaNumber, 10),
         phoneNumber: validatedData.phoneNumber,
 
         casteCode: parseInt(validatedData.casteCode, 10),

@@ -17,6 +17,10 @@ import {
   FaSearch,
   FaStickyNote,
   FaVenusMars,
+  FaWeight,
+  FaClock,
+  FaUserMd,
+  FaCalendarAlt,
 } from 'react-icons/fa';
 import {
   safeCalculateAge,
@@ -35,6 +39,7 @@ export default function AllChildren() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   const { childrenData, error, loading, fetchChildren } = useChildContext();
+
   useEffect(() => {
     fetchChildren();
     console.log('childrenData', childrenData);
@@ -91,8 +96,13 @@ export default function AllChildren() {
         vaccinationMap[vaccineType] = [];
       }
       vaccinationMap[vaccineType].push({
-        date: vacc.givenDate || vacc.dateGiven || vacc.createdAt,
+        date: vacc.dateGiven || vacc.givenDate || vacc.createdAt,
         dose: vacc.doseNumber || vaccinationMap[vaccineType].length + 1,
+        createdById: vacc.createdById,
+        createdAt: vacc.createdAt,
+        remarks: vacc.remarks,
+        isComplete: vacc.isComplete,
+        customVaccineName: vacc.customVaccineName,
       });
     });
 
@@ -176,7 +186,7 @@ export default function AllChildren() {
             </button>
 
             <button
-              onClick={() => setShowPrintComponent(!showPrintComponent)}
+              onClick={() => window.print()}
               className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-content transition-all duration-200 hover:bg-primary-focus hover:shadow-lg cursor-pointer"
             >
               <FaPrint className="text-lg" />
@@ -200,6 +210,7 @@ export default function AllChildren() {
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
               <div className="xl:col-span-4 space-y-4">
+                {/* Child Basic Info */}
                 <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden">
                   <div className="bg-primary text-primary-content p-4">
                     <div className="flex items-center space-x-3">
@@ -220,11 +231,10 @@ export default function AllChildren() {
                             <span>Ward {selectedChild.wardNumber}</span>
                           </span>
                           <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              selectedChild.purnaKhop
-                                ? 'bg-success text-success-content'
-                                : 'bg-warning text-warning-content'
-                            }`}
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${selectedChild.purnaKhop
+                              ? 'bg-success text-success-content'
+                              : 'bg-warning text-warning-content'
+                              }`}
                           >
                             {selectedChild.purnaKhop
                               ? 'Fully Vaccinated'
@@ -236,6 +246,7 @@ export default function AllChildren() {
                   </div>
                 </div>
 
+                {/* Personal Information */}
                 <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                   <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
                     <FaUser className="text-primary" />
@@ -327,9 +338,32 @@ export default function AllChildren() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Record Creation Info */}
+                    <div className="sm:col-span-2 pt-3 border-t border-base-300">
+                      <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
+                        <FaUserMd className="text-xs" />
+                        <span>Record Information</span>
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 text-xs">
+                        <div>
+                          <span className="text-base-content/70">Created by User:</span>
+                          <span className="font-semibold text-base-content ml-2">
+                            #{selectedChild.createdById}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-base-content/70">Created on:</span>
+                          <span className="font-semibold text-base-content ml-2">
+                            {safeFormatDate(selectedChild.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
+                {/* Vaccination Summary */}
                 <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                   <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
                     <FaShieldAlt className="text-primary" />
@@ -402,6 +436,51 @@ export default function AllChildren() {
                   </div>
                 </div>
 
+                {/* Weight Records */}
+                {selectedChild.weightRecords && selectedChild.weightRecords.length > 0 && (
+                  <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
+                    <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
+                      <FaWeight className="text-primary" />
+                      <span>Weight Tracking</span>
+                    </h3>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {selectedChild.weightRecords
+                        .sort((a, b) => new Date(b.date) - new Date(a.date))
+                        .map((record, index) => (
+                          <div key={record.id} className="bg-base-50 border border-base-200 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-lg font-bold text-primary">
+                                  {record.weight} kg
+                                </span>
+                                {index === 0 && (
+                                  <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
+                                    Latest
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-right text-xs text-base-content/70">
+                                <div>B.S: {adToBs(safeFormatDateYYMMDD(record.date))}</div>
+                                <div>A.D: {safeFormatDate(record.date)}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-base-content/60">
+                              <div className="flex items-center space-x-1">
+                                <FaUserMd />
+                                <span>Recorded by User #{record.createdById}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <FaClock />
+                                <span>{safeFormatDate(record.createdAt)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes/Remarks */}
                 {selectedChild.remarks && (
                   <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                     <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
@@ -417,6 +496,7 @@ export default function AllChildren() {
                 )}
               </div>
 
+              {/* Vaccination Records */}
               <div className="xl:col-span-8">
                 <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden">
                   <div className="bg-primary text-primary-content px-4 py-3">
@@ -427,7 +507,7 @@ export default function AllChildren() {
                           <span>Vaccination Records</span>
                         </h2>
                         <p className="text-primary-content/90 text-xs mt-1">
-                          Detailed immunization tracking
+                          Detailed immunization tracking with administration details
                         </p>
                       </div>
                       <div className="flex items-center space-x-4 text-xs">
@@ -465,13 +545,12 @@ export default function AllChildren() {
                                 </h4>
                                 <div className="flex items-center space-x-2">
                                   <span
-                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                      totalGiven === totalRequired
-                                        ? 'bg-success/20 text-success'
-                                        : totalGiven > 0
-                                          ? 'bg-warning/20 text-warning'
-                                          : 'bg-base-300 text-base-content'
-                                    }`}
+                                    className={`px-2 py-1 rounded-full text-xs font-medium ${totalGiven === totalRequired
+                                      ? 'bg-success/20 text-success'
+                                      : totalGiven > 0
+                                        ? 'bg-warning/20 text-warning'
+                                        : 'bg-base-300 text-base-content'
+                                      }`}
                                   >
                                     {totalGiven}/{totalRequired}
                                   </span>
@@ -483,16 +562,15 @@ export default function AllChildren() {
 
                               <div className="w-full bg-base-300 rounded-full h-1 mb-3">
                                 <div
-                                  className={`h-1 rounded-full transition-all ${
-                                    completionPercentage === 100
-                                      ? 'bg-success'
-                                      : 'bg-primary'
-                                  }`}
+                                  className={`h-1 rounded-full transition-all ${completionPercentage === 100
+                                    ? 'bg-success'
+                                    : 'bg-primary'
+                                    }`}
                                   style={{ width: `${completionPercentage}%` }}
                                 />
                               </div>
 
-                              <div className="space-y-1">
+                              <div className="space-y-2">
                                 {schedule.map((scheduleItem, index) => {
                                   const dose = givenDoses[index];
                                   const isGiven = dose !== undefined;
@@ -500,37 +578,66 @@ export default function AllChildren() {
                                   return (
                                     <div
                                       key={index}
-                                      className="flex items-center justify-between text-xs py-1 px-2 bg-base-200 rounded"
+                                      className="bg-base-200 rounded-lg p-3 space-y-2"
                                     >
-                                      <div className="flex items-center space-x-2">
-                                        <div
-                                          className={`w-1.5 h-1.5 rounded-full ${isGiven ? 'bg-success' : 'bg-base-content/30'}`}
-                                        />
-                                        <span className="font-medium">
-                                          Dose {scheduleItem.dose}
-                                        </span>
-                                        <span className="text-base-content/60 bg-base-300 px-1 py-0.5 rounded text-xs">
-                                          {getRecommendedAgeText(scheduleItem)}
-                                        </span>
-                                      </div>
-                                      <div className="text-right">
-                                        {isGiven ? (
-                                          <div>
-                                            <p className="font-medium text-base-content">
-                                              {adToBs(
-                                                safeFormatDateYYMMDD(dose.date),
-                                              )}
-                                            </p>
-                                            <p className="text-base-content/60">
-                                              {safeFormatDate(dose.date)}
-                                            </p>
-                                          </div>
-                                        ) : (
-                                          <span className="text-base-content/50 italic">
-                                            Pending
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                          <div
+                                            className={`w-2 h-2 rounded-full ${isGiven ? 'bg-success' : 'bg-base-content/30'}`}
+                                          />
+                                          <span className="font-medium text-sm">
+                                            Dose {scheduleItem.dose}
                                           </span>
+                                          <span className="text-base-content/60 bg-base-300 px-2 py-1 rounded text-xs">
+                                            {getRecommendedAgeText(scheduleItem)}
+                                          </span>
+                                        </div>
+                                        {isGiven && dose.isComplete && (
+                                          <FaCheckCircle className="text-success text-sm" />
                                         )}
                                       </div>
+
+                                      {isGiven ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                                          <div className="space-y-1">
+                                            <div className="font-medium text-base-content">
+                                              Given on: {adToBs(safeFormatDateYYMMDD(dose.date))} (B.S)
+                                            </div>
+                                            <div className="text-base-content/60">
+                                              A.D: {safeFormatDate(dose.date)}
+                                            </div>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <div className="flex items-center space-x-1 text-base-content/70">
+                                              <FaUserMd className="text-xs" />
+                                              <span>Given by User #{dose.createdById}</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1 text-base-content/70">
+                                              <FaClock className="text-xs" />
+                                              <span>Recorded: {safeFormatDate(dose.createdAt)}</span>
+                                            </div>
+                                          </div>
+                                          {dose.remarks && (
+                                            <div className="md:col-span-2 mt-2 p-2 bg-base-100 rounded border-l-2 border-primary">
+                                              <div className="text-xs text-base-content/70 mb-1">Remarks:</div>
+                                              <div className="text-sm text-base-content">{dose.remarks}</div>
+                                            </div>
+                                          )}
+                                          {dose.customVaccineName && (
+                                            <div className="md:col-span-2 mt-1">
+                                              <span className="text-xs bg-info/20 text-info px-2 py-1 rounded">
+                                                Custom: {dose.customVaccineName}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div className="text-center py-2">
+                                          <span className="text-base-content/50 italic text-sm">
+                                            Not yet administered
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -564,7 +671,7 @@ export default function AllChildren() {
                 records
               </p>
             </div>
-            <button className="inline-flex items-center space-x-2 bg-primary hover:bg-primary-focus text-primary-content px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-sm hover:shadow-md">
+            <button className="inline-flex items-center space-x-2 bg-primary hover:bg-primary-focus text-primary-content px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-sm hover:shadow-md cursor-pointer">
               <FaPlus />
               <span>Add New Child</span>
             </button>
@@ -643,6 +750,9 @@ export default function AllChildren() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {currentChildren.map((child) => {
                 const age = safeCalculateAge(child.birthDate);
+                const hasWeightRecords = child.weightRecords && child.weightRecords.length > 0;
+                const latestWeight = hasWeightRecords ?
+                  child.weightRecords.sort((a, b) => new Date(b.date) - new Date(a.date))[0] : null;
 
                 return (
                   <div
@@ -656,11 +766,10 @@ export default function AllChildren() {
                           <FaBaby className="text-primary" />
                         </div>
                         <div
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            child.purnaKhop
-                              ? 'bg-success/20 text-success border border-success/30'
-                              : 'bg-warning/20 text-warning border border-warning/30'
-                          }`}
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${child.purnaKhop
+                            ? 'bg-success/20 text-success border border-success/30'
+                            : 'bg-warning/20 text-warning border border-warning/30'
+                            }`}
                         >
                           {child.purnaKhop ? 'Vaccinated' : 'Pending'}
                         </div>
@@ -694,6 +803,29 @@ export default function AllChildren() {
                           <span className="text-base-content/70">Ward</span>
                           <span className="font-medium text-base-content">
                             {child.wardNumber}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-base-content/70">Vaccinations</span>
+                          <span className="font-medium text-base-content">
+                            {child.vaccinations ? child.vaccinations.length : 0} doses
+                          </span>
+                        </div>
+                        {latestWeight && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-base-content/70 flex items-center space-x-1">
+                              <FaWeight className="text-xs" />
+                              <span>Latest Weight</span>
+                            </span>
+                            <span className="font-medium text-base-content">
+                              {latestWeight.weight} kg
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between text-xs pt-2 border-t border-base-300">
+                          <span className="text-base-content/60 flex items-center space-x-1">
+                            <FaUserMd className="text-xs" />
+                            <span>Created by User #{child.createdById}</span>
                           </span>
                         </div>
                       </div>
