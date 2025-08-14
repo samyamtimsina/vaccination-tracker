@@ -8,7 +8,6 @@ import {
 } from '../utils/helpers.js';
 
 // Updated function to prepare vaccination data with BS date conversion
-// Prepare vaccination data from payload
 function prepareVaccinationCreateData(vaccines, user) {
   if (!vaccines) return [];
 
@@ -41,7 +40,7 @@ function prepareVaccinationCreateData(vaccines, user) {
           isComplete: true,
           recommendedAtMonths,
           remarks: doseObj.remarks || null,
-          createdBy: { connect: { id: user.id } },
+          createdById: user.id, // Use createdById to link the user
         };
       })
       .filter(Boolean);
@@ -53,7 +52,6 @@ export const createChild = async (req, res) => {
     // 1️⃣ Validate request body
     const validationResult = createChildSchema.safeParse(req.body);
 
-    console.log('validation result', validationResult);
     if (!validationResult.success) {
       return res.status(400).json({
         error: 'Validation failed',
@@ -68,22 +66,12 @@ export const createChild = async (req, res) => {
       return res.status(400).json({ error: 'Invalid BS birthDate string' });
     }
 
-    // 3️⃣ Combine full name
-    const combinedFullName =
-      `${validatedData.fullName} ${validatedData.lastName || ''}`.trim();
-
-    // 4️⃣ Prepare vaccinations
-    const vaccinationCreateData = prepareVaccinationCreateData(
-      validatedData.vaccines,
-      req.user,
-    );
-
-    // 5️⃣ Create child
-    const child = await prisma.child.create({
-      data: {
-        sewaDartaNumber: parseInt(validatedData.sewaDartaNumber, 10),
+    // Wrap everything in a transaction to ensure data consistency
+    const newChild = await prisma.$transaction(async (tx) => {
+      // 3️⃣ Create child record
+      const childData = {
         isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
-        fullName: combinedFullName,
+        fullName: validatedData.fullName,
         wardNumber: parseInt(validatedData.wardNumber, 10),
         parentName: validatedData.parentName || '',
         tole: validatedData.tole || '',
@@ -94,25 +82,42 @@ export const createChild = async (req, res) => {
         createdById: req.user.id,
         purnaKhop: validatedData.purnaKhop || false,
         remarks: validatedData.remarks || '',
-        vaccinations: { create: vaccinationCreateData },
-      },
-      include: { vaccinations: true },
+      };
+      // `sewaDartaNumber` is now auto-incrementing, so we don't include it here
+      const child = await tx.child.create({ data: childData });
+
+      // 4️⃣ Prepare and create vaccinations
+      const vaccinationCreateData = prepareVaccinationCreateData(
+        validatedData.vaccines,
+        req.user,
+      );
+      if (vaccinationCreateData.length > 0) {
+        // Link vaccination records to the new child
+        const vaccinationsWithChildId = vaccinationCreateData.map((v) => ({
+          ...v,
+          citizenId: child.id,
+        }));
+        await tx.vaccinationRecord.createMany({
+          data: vaccinationsWithChildId,
+        });
+      }
+
+      // 5️⃣ Prepare and create weight records
+      if (validatedData.weightRecords?.length) {
+        const weightCreateData = validatedData.weightRecords.map((w) => ({
+          childId: child.id,
+          weight: w.weight,
+          date: parseBsDateString(w.date), // Use the correct field name 'date'
+          createdById: req.user.id,
+        }));
+        await tx.weightRecord.createMany({ data: weightCreateData });
+      }
+
+      return child;
     });
 
-    // 6️⃣ Create weight records if any
-    if (validatedData.weightRecords?.length) {
-      const weightCreateData = validatedData.weightRecords.map((w) => ({
-        childId: child.id,
-        weight: w.weight,
-        measuredAt: parseBsDateString(w.date),
-        createdById: req.user.id,
-      }));
-
-      await prisma.weightRecord.createMany({ data: weightCreateData });
-    }
-
-    // 7️⃣ Send response
-    res.status(201).json(child);
+    // 6️⃣ Send response
+    res.status(201).json(newChild);
   } catch (error) {
     console.error('Child creation error:', error);
     res.status(500).json({
@@ -122,6 +127,8 @@ export const createChild = async (req, res) => {
   }
 };
 
+// ... the rest of your controller functions
+
 // Rest of your controllers (getAllChildren, getChild) remain the same
 
 // Controller to get all children, including their vaccination records
@@ -130,6 +137,8 @@ export const getAllChildren = async (req, res) => {
     const children = await prisma.child.findMany({
       include: {
         vaccinations: true,
+
+        weightRecords: true,
       },
     });
 
@@ -166,6 +175,7 @@ export const getWardChildren = async (req, res) => {
 
       include: {
         vaccinations: true,
+        weightRecords: true,
       },
     });
 
@@ -193,6 +203,7 @@ export const getChild = async (req, res) => {
       },
       include: {
         vaccinations: true,
+        weightRecords: true,
       },
     });
 

@@ -30,7 +30,7 @@ model User {
 
 model Child {
   id                      String              @id @default(uuid())
-sewaDartaNumber         Int                 @unique @default(autoincrement())
+  sewaDartaNumber         Int                 @unique @default(autoincrement())
   fullName                String // Combined full name (first + last)
   wardNumber              Int
   casteCode               Int
@@ -47,11 +47,12 @@ sewaDartaNumber         Int                 @unique @default(autoincrement())
   createdAt               DateTime            @default(now())
   NotificationLog         NotificationLog[]
   isFromOtherMunicipality Boolean             @default(false)
+  weightRecords           WeightRecord[]
 }
 
 model Mother {
   id                      String    @id @default(uuid())
-sewaDartaNumber         Int                 @unique @default(autoincrement())
+  sewaDartaNumber         Int       @unique @default(autoincrement())
   name                    String
   casteCode               Int
   age                     Int
@@ -137,14 +138,15 @@ model Certificate {
   token      String   @unique // UUID or secure token
   pdfPath    String? // optional if you store pdfs
 }
+
 model WeightRecord {
-  id          String    @id @default(uuid())
-  date        String    
+  id          String   @id @default(uuid())
+  date        DateTime
   weight      Float
-  child       Child     @relation(fields: [childId], references: [id])
+  child       Child    @relation(fields: [childId], references: [id])
   childId     String
-  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdBy   User     @relation(fields: [createdById], references: [id])
   createdById Int
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

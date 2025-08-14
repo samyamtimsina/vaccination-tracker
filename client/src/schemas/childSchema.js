@@ -10,6 +10,7 @@ const numericString = z.coerce
   });
 
 // A robust date schema that accepts either "YYYY-MM-DD" or the full ISO string
+// and then transforms it to "YYYY-MM-DD"
 const dateSchema = z
   .union([
     z.string({
@@ -24,13 +25,10 @@ const dateSchema = z
     if (val instanceof Date) {
       // Get UTC date parts to avoid timezone shift
       const year = val.getUTCFullYear();
-      const month = val.getUTCMonth();
+      const month = val.getUTCMonth(); // still 0-indexed
       const day = val.getUTCDate();
       const nepDate = new NepaliDate(year, month, day);
-      return `${nepDate.getYear()}-${String(nepDate.getMonth() + 1).padStart(
-        2,
-        '0',
-      )}-${String(nepDate.getDate()).padStart(2, '0')}`;
+      return `${nepDate.getYear()}-${String(nepDate.getMonth() + 1).padStart(2, '0')}-${String(nepDate.getDate()).padStart(2, '0')}`;
     }
     return val;
   })
@@ -71,28 +69,29 @@ const dateSchema = z
       ),
   );
 
-// New schema for a single vaccine dose with date and optional remarks
+// Schema for a single vaccine dose object
 const vaccineDoseSchema = z.object({
   date: z
-    .union([dateSchema, z.string().length(0)])
-    .nullable()
-    .optional()
-    .transform((val) => (val === '' ? null : val)),
-  remarks: z
     .string()
-    .optional()
+    .length(0)
+    .or(dateSchema)
     .nullable()
+    .optional()
     .transform((val) => (val === '' ? null : val)),
+  remarks: z.string().optional().nullable(),
 });
 
-// New schema for a single weight record
+// Schema for a single weight record
 const weightRecordSchema = z.object({
   date: dateSchema,
-  weight: z.coerce.number().min(0.1, 'तौल ०.१ kg भन्दा बढी हुनुपर्छ'),
+  weight: numericString,
 });
 
 export const createChildSchema = z.object({
-  sewaDartaNumber: numericString,
+  fullName: z.string().min(1, 'पहिलो नाम आवश्यक छ'),
+  lastName: z.string().optional().nullable(),
+  parentName: z.string().min(1, 'अभिभावकको नाम आवश्यक छ'),
+  tole: z.string().min(1, 'टोल आवश्यक छ'),
   wardNumber: numericString,
   casteCode: numericString,
   birthDate: dateSchema,
@@ -108,30 +107,6 @@ export const createChildSchema = z.object({
         }),
       }),
     ),
-
-  vaccines: z
-    .record(
-      z.enum([
-        'BCG',
-        'ROTA',
-        'OPV',
-        'fIPV',
-        'PCV',
-        'DPT_HepB_hib',
-        'MR',
-        'JE',
-        'TCV',
-        'HPV',
-      ]),
-      z.array(vaccineDoseSchema),
-    )
-    .optional(),
-
-  weightRecords: z.array(weightRecordSchema),
-
-  fullName: z.string().min(1, 'पुरा नाम आवश्यक छ'),
-  parentName: z.string().min(1, 'अभिभावकको नाम आवश्यक छ'),
-  tole: z.string().min(1, 'टोल आवश्यक छ'),
   phoneNumber: z
     .string()
     .optional()
@@ -141,5 +116,16 @@ export const createChildSchema = z.object({
         'फोन नम्बर 7-15 अंकको हुनुपर्छ, वैकल्पिक रूपमा + बाट सुरु हुन सक्छ',
     }),
   purnaKhop: z.boolean().default(false),
-  remarks: z.string().optional(),
+  remarks: z.string().optional().nullable(),
+
+  // Use the new vaccineDoseSchema to validate the array of vaccine doses
+  vaccines: z
+    .record(
+      z.string(), // The key can be any string (vaccine name)
+      z.array(vaccineDoseSchema),
+    )
+    .optional(),
+
+  // Add the schema for the weightRecords array
+  weightRecords: z.array(weightRecordSchema).optional(),
 });

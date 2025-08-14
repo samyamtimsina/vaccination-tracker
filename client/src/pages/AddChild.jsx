@@ -1,4 +1,4 @@
-import { useForm, Controller, useWatch } from 'react-hook-form';
+import { useForm, Controller, useWatch, useFieldArray } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { vaccineSchedule } from '../utils/vaccineSchedule';
 import axiosClient from '../api/axiosClient.js';
@@ -75,6 +75,28 @@ function calculateAge(birthDate) {
     return { days: 0, weeks: 0, months: 0 };
   }
 }
+// A simple helper function to get the first error message from the nested errors object
+const getFirstErrorMessage = (errors) => {
+  const firstErrorKey = Object.keys(errors)[0];
+  if (!firstErrorKey) return 'Unknown error.';
+
+  const firstError = errors[firstErrorKey];
+  // Handles errors for simple fields
+  if (typeof firstError.message === 'string') {
+    return firstError.message;
+  }
+  // Handles errors for nested fields like weightRecords
+  if (Array.isArray(firstError)) {
+    const nestedError = firstError.find(
+      (err) => err && Object.keys(err).length > 0,
+    );
+    if (nestedError) {
+      const nestedKey = Object.keys(nestedError)[0];
+      return nestedError[nestedKey].message;
+    }
+  }
+  return 'Please check the form for errors.';
+};
 
 export default function AddChild() {
   const { addChildToState } = useChildContext();
@@ -85,7 +107,7 @@ export default function AddChild() {
     formState: { errors, isSubmitting },
     reset,
     setValue,
-    getValues,
+    getValues, // <<< ADDED getValues here
   } = useForm({
     resolver: zodResolver(createChildSchema),
     defaultValues: {
@@ -97,6 +119,7 @@ export default function AddChild() {
           doses.map(() => ({ date: '', remarks: '' })),
         ]),
       ),
+      // Start with one empty weight record field
       weightRecords: [{ date: '', weight: '' }],
     },
   });
@@ -106,23 +129,19 @@ export default function AddChild() {
   const birthDate = useWatch({ control, name: 'birthDate', defaultValue: '' });
 
   const [showRemarks, setShowRemarks] = useState({});
-  const [weightRecordsCount, setWeightRecordsCount] = useState(1);
+  // Remove useState and getValues for managing dynamic fields
+
+  // Use useFieldArray to manage the weightRecords array
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'weightRecords',
+  });
+  // Remove the old add and remove weight record functions
+  // The append and remove functions from useFieldArray handle this now
 
   const toggleRemarks = (vaccineName, doseIndex) => {
     const key = `${vaccineName}-${doseIndex}`;
     setShowRemarks((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const addWeightRecord = () => {
-    setWeightRecordsCount((prev) => prev + 1);
-    setValue(`weightRecords.${weightRecordsCount}`, { date: '', weight: '' });
-  };
-
-  const removeWeightRecord = (index) => {
-    const currentRecords = getValues('weightRecords');
-    const newRecords = currentRecords.filter((_, i) => i !== index);
-    setValue('weightRecords', newRecords);
-    setWeightRecordsCount((prev) => prev - 1);
   };
 
   const onSubmit = async (data) => {
@@ -135,7 +154,6 @@ export default function AddChild() {
         ...data,
         weightRecords: filteredWeightRecords,
       };
-      console.log(payload);
 
       const res = await axiosClient.post('/api/child', payload);
       addChildToState(res.data);
@@ -145,6 +163,11 @@ export default function AddChild() {
       console.error('Submission failed:', err);
       toast.error('डेटा सेभ गर्न असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।');
     }
+  };
+  // This is the new function that runs when submission FAILS due to validation
+  const onErrors = (errors) => {
+    const errorMessage = getFirstErrorMessage(errors);
+    toast.error(`कृपया सबै आवश्यक जानकारी भर्नुहोस्। (${errorMessage})`);
   };
 
   const age = calculateAge(birthDate);
@@ -166,7 +189,7 @@ export default function AddChild() {
     <>
       <ToastContainer position="top-right" autoClose={3000} />
       <form
-        onSubmit={handleSubmit(onSubmit)}
+        onSubmit={handleSubmit(onSubmit, onErrors)}
         className="card w-full max-w-full mx-auto p-6 bg-base-100 shadow-xl space-y-6"
       >
         <div className="flex items-center justify-between mb-6">
@@ -216,27 +239,27 @@ export default function AddChild() {
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Personal Information Fields */}
-          <div className="sm:col-span-1 lg:col-span-1 form-control">
-            <label className="label" htmlFor="sewaDartaNumber">
-              <span className="label-text text-base-content">
-                सेवा दर्ता नम्बर
-              </span>
-            </label>
-            <input
-              id="sewaDartaNumber"
-              type="number"
-              {...register('sewaDartaNumber')}
-              className="input input-bordered w-full text-base-content"
-              placeholder="सेवा दर्ता नम्बर"
-            />
-            {errors.sewaDartaNumber && (
-              <label className="label">
-                <span className="label-text-alt text-error">
-                  {errors.sewaDartaNumber.message}
-                </span>
-              </label>
-            )}
-          </div>
+          {/* <div className="sm:col-span-1 lg:col-span-1 form-control"> */}
+          {/* <label className="label" htmlFor="sewaDartaNumber"> */}
+          {/* <span className="label-text text-base-content"> */}
+          {/* सेवा दर्ता नम्बर */}
+          {/* </span> */}
+          {/* </label> */}
+          {/* <input */}
+          {/* id="sewaDartaNumber" */}
+          {/* type="number" */}
+          {/* {...register('sewaDartaNumber')} */}
+          {/* className="input input-bordered w-full text-base-content" */}
+          {/* placeholder="सेवा दर्ता नम्बर" */}
+          {/* /> */}
+          {/* {errors.sewaDartaNumber && ( */}
+          {/* <label className="label"> */}
+          {/* <span className="label-text-alt text-error"> */}
+          {/* {errors.sewaDartaNumber.message} */}
+          {/* </span> */}
+          {/* </label> */}
+          {/* )} */}
+          {/* </div> */}
 
           <div className="form-control">
             <label className="label" htmlFor="fullName">
@@ -486,9 +509,9 @@ export default function AddChild() {
             </div>
           </div>
 
-          {Array.from({ length: weightRecordsCount }).map((_, index) => (
+          {fields.map((field, index) => (
             <div
-              key={index}
+              key={field.id} // Use the field's unique ID for the key
               className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end"
             >
               <div className="form-control">
@@ -547,26 +570,39 @@ export default function AddChild() {
               </div>
 
               <div className="flex space-x-2">
-                {index === 0 ? (
+                {fields.length > 1 && (
                   <button
                     type="button"
-                    onClick={addWeightRecord}
-                    className="btn btn-sm btn-success"
-                  >
-                    <FaPlus />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => removeWeightRecord(index)}
+                    onClick={() => remove(index)}
                     className="btn btn-sm btn-error"
                   >
                     <FaMinus />
                   </button>
                 )}
+                {index === fields.length - 1 && (
+                  <button
+                    type="button"
+                    onClick={() => append({ date: '', weight: '' })}
+                    className="btn btn-sm btn-success"
+                  >
+                    <FaPlus />
+                  </button>
+                )}
               </div>
             </div>
           ))}
+          {fields.length === 0 && (
+            <div className="flex justify-center mt-4">
+              <button
+                type="button"
+                onClick={() => append({ date: '', weight: '' })}
+                className="btn btn-sm btn-success"
+              >
+                <FaPlus />
+                <span>पहिलो तौल रेकर्ड थप्नुहोस्</span>
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Vaccines Section */}

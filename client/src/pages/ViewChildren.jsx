@@ -37,6 +37,7 @@ export default function AllChildren() {
   const { childrenData, error, loading, fetchChildren } = useChildContext();
   useEffect(() => {
     fetchChildren();
+    console.log('childrenData', childrenData);
   }, [fetchChildren]);
 
   const filteredChildren = useMemo(() => {

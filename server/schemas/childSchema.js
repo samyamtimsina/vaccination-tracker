@@ -4,8 +4,10 @@ const numericString = z.coerce.number().refine((val) => val > 0, {
   message: 'Value must be a positive number',
 });
 
+// A simplified schema that only validates the BS date string format
 const bsDateSchema = z
   .string()
+  .min(1, 'Date is required')
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in "YYYY-MM-DD" BS format')
   .refine(
     (val) => {
@@ -17,9 +19,22 @@ const bsDateSchema = z
     },
   );
 
+// Corrected schema for a single vaccine dose with date and optional remarks
+const vaccineDoseSchema = z.object({
+  date: bsDateSchema.nullable().optional(),
+  remarks: z.string().optional().nullable(),
+});
+
+// Schema for a single weight record, which was missing
+const weightRecordSchema = z.object({
+  date: bsDateSchema,
+  weight: z.coerce.number().min(0.1, 'Weight must be greater than 0.1 kg'),
+});
+
 export const createChildSchema = z.object({
+  // sewaDartaNumber is removed because it's auto-incrementing
+
   birthDate: bsDateSchema,
-  sewaDartaNumber: numericString,
   wardNumber: numericString,
   casteCode: numericString,
   isFromOtherMunicipality: z.boolean().default(false),
@@ -36,6 +51,7 @@ export const createChildSchema = z.object({
       }),
     ),
 
+  // Corrected schema for vaccines to match your payload
   vaccines: z
     .record(
       z.enum([
@@ -50,37 +66,33 @@ export const createChildSchema = z.object({
         'TCV',
         'HPV',
       ]),
-      z.array(bsDateSchema.nullable()), //
+      z.array(vaccineDoseSchema),
     )
     .optional()
     .transform((val) => {
-      if (!val) {
-        return {
-          BCG: [],
-          ROTA: [],
-          OPV: [],
-          fIPV: [],
-          PCV: [],
-          DPT_HepB_hib: [],
-          MR: [],
-          JE: [],
-          TCV: [],
-          HPV: [],
-        };
+      // This transform ensures the final object has empty arrays for any missing vaccine types.
+      const vaccinesObject = val || {};
+      const allVaccineTypes = [
+        'BCG',
+        'ROTA',
+        'OPV',
+        'fIPV',
+        'PCV',
+        'DPT_HepB_hib',
+        'MR',
+        'JE',
+        'TCV',
+        'HPV',
+      ];
+      const transformed = {};
+      for (const type of allVaccineTypes) {
+        transformed[type] = vaccinesObject[type] || [];
       }
-      return {
-        BCG: val.BCG || [],
-        ROTA: val.ROTA || [],
-        OPV: val.OPV || [],
-        fIPV: val.fIPV || [],
-        PCV: val.PCV || [],
-        DPT_HepB_hib: val.DPT_HepB_hib || [],
-        MR: val.MR || [],
-        JE: val.JE || [],
-        TCV: val.TCV || [],
-        HPV: val.HPV || [],
-      };
+      return transformed;
     }),
+
+  // Re-added the weight records field
+  weightRecords: z.array(weightRecordSchema),
 
   fullName: z.string().min(1, 'Full name is required'),
   parentName: z.string().min(1, 'Parent name is required'),
