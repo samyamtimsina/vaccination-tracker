@@ -31,8 +31,12 @@ import { vaccineSchedule } from '../utils/vaccineSchedule.js';
 import { adToBs } from '@sbmdkl/nepali-date-converter';
 import VaccinationCardOverlay from '../components/print';
 import { useChildContext } from '../context/ChildContext';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 export default function AllChildren() {
+const navigate = useNavigate();
+  const { t } = useTranslation('viewChildren');
   const [selectedChild, setSelectedChild] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showPrintComponent, setShowPrintComponent] = useState(false);
@@ -42,7 +46,7 @@ export default function AllChildren() {
 
   useEffect(() => {
     fetchChildren();
-    console.log('childrenData', childrenData);
+    console.log('childrenData updated:', childrenData);
   }, [fetchChildren]);
 
   const filteredChildren = useMemo(() => {
@@ -75,16 +79,16 @@ export default function AllChildren() {
   const getRecommendedAgeText = (scheduleItem) => {
     if (scheduleItem.recommendedAtDays !== undefined) {
       return scheduleItem.recommendedAtDays === 0
-        ? 'At birth'
-        : `${scheduleItem.recommendedAtDays} days`;
+        ? t('childDetails.vaccinationRecords.recommendedAt.atBirth')
+        : t('childDetails.vaccinationRecords.recommendedAt.days', { value: scheduleItem.recommendedAtDays });
     }
     if (scheduleItem.recommendedAtWeeks !== undefined) {
-      return `${scheduleItem.recommendedAtWeeks} weeks`;
+      return t('childDetails.vaccinationRecords.recommendedAt.weeks', { value: scheduleItem.recommendedAtWeeks });
     }
     if (scheduleItem.recommendedAtMonths !== undefined) {
-      return `${scheduleItem.recommendedAtMonths} months`;
+      return t('childDetails.vaccinationRecords.recommendedAt.months', { value: scheduleItem.recommendedAtMonths });
     }
-    return 'Unknown';
+    return t('childDetails.vaccinationRecords.recommendedAt.unknown');
   };
 
   const getOverallVaccinationStats = (child) => {
@@ -103,6 +107,7 @@ export default function AllChildren() {
         remarks: vacc.remarks,
         isComplete: vacc.isComplete,
         customVaccineName: vacc.customVaccineName,
+        createdBy: vacc.createdBy, // Include createdBy
       });
     });
 
@@ -147,7 +152,7 @@ export default function AllChildren() {
       <div className="min-h-screen flex items-center justify-center bg-base-200">
         <div className="text-center">
           <FaSpinner className="animate-spin text-4xl text-primary mx-auto mb-3" />
-          <p className="text-base-content">Loading children records...</p>
+          <p className="text-base-content">{t('loading.message')}</p>
         </div>
       </div>
     );
@@ -159,9 +164,9 @@ export default function AllChildren() {
         <div className="bg-base-100 p-6 rounded-xl shadow-lg border border-error/20 max-w-md mx-4">
           <div className="text-center">
             <h2 className="text-lg font-bold text-base-content mb-2">
-              Error Loading Data
+              {t('error.title')}
             </h2>
-            <p className="text-base-content text-sm">{error}</p>
+            <p className="text-base-content text-sm">{t('error.message', { error })}</p>
           </div>
         </div>
       </div>
@@ -174,7 +179,7 @@ export default function AllChildren() {
     const { vaccinationMap } = vaccinationStats;
 
     return (
-      <div className="min-h-screen bg-base-200">
+      <div className="min-h-screen bg-base-200 min-w-[20rem]">
         <div className="bg-base-100 shadow-sm border-b border-base-300">
           <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between">
             <button
@@ -182,7 +187,7 @@ export default function AllChildren() {
               className="inline-flex items-center space-x-2 text-primary hover:text-primary-focus transition-colors font-medium cursor-pointer"
             >
               <FaChevronLeft className="text-sm" />
-              <span>Back to All Children</span>
+              <span>{t('childDetails.back')}</span>
             </button>
 
             <button
@@ -190,7 +195,7 @@ export default function AllChildren() {
               className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-content transition-all duration-200 hover:bg-primary-focus hover:shadow-lg cursor-pointer"
             >
               <FaPrint className="text-lg" />
-              <span>Print Record</span>
+              <span>{t('childDetails.print')}</span>
             </button>
           </div>
         </div>
@@ -223,12 +228,12 @@ export default function AllChildren() {
                           {selectedChild.lastName || ''}
                         </h1>
                         <p className="text-primary-content/90 text-sm">
-                          {age.formatted} old
+                          {t('childDetails.age', { formatted: age.formatted })}
                         </p>
                         <div className="flex items-center space-x-3 mt-2 text-xs">
                           <span className="flex items-center space-x-1">
                             <FaMapMarkerAlt />
-                            <span>Ward {selectedChild.wardNumber}</span>
+                            <span>{t('childCard.ward')} {selectedChild.wardNumber}</span>
                           </span>
                           <span
                             className={`px-2 py-1 rounded-full text-xs font-medium ${selectedChild.purnaKhop
@@ -237,8 +242,8 @@ export default function AllChildren() {
                               }`}
                           >
                             {selectedChild.purnaKhop
-                              ? 'Fully Vaccinated'
-                              : 'Incomplete'}
+                              ? t('childDetails.fullyVaccinated')
+                              : t('childDetails.incomplete')}
                           </span>
                         </div>
                       </div>
@@ -250,12 +255,12 @@ export default function AllChildren() {
                 <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                   <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
                     <FaUser className="text-primary" />
-                    <span>Personal Information</span>
+                    <span>{t('childDetails.personalInfo.title')}</span>
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div>
                       <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
-                        Service Registration
+                        {t('childDetails.personalInfo.serviceRegistration')}
                       </label>
                       <p className="font-semibold text-base-content mt-1">
                         #{selectedChild.sewaDartaNumber}
@@ -265,7 +270,7 @@ export default function AllChildren() {
                     <div>
                       <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
                         <FaVenusMars className="text-xs" />
-                        <span>Gender</span>
+                        <span>{t('childDetails.personalInfo.gender')}</span>
                       </label>
                       <p className="font-semibold text-base-content mt-1">
                         {selectedChild.gender}
@@ -274,7 +279,7 @@ export default function AllChildren() {
 
                     <div>
                       <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
-                        Parent Name
+                        {t('childDetails.personalInfo.parentName')}
                       </label>
                       <p className="font-semibold text-base-content mt-1">
                         {selectedChild.parentName}
@@ -283,7 +288,7 @@ export default function AllChildren() {
 
                     <div>
                       <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
-                        Tole
+                        {t('childDetails.personalInfo.tole')}
                       </label>
                       <p className="font-semibold text-base-content mt-1">
                         {selectedChild.tole}
@@ -293,7 +298,7 @@ export default function AllChildren() {
                     {selectedChild.phoneNumber && (
                       <div>
                         <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
-                          Phone
+                          {t('childDetails.personalInfo.phone')}
                         </label>
                         <p className="font-semibold text-base-content mt-1">
                           {selectedChild.phoneNumber}
@@ -303,18 +308,18 @@ export default function AllChildren() {
 
                     <div>
                       <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
-                        Municipality
+                        {t('childDetails.personalInfo.municipalityLabel')}
                       </label>
                       <p className="font-semibold text-base-content mt-1">
                         {selectedChild.isFromOtherMunicipality
-                          ? 'Other Municipality'
-                          : 'Local Municipality'}
+                          ? t('childDetails.personalInfo.municipality.other')
+                          : t('childDetails.personalInfo.municipality.local')}
                       </p>
                     </div>
 
                     <div>
                       <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
-                        Caste Code
+                        {t('childDetails.personalInfo.casteCode')}
                       </label>
                       <p className="font-semibold text-base-content mt-1">
                         {selectedChild.casteCode}
@@ -324,36 +329,37 @@ export default function AllChildren() {
                     <div className="sm:col-span-2">
                       <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
                         <FaBirthdayCake className="text-xs" />
-                        <span>Birth Date</span>
+                        <span>{t('childDetails.personalInfo.birthDate')}</span>
                       </label>
                       <div className="flex space-x-4 mt-1">
                         <span className="font-semibold text-base-content">
-                          B.S:{' '}
-                          {adToBs(
-                            safeFormatDateYYMMDD(selectedChild.birthDate),
-                          )}
+                          {t('childCard.birthDateBS')}: {adToBs(safeFormatDateYYMMDD(selectedChild.birthDate))}
                         </span>
                         <span className="font-semibold text-base-content">
-                          A.D: {safeFormatDate(selectedChild.birthDate)}
+                          {t('childCard.birthDateAD')}: {safeFormatDate(selectedChild.birthDate)}
                         </span>
                       </div>
                     </div>
 
-                    {/* Record Creation Info */}
                     <div className="sm:col-span-2 pt-3 border-t border-base-300">
                       <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider flex items-center space-x-1">
                         <FaUserMd className="text-xs" />
-                        <span>Record Information</span>
+                        <span>{t('childDetails.personalInfo.recordInfo')}</span>
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 text-xs">
+<div>
+  <span className="text-base-content/70">
+    {t('childDetails.personalInfo.createdBy')}:
+  </span>
+  <span 
+    className="font-semibold text-base-content ml-2 hover:text-primary hover:underline cursor-pointer"
+    onClick={() => navigate(`/users/${selectedChild.createdBy.id}`)}
+  >
+    {selectedChild.createdBy.name}
+  </span>
+</div>
                         <div>
-                          <span className="text-base-content/70">Created by User:</span>
-                          <span className="font-semibold text-base-content ml-2">
-                            #{selectedChild.createdById}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-base-content/70">Created on:</span>
+                          <span className="text-base-content/70">{t('childDetails.personalInfo.createdOn')}:</span>
                           <span className="font-semibold text-base-content ml-2">
                             {safeFormatDate(selectedChild.createdAt)}
                           </span>
@@ -367,7 +373,7 @@ export default function AllChildren() {
                 <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                   <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
                     <FaShieldAlt className="text-primary" />
-                    <span>Vaccination Summary</span>
+                    <span>{t('childDetails.vaccinationSummary.title')}</span>
                   </h3>
                   <div className="flex items-center space-x-4 mb-4">
                     <div className="relative w-16 h-16">
@@ -406,11 +412,13 @@ export default function AllChildren() {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm text-base-content/70">
-                        Overall Progress
+                        {t('childDetails.vaccinationSummary.overallProgress')}
                       </p>
                       <p className="font-semibold text-base-content">
-                        {vaccinationStats.totalGiven} of{' '}
-                        {vaccinationStats.totalRequired} doses given
+                        {t('childDetails.vaccinationSummary.dosesGiven', {
+                          given: vaccinationStats.totalGiven,
+                          required: vaccinationStats.totalRequired,
+                        })}
                       </p>
                     </div>
                   </div>
@@ -419,19 +427,19 @@ export default function AllChildren() {
                       <p className="text-xl font-bold text-success">
                         {vaccinationStats.completeVaccines}
                       </p>
-                      <p className="text-xs text-base-content/80">Complete</p>
+                      <p className="text-xs text-base-content/80">{t('childDetails.vaccinationSummary.complete')}</p>
                     </div>
                     <div className="bg-warning/10 rounded-lg p-2">
                       <p className="text-xl font-bold text-warning">
                         {vaccinationStats.inProgressVaccines}
                       </p>
-                      <p className="text-xs text-base-content/80">Progress</p>
+                      <p className="text-xs text-base-content/80">{t('childDetails.vaccinationSummary.progress')}</p>
                     </div>
                     <div className="bg-base-300 rounded-lg p-2">
                       <p className="text-xl font-bold text-base-content">
                         {vaccinationStats.notStartedVaccines}
                       </p>
-                      <p className="text-xs text-base-content/80">Pending</p>
+                      <p className="text-xs text-base-content/80">{t('childDetails.vaccinationSummary.pending')}</p>
                     </div>
                   </div>
                 </div>
@@ -441,7 +449,7 @@ export default function AllChildren() {
                   <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                     <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
                       <FaWeight className="text-primary" />
-                      <span>Weight Tracking</span>
+                      <span>{t('childDetails.weightTracking.title')}</span>
                     </h3>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {selectedChild.weightRecords
@@ -455,23 +463,28 @@ export default function AllChildren() {
                                 </span>
                                 {index === 0 && (
                                   <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
-                                    Latest
+                                    {t('childDetails.weightTracking.latest')}
                                   </span>
                                 )}
                               </div>
                               <div className="text-right text-xs text-base-content/70">
-                                <div>B.S: {adToBs(safeFormatDateYYMMDD(record.date))}</div>
-                                <div>A.D: {safeFormatDate(record.date)}</div>
+                                <div>{t('childCard.birthDateBS')}: {adToBs(safeFormatDateYYMMDD(record.date))}</div>
+                                <div>{t('childCard.birthDateAD')}: {safeFormatDate(record.date)}</div>
                               </div>
                             </div>
                             <div className="flex items-center justify-between text-xs text-base-content/60">
                               <div className="flex items-center space-x-1">
-                                <FaUserMd />
-                                <span>Recorded by User #{record.createdById}</span>
-                              </div>
+  <FaUserMd />
+  <span 
+    className="hover:text-primary hover:underline cursor-pointer"
+    onClick={() => navigate(`/users/${record.createdBy.id}`)}
+  >
+    {t('childDetails.weightTracking.recordedBy')}: {record.createdBy.name}
+  </span>
+</div>
                               <div className="flex items-center space-x-1">
                                 <FaClock />
-                                <span>{safeFormatDate(record.createdAt)}</span>
+                                <span>{t('childDetails.weightTracking.recordedOn')} {safeFormatDate(record.createdAt)}</span>
                               </div>
                             </div>
                           </div>
@@ -485,7 +498,7 @@ export default function AllChildren() {
                   <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                     <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
                       <FaStickyNote className="text-primary" />
-                      <span>Notes</span>
+                      <span>{t('childDetails.notes.title')}</span>
                     </h3>
                     <div className="bg-warning/10 border border-warning/20 rounded-lg p-3">
                       <p className="text-base-content text-sm leading-relaxed">
@@ -504,20 +517,20 @@ export default function AllChildren() {
                       <div>
                         <h2 className="text-lg font-bold flex items-center space-x-2">
                           <FaSyringe />
-                          <span>Vaccination Records</span>
+                          <span>{t('childDetails.vaccinationRecords.title')}</span>
                         </h2>
                         <p className="text-primary-content/90 text-xs mt-1">
-                          Detailed immunization tracking with administration details
+                          {t('childDetails.vaccinationRecords.description')}
                         </p>
                       </div>
                       <div className="flex items-center space-x-4 text-xs">
                         <div className="flex items-center space-x-1">
                           <div className="w-2 h-2 bg-white rounded-full"></div>
-                          <span>Given</span>
+                          <span>{t('childDetails.vaccinationRecords.legend.given')}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <div className="w-2 h-2 bg-white/40 rounded-full"></div>
-                          <span>Pending</span>
+                          <span>{t('childDetails.vaccinationRecords.legend.pending')}</span>
                         </div>
                       </div>
                     </div>
@@ -586,7 +599,7 @@ export default function AllChildren() {
                                             className={`w-2 h-2 rounded-full ${isGiven ? 'bg-success' : 'bg-base-content/30'}`}
                                           />
                                           <span className="font-medium text-sm">
-                                            Dose {scheduleItem.dose}
+                                            {t('childDetails.vaccinationRecords.dose', { dose: scheduleItem.dose })}
                                           </span>
                                           <span className="text-base-content/60 bg-base-300 px-2 py-1 rounded text-xs">
                                             {getRecommendedAgeText(scheduleItem)}
@@ -601,32 +614,37 @@ export default function AllChildren() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                                           <div className="space-y-1">
                                             <div className="font-medium text-base-content">
-                                              Given on: {adToBs(safeFormatDateYYMMDD(dose.date))} (B.S)
+                                              {t('childDetails.vaccinationRecords.givenOnBS', { date: adToBs(safeFormatDateYYMMDD(dose.date)) })}
                                             </div>
                                             <div className="text-base-content/60">
-                                              A.D: {safeFormatDate(dose.date)}
+                                              {t('childDetails.vaccinationRecords.givenOnAD', { date: safeFormatDate(dose.date) })}
                                             </div>
                                           </div>
                                           <div className="space-y-1">
                                             <div className="flex items-center space-x-1 text-base-content/70">
-                                              <FaUserMd className="text-xs" />
-                                              <span>Given by User #{dose.createdById}</span>
-                                            </div>
+  <FaUserMd className="text-xs" />
+  <span 
+    className="hover:text-primary hover:underline cursor-pointer"
+    onClick={() => navigate(`/users/${dose.createdById}`)}
+  >
+    {t('childDetails.vaccinationRecords.givenBy')}: {dose.createdBy.name}
+  </span>
+</div>
                                             <div className="flex items-center space-x-1 text-base-content/70">
                                               <FaClock className="text-xs" />
-                                              <span>Recorded: {safeFormatDate(dose.createdAt)}</span>
+                                              <span>{t('childDetails.vaccinationRecords.recorded', { date: safeFormatDate(dose.createdAt) })}</span>
                                             </div>
                                           </div>
                                           {dose.remarks && (
                                             <div className="md:col-span-2 mt-2 p-2 bg-base-100 rounded border-l-2 border-primary">
-                                              <div className="text-xs text-base-content/70 mb-1">Remarks:</div>
+                                              <div className="text-xs text-base-content/70 mb-1">{t('childDetails.vaccinationRecords.remarks')}</div>
                                               <div className="text-sm text-base-content">{dose.remarks}</div>
                                             </div>
                                           )}
                                           {dose.customVaccineName && (
                                             <div className="md:col-span-2 mt-1">
                                               <span className="text-xs bg-info/20 text-info px-2 py-1 rounded">
-                                                Custom: {dose.customVaccineName}
+                                                {t('childDetails.vaccinationRecords.customVaccine', { name: dose.customVaccineName })}
                                               </span>
                                             </div>
                                           )}
@@ -634,7 +652,7 @@ export default function AllChildren() {
                                       ) : (
                                         <div className="text-center py-2">
                                           <span className="text-base-content/50 italic text-sm">
-                                            Not yet administered
+                                            {t('childDetails.vaccinationRecords.notAdministered')}
                                           </span>
                                         </div>
                                       )}
@@ -658,22 +676,21 @@ export default function AllChildren() {
   }
 
   return (
-    <div className="min-h-screen bg-base-200">
+    <div className="min-h-screen bg-base-200 min-w-[20rem]">
       <div className="bg-base-100 shadow-sm border-b border-base-300">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0">
             <div>
               <h1 className="text-2xl font-bold text-base-content mb-1">
-                Children Health Records
+                {t('header.title')}
               </h1>
               <p className="text-base-content/70 text-sm">
-                Manage and track children's health information and vaccination
-                records
+                {t('header.description')}
               </p>
             </div>
             <button className="inline-flex items-center space-x-2 bg-primary hover:bg-primary-focus text-primary-content px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-sm hover:shadow-md cursor-pointer">
               <FaPlus />
-              <span>Add New Child</span>
+              <span>{t('addChildButton.label')}</span>
             </button>
           </div>
         </div>
@@ -686,7 +703,7 @@ export default function AllChildren() {
               <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-base-content/50" />
               <input
                 type="text"
-                placeholder="Search children by name..."
+                placeholder={t('search.placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-base-100 border border-base-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm text-base-content placeholder:text-base-content/60"
@@ -703,7 +720,7 @@ export default function AllChildren() {
                 <p className="text-2xl font-bold text-base-content">
                   {childrenData.length}
                 </p>
-                <p className="text-xs text-base-content/70">Total Children</p>
+                <p className="text-xs text-base-content/70">{t('stats.totalChildren')}</p>
               </div>
             </div>
           </div>
@@ -717,7 +734,7 @@ export default function AllChildren() {
                 <p className="text-2xl font-bold text-base-content">
                   {childrenData.filter((child) => child.purnaKhop).length}
                 </p>
-                <p className="text-xs text-base-content/70">Fully Vaccinated</p>
+                <p className="text-xs text-base-content/70">{t('stats.fullyVaccinated')}</p>
               </div>
             </div>
           </div>
@@ -728,20 +745,20 @@ export default function AllChildren() {
             <FaBaby className="text-4xl text-base-content/40 mx-auto mb-3" />
             <h2 className="text-xl font-bold text-base-content mb-2">
               {searchTerm
-                ? 'No matching children found'
-                : 'No children records found'}
+                ? t('noResults.title_with_search')
+                : t('noResults.title_no_data')}
             </h2>
             <p className="text-base-content/70 text-sm mb-4">
               {searchTerm
-                ? 'Try adjusting your search terms or clear the search to see all children.'
-                : 'Get started by adding your first child record.'}
+                ? t('noResults.description_with_search')
+                : t('noResults.description_no_data')}
             </p>
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
                 className="bg-primary hover:bg-primary-focus text-primary-content px-4 py-2 rounded-lg font-medium transition-colors duration-200"
               >
-                Clear Search
+                {t('noResults.clear_search')}
               </button>
             )}
           </div>
@@ -771,21 +788,21 @@ export default function AllChildren() {
                             : 'bg-warning/20 text-warning border border-warning/30'
                             }`}
                         >
-                          {child.purnaKhop ? 'Vaccinated' : 'Pending'}
+                          {child.purnaKhop ? t('childCard.vaccinated') : t('childCard.pending')}
                         </div>
                       </div>
                       <h3 className="text-lg font-bold mb-1 text-base-content">
                         {child.fullName} {child.lastName || ''}
                       </h3>
                       <p className="text-base-content/70 text-sm">
-                        {age.formatted}
+                        {t('childDetails.age', { formatted: age.formatted })}
                       </p>
                     </div>
                     <div className="p-4">
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-base-content/70">
-                            Birth Date (B.S.)
+                            {t('childCard.birthDateBS')}
                           </span>
                           <span className="font-medium text-base-content">
                             {adToBs(safeFormatDateYYMMDD(child.birthDate))}
@@ -793,45 +810,50 @@ export default function AllChildren() {
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-base-content/70">
-                            Birth Date (A.D.)
+                            {t('childCard.birthDateAD')}
                           </span>
                           <span className="font-medium text-base-content">
                             {safeFormatDate(child.birthDate)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-base-content/70">Ward</span>
+                          <span className="text-base-content/70">{t('childCard.ward')}</span>
                           <span className="font-medium text-base-content">
                             {child.wardNumber}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-base-content/70">Vaccinations</span>
+                          <span className="text-base-content/70">{t('childCard.vaccinations')}</span>
                           <span className="font-medium text-base-content">
-                            {child.vaccinations ? child.vaccinations.length : 0} doses
+                            {child.vaccinations ? child.vaccinations.length : 0} {t('childCard.vaccinations')}
                           </span>
                         </div>
                         {latestWeight && (
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-base-content/70 flex items-center space-x-1">
                               <FaWeight className="text-xs" />
-                              <span>Latest Weight</span>
+                              <span>{t('childCard.latestWeight')}</span>
                             </span>
                             <span className="font-medium text-base-content">
                               {latestWeight.weight} kg
                             </span>
                           </div>
                         )}
-                        <div className="flex items-center justify-between text-xs pt-2 border-t border-base-300">
-                          <span className="text-base-content/60 flex items-center space-x-1">
-                            <FaUserMd className="text-xs" />
-                            <span>Created by User #{child.createdById}</span>
-                          </span>
-                        </div>
+                      <div className="flex items-center justify-between text-xs pt-2 border-t border-base-300">
+  <span className="text-base-content/60 flex items-center space-x-1">
+    <FaUserMd className="text-xs" />
+    <span 
+      className="hover:text-primary hover:underline cursor-pointer"
+      onClick={() => navigate(`/users/${child.createdBy.id}`)}
+    >
+      {t('childCard.createdBy')}: {child.createdBy.name}
+    </span>
+  </span>
+</div>
                       </div>
                       <button className="w-full bg-base-200 hover:bg-primary hover:text-primary-content text-base-content py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 border border-base-300 group-hover:bg-primary group-hover:text-primary-content">
                         <FaEye />
-                        <span>View Details</span>
+                        <span>{t('childCard.viewDetails')}</span>
                       </button>
                     </div>
                   </div>
@@ -845,10 +867,10 @@ export default function AllChildren() {
                   disabled={currentPage === 1}
                   className="btn btn-primary disabled:opacity-50"
                 >
-                  Previous
+                  {t('pagination.previous')}
                 </button>
                 <span className="text-base-content">
-                  Page {currentPage} of {totalPages}
+                  {t('pagination.page', { current: currentPage, total: totalPages })}
                 </span>
                 <button
                   onClick={() =>
@@ -857,7 +879,7 @@ export default function AllChildren() {
                   disabled={currentPage === totalPages}
                   className="btn btn-primary disabled:opacity-50"
                 >
-                  Next
+                  {t('pagination.next')}
                 </button>
               </div>
             )}

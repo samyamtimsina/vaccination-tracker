@@ -1,0 +1,36 @@
+{
+  "title": "Welcome Back",
+  "subtitle": "Sign in to your account",
+  "email_label": "Email Address",
+  "email_placeholder": "you@example.com",
+  "password_label": "Password",
+  "password_placeholder": "••••••••",
+  "sign_in": "Sign in",
+  "signing_in": "Signing in...",
+  "hero": {
+    "title": "Welcome to Vaccination Monitoring System",
+    "description": "Easily manage vaccination records for children and mothers.",
+    "features": [
+      {
+        "title": "Vaccination Records",
+        "description": "Easily track vaccination records for children and mothers."
+      },
+      {
+        "title": "Profile Management",
+        "description": "Add profiles and keep all information organized."
+      },
+      {
+        "title": "Secure & Easy",
+        "description": "Our platform keeps data secure."
+      }
+    ]
+  },
+  "toast": {
+    "success": "Login successful",
+    "error": "Invalid credentials"
+  },
+  "language_toggle": {
+    "en": "English",
+    "ne": "Nepali"
+  }
+}

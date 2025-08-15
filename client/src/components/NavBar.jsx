@@ -14,8 +14,15 @@ import {
   FaShieldAlt,
   FaChevronDown,
 } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 export default function Navbar() {
+  const { i18n, t } = useTranslation('common');
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'ne' : 'en';
+    i18n.changeLanguage(newLang);
+  };
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -77,21 +84,25 @@ export default function Navbar() {
             )}
           </button>
 
+          {/* language change button (Desktop) */}
+          <button
+            onClick={toggleLanguage}
+            className="px-3 py-2 w-24 border rounded-md transition-colors duration-300 flex items-center justify-center
+            bg-base-200 text-base-content border-base-300
+            hover:bg-base-300 hover:border-base-400 cursor-pointer"
+          >
+            <span className="mr-2">🌐</span>
+            {i18n.language === 'en' ? 'नेपाली' : 'English'}
+          </button>
+          
           {!user ? (
             <div className="flex items-center gap-2">
               <Link
                 to="/login"
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-base-content/70 hover:text-primary hover:bg-base-200 transition-all duration-200 font-medium"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white bg-primary hover:bg-primary-focus transition-colors duration-200 font-medium"
               >
                 <FaSignInAlt className="text-sm" />
                 Sign In
-              </Link>
-              <Link
-                to="/register"
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white bg-primary hover:bg-primary-focus transition-colors duration-200 font-medium"
-              >
-                <FaUserPlus className="text-sm" />
-                Get Started
               </Link>
             </div>
           ) : (
@@ -147,7 +158,7 @@ export default function Navbar() {
             {theme === 'light' ? (
               <FaMoon className="text-primary" />
             ) : (
-              <FaSun className="text-accent" />
+              <FaSun className="text-primary" />
             )}
           </button>
           <button
@@ -169,6 +180,19 @@ export default function Navbar() {
           className="md:hidden bg-base-100 border-t border-base-300 shadow-xl"
           ref={menuRef}
         >
+          {/* Mobile-specific options container */}
+          <div className="p-4 space-y-2 border-b border-base-300">
+            {/* language change button (Mobile) */}
+            <button
+              onClick={toggleLanguage}
+              className="flex items-center justify-start w-full px-4 py-3 rounded-lg hover:bg-base-200 transition-all duration-200 text-base-content/70 hover:text-primary"
+            >
+              <span className="mr-4 text-xl">🌐</span>
+              <span className="font-medium">
+                {i18n.language === 'en' ? 'नेपाली' : 'English'}
+              </span>
+            </button>
+          </div>
           {!user ? (
             <div className="p-4 space-y-2">
               <Link
@@ -178,14 +202,6 @@ export default function Navbar() {
               >
                 <FaSignInAlt className="text-base-content/50" />
                 <span className="font-medium">Sign In</span>
-              </Link>
-              <Link
-                to="/register"
-                onClick={() => setIsMenuOpen(false)}
-                className="flex items-center gap-3 w-full p-4 rounded-lg text-white bg-primary hover:bg-primary-focus transition-all duration-200"
-              >
-                <FaUserPlus className="text-white" />
-                <span className="font-medium">Get Started</span>
               </Link>
             </div>
           ) : (

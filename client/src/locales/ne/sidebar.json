@@ -1,0 +1,29 @@
+{
+  "header": "नेभिगेसन",
+  "menu": {
+    "dashboard": {
+      "label": "ड्यासबोर्ड"
+    },
+    "add_child": {
+      "label": "बालबालिका थप्नुहोस्"
+    },
+    "view_children": {
+      "label": "बालबालिकाहरू हेर्नुहोस्"
+    },
+    "add_mother": {
+      "label": "आमा थप्नुहोस्"
+    },
+    "view_mothers": {
+      "label": "आमाहरू हेर्नुहोस्"
+    },
+    "search_records": {
+      "label": "रेकर्डहरू खोज्नुहोस्"
+    },
+    "profile": {
+      "label": "प्रोफाइल"
+    },
+    "logout": {
+      "label": "लगआउट"
+    }
+  }
+}

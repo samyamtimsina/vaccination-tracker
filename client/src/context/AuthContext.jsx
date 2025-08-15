@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
 
   const checkAuthentication = async () => {
     try {
-      const response = await axiosClient.get('/api/auth/me', {
+      const response = await axiosClient.get('/api/users/me', {
         withCredentials: true,
       });
       setUser(response.data.user); // The server should return the user's data

@@ -1,0 +1,122 @@
+{
+  "mobile_header": {
+    "title": "Dashboard",
+    "subtitle": "Vaccine System"
+  },
+  "welcome": {
+    "greeting_morning": "Good Morning, {{name}}",
+    "greeting_afternoon": "Good Afternoon, {{name}}",
+    "greeting_evening": "Good Evening, {{name}}",
+    "overview": "Here's your vaccination management system overview",
+    "system_status": "System Status",
+    "online": "Online",
+    "logout": "Logout"
+  },
+  "main_stats": {
+    "children_registered": {
+      "label": "Total Children Registered",
+      "description": "This month"
+    },
+    "mothers_registered": {
+      "label": "Total Mothers Registered",
+      "description": "This month"
+    },
+    "pending_vaccinations": {
+      "label": "Pending Vaccinations",
+      "description": "Next 7 days"
+    },
+    "completed_today": {
+      "label": "Completed Today",
+      "description": "Today"
+    },
+    "change_positive": "+{{value}}%",
+    "change_negative": "-{{value}}%"
+  },
+  "alerts": {
+    "title": "Alerts",
+    "vaccination_due": {
+      "title": "Vaccination Due",
+      "message": "{{count}} children have overdue vaccinations",
+      "time": "{{time}} ago"
+    },
+    "weekly_report": {
+      "title": "Weekly Report",
+      "message": "Weekly vaccination report is ready",
+      "time": "{{time}} ago"
+    },
+    "goal_achieved": {
+      "title": "Goal Achieved",
+      "message": "Monthly vaccination target reached",
+      "time": "{{time}} ago"
+    }
+  },
+  "quick_actions": {
+    "title": "Quick Actions",
+    "register_child": {
+      "label": "Register Child",
+      "description": "Add new child to the system"
+    },
+    "register_mother": {
+      "label": "Register Mother",
+      "description": "Register expecting or new mother"
+    },
+    "search_records": {
+      "label": "Search Records",
+      "description": "Find child or mother records"
+    },
+    "view_all_children": {
+      "label": "View All Children",
+      "description": "Browse all registered children",
+      "count": "{{count}}"
+    },
+    "pending_vaccinations": {
+      "label": "Pending Vaccinations",
+      "description": "View upcoming vaccination schedule",
+      "count": "{{count}}"
+    },
+    "generate_report": {
+      "label": "Generate Report",
+      "description": "Create vaccination reports"
+    }
+  },
+  "recent_activity": {
+    "title": "Recent Activity",
+    "live_updates": "Live updates",
+    "child_registration": {
+      "action": "Child registration completed",
+      "by": "by {{user}}",
+      "location": "at {{location}}",
+      "time": "{{time}} ago"
+    },
+    "vaccination_administered": {
+      "action": "Vaccination administered",
+      "by": "by {{user}}",
+      "location": "at {{location}}",
+      "time": "{{time}} ago"
+    },
+    "mother_record_updated": {
+      "action": "Mother record updated",
+      "by": "by {{user}}",
+      "location": "at {{location}}",
+      "time": "{{time}} ago"
+    },
+    "appointment_scheduled": {
+      "action": "Appointment scheduled",
+      "by": "by {{user}}",
+      "location": "at {{location}}",
+      "time": "{{time}} ago"
+    },
+    "sms_reminders": {
+      "action": "SMS reminders sent",
+      "by": "by {{user}}",
+      "location": "at {{location}}",
+      "time": "{{time}} ago"
+    },
+    "stock_alert": {
+      "action": "Stock alert generated",
+      "by": "by {{user}}",
+      "location": "at {{location}}",
+      "time": "{{time}} ago"
+    }
+  }
+}

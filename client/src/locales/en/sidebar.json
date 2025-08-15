@@ -1,0 +1,29 @@
+{
+  "header": "Navigation",
+  "menu": {
+    "dashboard": {
+      "label": "Dashboard"
+    },
+    "add_child": {
+      "label": "Add Child"
+    },
+    "view_children": {
+      "label": "View Children"
+    },
+    "add_mother": {
+      "label": "Add Mother"
+    },
+    "view_mothers": {
+      "label": "View Mothers"
+    },
+    "search_records": {
+      "label": "Search Records"
+    },
+    "profile": {
+      "label": "Profile"
+    },
+    "logout": {
+      "label": "Logout"
+    }
+  }
+}

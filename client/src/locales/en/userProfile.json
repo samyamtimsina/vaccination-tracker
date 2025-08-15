@@ -1,0 +1,29 @@
+{
+  "loading": "Loading user profile...",
+  "backButton": "Back",
+  "error": {
+    "title": "Error fetching user data",
+    "backButton": "Go Back"
+  },
+  "notFound": {
+    "title": "User not found",
+    "message": "The requested user profile could not be found."
+  },
+  "roles": {
+    "admin": "Administrator",
+    "healthworker": "Health Worker",
+    "staff": "Staff",
+    "ward_officer": "Ward Officer"
+  },
+  "personalInfo": {
+    "title": "Personal Information",
+    "email": "Email",
+    "phone": "Phone",
+    "address": "Address"
+  },
+  "accountInfo": {
+    "title": "Account Information",
+    "role": "Role",
+    "memberSince": "Member Since"
+  }
+}

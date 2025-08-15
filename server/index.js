@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { authenticate, authorize } from './middlewares/auth.js';
 import authRoutes from './routes/authRoutes.js';
 import childRoutes from './routes/childRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 import cookieParser from 'cookie-parser';
 
 import motherRoutes from './routes/motherRoutes.js';
@@ -31,6 +32,9 @@ app.use(express.json());
 
 //Routes
 app.use('/api/auth', authRoutes);
+
+//User routes
+app.use('/api/users', userRoutes)
 
 //child routes
 app.use('/api/child', childRoutes);

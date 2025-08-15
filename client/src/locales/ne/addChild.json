@@ -1,0 +1,119 @@
+{
+  "header": {
+    "title": "बालबालिका थप्नुहोस्",
+    "description": "नयाँ बालबालिकाको जानकारी दर्ता गर्नुहोस्"
+  },
+  "dashboard_button": {
+    "label": "ड्यासबोर्ड",
+    "title": "ड्यासबोर्डमा फर्कनुहोस्"
+  },
+  "personalInfo": {
+    "title": "व्यक्तिगत जानकारी",
+    "municipality": {
+      "label": "बाहिरको नगरपालिकाबाट आएको हो"
+    },
+    "form": {
+      "firstName": {
+        "label": "पहिलो नाम",
+        "placeholder": "पहिलो नाम",
+        "required": "पहिलो नाम अनिवार्य छ"
+      },
+      "lastName": {
+        "label": "थर",
+        "placeholder": "थर"
+      },
+      "gender": {
+        "label": "लिंग",
+        "placeholder": "लिंग छान्नुहोस्",
+        "required": "लिंग अनिवार्य छ",
+        "options": {
+          "male": "पुरुष",
+          "female": "महिला",
+          "other": "अन्य"
+        }
+      },
+      "wardNumber": {
+        "label": "वडा नम्बर",
+        "placeholder": "वडा नम्बर",
+        "required": "वडा नम्बर अनिवार्य छ"
+      },
+      "casteCode": {
+        "label": "जात कोड",
+        "placeholder": "जात कोड",
+        "required": "जात कोड अनिवार्य छ"
+      },
+      "parentName": {
+        "label": "अभिभावकको नाम",
+        "placeholder": "अभिभावकको नाम",
+        "required": "अभिभावकको नाम अनिवार्य छ"
+      },
+      "tole": {
+        "label": "टोल",
+        "placeholder": "टोल",
+        "required": "टोल अनिवार्य छ"
+      },
+      "phoneNumber": {
+        "label": "फोन नम्बर",
+        "placeholder": "फोन नम्बर"
+      },
+      "birthDate": {
+        "label": "जन्म मिति",
+        "required": "जन्म मिति अनिवार्य छ",
+        "clear_title": "मिति मेटाउनुहोस्"
+      },
+      "purnaKhop": {
+        "label": "पूर्ण खोप"
+      }
+    },
+    "age": "उमेर: {{months}} महिना ({{days}} दिन)"
+  },
+  "weightTracking": {
+    "title": "तौल ट्र्याकिंग",
+    "date_label": "मिति {{index}}",
+    "weight_label": "तौल (किलोग्राम)",
+    "add_button": "पहिलो तौल रेकर्ड थप्नुहोस्",
+    "remove_button_title": "तौल रेकर्ड हटाउनुहोस्",
+    "add_more_button_title": "अर्को तौल रेकर्ड थप्नुहोस्",
+    "errors": {
+      "weight_positive": "तौल सकारात्मक हुनुपर्छ",
+      "weight_too_large": "तौल धेरै ठूलो छ"
+    }
+  },
+  "vaccines": {
+    "title": "खोपहरू",
+    "dose_label": "मात्रा {{dose}}",
+    "recommended_at": {
+      "months": "{{value}} महिना",
+      "weeks": "{{value}} हप्ता",
+      "days": "{{value}} दिन"
+    },
+    "not_eligible": "खोपको लागि उमेर पुगेको छैन",
+    "remarks": {
+      "label": "कैफियत",
+      "placeholder": "उदाहरण: बच्चालाई ज्वरो भयो..."
+    },
+    "clear_date_title": "मिति मेटाउनुहोस्"
+  },
+  "generalRemarks": {
+    "title": "सामान्य कैफियत",
+    "label": "अतिरिक्त जानकारी वा टिप्पणी (वैकल्पिक)",
+    "placeholder": "यहाँ कुनै विशेष कैफियत, अवलोकन, वा अन्य महत्वपूर्ण जानकारी लेख्नुहोस्...",
+    "optional_note": "यो क्षेत्र वैकल्पिक छ"
+  },
+  "submitSection": {
+    "title": "तयार छ?",
+    "description": "सबै जानकारी जाँच गरेर सेभ गर्नुहोस्",
+    "reset_button": "रिसेट गर्नुहोस्",
+    "reset_confirm": "के तपाईं निश्चित हुनुहुन्छ? सबै डेटा हराउनेछ।",
+    "save_button": "डेटा सेभ गर्नुहोस्",
+    "saving": "सेभ हुँदैछ..."
+  },
+  "toast": {
+    "success": "बालबालिका डेटा सफलतापूर्वक सेभ भयो!",
+    "error": "डेटा सेभ गर्न असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।",
+    "validation_error": "कृपया सबै आवश्यक जानकारी भर्नुहोस्। ({{message}})"
+  },
+  "scrollToTop": {
+    "title": "माथि जानुहोस्"
+  }
+}

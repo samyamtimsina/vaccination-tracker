@@ -1,0 +1,122 @@
+{
+  "mobile_header": {
+    "title": "ड्यासबोर्ड",
+    "subtitle": "खोप प्रणाली"
+  },
+  "welcome": {
+    "greeting_morning": "शुभ प्रभात, {{name}}",
+    "greeting_afternoon": "शुभ दिउँसो, {{name}}",
+    "greeting_evening": "शुभ साँझ, {{name}}",
+    "overview": "यहाँ तपाईंको खोप व्यवस्थापन प्रणालीको अवलोकन छ",
+    "system_status": "प्रणाली स्थिति",
+    "online": "अनलाइन",
+    "logout": "लगआउट"
+  },
+  "main_stats": {
+    "children_registered": {
+      "label": "कुल बालबालिका दर्ता",
+      "description": "यो महिना"
+    },
+    "mothers_registered": {
+      "label": "कुल आमा दर्ता",
+      "description": "यो महिना"
+    },
+    "pending_vaccinations": {
+      "label": "बाँकी खोपहरू",
+      "description": "आगामी ७ दिन"
+    },
+    "completed_today": {
+      "label": "आज सम्पन्न",
+      "description": "आज"
+    },
+    "change_positive": "+{{value}}%",
+    "change_negative": "-{{value}}%"
+  },
+  "alerts": {
+    "title": "चेतावनीहरू",
+    "vaccination_due": {
+      "title": "खोप बाँकी",
+      "message": "{{count}} बालबालिकाहरूको खोप समयावधि सकिएको छ",
+      "time": "{{time}} अघि"
+    },
+    "weekly_report": {
+      "title": "साप्ताहिक प्रतिवेदन",
+      "message": "साप्ताहिक खोप प्रतिवेदन तयार छ",
+      "time": "{{time}} अघि"
+    },
+    "goal_achieved": {
+      "title": "लक्ष्य प्राप्त",
+      "message": "मासिक खोप लक्ष्य पुगेको छ",
+      "time": "{{time}} अघि"
+    }
+  },
+  "quick_actions": {
+    "title": "द्रुत कार्यहरू",
+    "register_child": {
+      "label": "बालबालिका दर्ता",
+      "description": "प्रणालीमा नयाँ बालबालिका थप्नुहोस्"
+    },
+    "register_mother": {
+      "label": "आमा दर्ता",
+      "description": "गर्भवती वा नयाँ आमा दर्ता गर्नुहोस्"
+    },
+    "search_records": {
+      "label": "रेकर्डहरू खोज्नुहोस्",
+      "description": "बालबालिका वा आमा रेकर्डहरू फेला पार्नुहोस्"
+    },
+    "view_all_children": {
+      "label": "सबै बालबालिका हेर्नुहोस्",
+      "description": "सबै दर्ता गरिएका बालबालिकाहरू ब्राउज गर्नुहोस्",
+      "count": "{{count}}"
+    },
+    "pending_vaccinations": {
+      "label": "बाँकी खोपहरू",
+      "description": "आगामी खोप तालिका हेर्नुहोस्",
+      "count": "{{count}}"
+    },
+    "generate_report": {
+      "label": "प्रतिवेदन उत्पन्न गर्नुहोस्",
+      "description": "खोप प्रतिवेदनहरू सिर्जना गर्नुहोस्"
+    }
+  },
+  "recent_activity": {
+    "title": "हालको गतिविधि",
+    "live_updates": "प्रत्यक्ष अपडेटहरू",
+    "child_registration": {
+      "action": "बालबालिका दर्ता सम्पन्न",
+      "by": "{{user}} द्वारा",
+      "location": "{{location}} मा",
+      "time": "{{time}} अघि"
+    },
+    "vaccination_administered": {
+      "action": "खोप प्रदान गरियो",
+      "by": "{{user}} द्वारा",
+      "location": "{{location}} मा",
+      "time": "{{time}} अघि"
+    },
+    "mother_record_updated": {
+      "action": "आमा रेकर्ड अद्यावधिक",
+      "by": "{{user}} द्वारा",
+      "location": "{{location}} मा",
+      "time": "{{time}} अघि"
+    },
+    "appointment_scheduled": {
+      "action": "नियुक्ति तालिकाबद्ध",
+      "by": "{{user}} द्वारा",
+      "location": "{{location}} मा",
+      "time": "{{time}} अघि"
+    },
+    "sms_reminders": {
+      "action": "एसएमएस रिमाइन्डरहरू पठाइयो",
+      "by": "{{user}} द्वारा",
+      "location": "{{location}} मा",
+      "time": "{{time}} अघि"
+    },
+    "stock_alert": {
+      "action": "स्टक चेतावनी उत्पन्न",
+      "by": "{{user}} द्वारा",
+      "location": "{{location}} मा",
+      "time": "{{time}} अघि"
+    }
+  }
+}

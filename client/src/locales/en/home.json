@@ -1,0 +1,46 @@
+{
+  "welcome": "Welcome to",
+  "title": "Vaccination Monitoring System",
+  "description": "Easily manage vaccination records for children and mothers. Our intuitive and secure platform keeps your health data organized and accessible.",
+  "get_started": "Get Started",
+  "login": "Log In",
+  "register": "Register",
+  "features": [
+    {
+      "title": "Vaccination Records",
+      "description": "Easily track and manage vaccination records for children and mothers."
+    },
+    {
+      "title": "Profile Management",
+      "description": "Add profiles and organize all information in one place."
+    },
+    {
+      "title": "Secure & Easy",
+      "description": "Our platform keeps data secure and easy to use."
+    },
+    {
+      "title": "Progress Tracking",
+      "description": "Monitor vaccination program progress and schedules."
+    },
+    {
+      "title": "Smart Alerts",
+      "description": "Receive automated reminders and notifications for upcoming vaccinations."
+    },
+    {
+      "title": "Health Monitoring",
+      "description": "Keep a comprehensive record of overall health and vaccination history."
+    }
+  ],
+  "stats": {
+    "total_users": "Total Users",
+    "vaccination_records": "Vaccination Records",
+    "service_availability": "Service Availability",
+    "daily_growth": "Daily Growth",
+    "secure_storage": "Secure Storage",
+    "24_7_service": "24/7 Service"
+  },
+  "cta": {
+    "title": "Get Started Today",
+    "description": "Start managing your family's health records and tracking vaccination programs today."
+  }
+}

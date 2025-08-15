@@ -1,0 +1,49 @@
+{
+  "header": {
+    "title": "Profile",
+    "backToDashboard": "Back to Dashboard"
+  },
+  "guestUser": {
+    "name": "Guest User",
+    "email": "guest@example.com",
+    "role": "Guest"
+  },
+  "personalInfo": {
+    "title": "Personal Information",
+    "name": "Name",
+    "namePlaceholder": "Your Name",
+    "email": "Email",
+    "emailPlaceholder": "Your Email",
+    "ward": "Ward",
+    "wardPlaceholder": "Ward Number (Optional)",
+    "wardNotSet": "Not set",
+    "role": "Role",
+    "roleNotSet": "Not set"
+  },
+  "password": {
+    "title": "Change Password",
+    "current": "Current Password",
+    "currentPlaceholder": "Current Password",
+    "new": "New Password",
+    "newPlaceholder": "New Password",
+    "confirm": "Confirm Password",
+    "confirmPlaceholder": "Confirm Password"
+  },
+  "buttons": {
+    "editProfile": "Edit Profile",
+    "changePassword": "Change Password",
+    "saveProfile": "Save Profile",
+    "savePassword": "Save Password",
+    "saving": "Saving...",
+    "cancel": "Cancel"
+  },
+  "success": {
+    "profileUpdated": "Profile updated successfully!",
+    "passwordChanged": "Password changed successfully!"
+  },
+  "error": {
+    "profileUpdateFailed": "Failed to update profile",
+    "passwordChangeFailed": "Failed to change password",
+    "passwordMismatch": "Passwords do not match"
+  }
+}

@@ -15,44 +15,46 @@ import {
   FaChevronRight,
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const menuItems = [
   {
     to: '/dashboard',
-    label: 'Dashboard',
+    label: 'menu.dashboard.label',
     icon: <FaTachometerAlt />,
     type: 'link',
   },
-  { to: '/add-child', label: 'Add Child', icon: <FaChild />, type: 'link' },
+  { to: '/add-child', label: 'menu.add_child.label', icon: <FaChild />, type: 'link' },
   {
     to: '/view-children',
-    label: 'View Children',
+    label: 'menu.view_children.label',
     icon: <FaUsers />,
     type: 'link',
   },
   {
     to: '/add-mother',
-    label: 'Add Mother',
+    label: 'menu.add_mother.label',
     icon: <FaUserPlus />,
     type: 'link',
   },
   {
     to: '/view-mothers',
-    label: 'View Mothers',
+    label: 'menu.view_mothers.label',
     icon: <FaFemale />,
     type: 'link',
   },
   {
     to: '/search-records',
-    label: 'Search Records',
+    label: 'menu.search_records.label',
     icon: <FaSearch />,
     type: 'link',
   },
-  { to: '/profile', label: 'Profile', icon: <FaUserCircle />, type: 'link' },
-  { to: '/', label: 'Logout', icon: <FaSignOutAlt />, type: 'button' },
+  { to: '/profile', label: 'menu.profile.label', icon: <FaUserCircle />, type: 'link' },
+  { to: '/', label: 'menu.logout.label', icon: <FaSignOutAlt />, type: 'button' },
 ];
 
 export default function SidebarNav() {
+  const { t } = useTranslation('sidebar');
   const { logout } = useAuth();
   const location = useLocation();
 
@@ -77,7 +79,6 @@ export default function SidebarNav() {
 
   const handleLogout = () => {
     logout();
-    navigate('/', { replace: true });
   };
 
   const toggleSidebar = () => {
@@ -110,7 +111,7 @@ export default function SidebarNav() {
       <aside
         className={`fixed top-0 left-0 h-full bg-base-100 border-r border-base-300 z-50 transform transition-transform duration-300 ease-in-out ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } min-w-[20rem]`}
         style={{ width: SNAP_POINTS.EXPANDED }}
       >
         <div className="flex flex-col h-full">
@@ -120,7 +121,7 @@ export default function SidebarNav() {
               <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-content">
                 <FaTachometerAlt />
               </div>
-              <span className="font-bold">Navigation</span>
+              <span className="font-bold">{t('header')}</span>
             </div>
             <button
               onClick={() => setIsMobileMenuOpen(false)}
@@ -149,7 +150,7 @@ export default function SidebarNav() {
                   <div className="w-8 h-8 flex items-center justify-center">
                     {icon}
                   </div>
-                  <span>{label}</span>
+                  <span>{t(label)}</span>
                 </Link>
               ) : (
                 <button
@@ -160,7 +161,7 @@ export default function SidebarNav() {
                   <div className="w-8 h-8 flex items-center justify-center">
                     {icon}
                   </div>
-                  <span>{label}</span>
+                  <span>{t(label)}</span>
                 </button>
               );
             })}
@@ -182,7 +183,7 @@ export default function SidebarNav() {
             <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-content">
               <FaTachometerAlt />
             </div>
-            <span className="font-bold">Navigation</span>
+            <span className="font-bold">{t('header')}</span>
           </div>
         )}
         <button
@@ -213,7 +214,7 @@ export default function SidebarNav() {
               <div className="w-8 h-8 flex items-center justify-center">
                 {icon}
               </div>
-              {showText && <span>{label}</span>}
+              {showText && <span>{t(label)}</span>}
             </Link>
           ) : (
             <button
@@ -224,7 +225,7 @@ export default function SidebarNav() {
               <div className="w-8 h-8 flex items-center justify-center">
                 {icon}
               </div>
-              {showText && <span>{label}</span>}
+              {showText && <span>{t(label)}</span>}
             </button>
           );
         })}

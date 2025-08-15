@@ -1,0 +1,49 @@
+{
+  "header": {
+    "title": "प्रोफाइल",
+    "backToDashboard": "ड्यासबोर्डमा फर्कनुहोस्"
+  },
+  "guestUser": {
+    "name": "अतिथि प्रयोगकर्ता",
+    "email": "guest@example.com",
+    "role": "अतिथि"
+  },
+  "personalInfo": {
+    "title": "व्यक्तिगत जानकारी",
+    "name": "नाम",
+    "namePlaceholder": "तपाईंको नाम",
+    "email": "इमेल",
+    "emailPlaceholder": "तपाईंको इमेल",
+    "ward": "वार्ड",
+    "wardPlaceholder": "वार्ड नम्बर (वैकल्पिक)",
+    "wardNotSet": "सेट गरिएको छैन",
+    "role": "भूमिका",
+    "roleNotSet": "सेट गरिएको छैन"
+  },
+  "password": {
+    "title": "पासवर्ड परिवर्तन गर्नुहोस्",
+    "current": "हालको पासवर्ड",
+    "currentPlaceholder": "हालको पासवर्ड",
+    "new": "नयाँ पासवर्ड",
+    "newPlaceholder": "नयाँ पासवर्ड",
+    "confirm": "पासवर्ड पुष्टि गर्नुहोस्",
+    "confirmPlaceholder": "पासवर्ड पुष्टि गर्नुहोस्"
+  },
+  "buttons": {
+    "editProfile": "प्रोफाइल सम्पादन गर्नुहोस्",
+    "changePassword": "पासवर्ड परिवर्तन गर्नुहोस्",
+    "saveProfile": "प्रोफाइल सेभ गर्नुहोस्",
+    "savePassword": "पासवर्ड सेभ गर्नुहोस्",
+    "saving": "सेभ हुँदैछ...",
+    "cancel": "रद्द गर्नुहोस्"
+  },
+  "success": {
+    "profileUpdated": "प्रोफाइल सफलतापूर्वक अद्यावधिक गरियो!",
+    "passwordChanged": "पासवर्ड सफलतापूर्वक परिवर्तन गरियो!"
+  },
+  "error": {
+    "profileUpdateFailed": "प्रोफाइल अद्यावधिक गर्न असफल",
+    "passwordChangeFailed": "पासवर्ड परिवर्तन गर्न असफल",
+    "passwordMismatch": "पासवर्डहरू मेल खाँदैनन्"
+  }
+}

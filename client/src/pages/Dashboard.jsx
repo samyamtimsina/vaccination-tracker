@@ -9,7 +9,6 @@ import {
   FaBell,
   FaCalendarAlt,
   FaClock,
-  FaGripHorizontal,
   FaBars,
   FaChevronRight,
   FaUsers,
@@ -18,14 +17,14 @@ import {
   FaCheckCircle,
   FaClipboardList,
   FaMapMarkerAlt,
-  FaPhone,
-  FaEye,
 } from 'react-icons/fa';
 import { FaArrowTrendUp, FaArrowTrendDown } from 'react-icons/fa6';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 export default function Dashboard() {
+  const { t } = useTranslation('dashboard');
   const { user, logout } = useAuth();
   const { theme } = useTheme();
   const [activityHeight, setActivityHeight] = useState(400);
@@ -97,75 +96,76 @@ export default function Dashboard() {
     }
   }, [isResizing, activityHeight, SNAP_POINTS, isMobile]);
 
+  // Dynamic data (to be replaced with API calls)
   const mainStats = [
     {
-      label: 'Total Children Registered',
-      value: 1247,
+      label: t('main_stats.children_registered.label'),
+      value: 1247, // Dynamic
       icon: <FaChild className="text-2xl" />,
       link: '/view-children',
-      change: '+12.5%',
+      change: '12.5', // Dynamic
       changeType: 'positive',
       bgColor: 'bg-blue-500',
       lightBg: 'bg-blue-50',
-      description: 'This month',
+      description: t('main_stats.children_registered.description'),
     },
     {
-      label: 'Total Mothers Registered',
-      value: 894,
+      label: t('main_stats.mothers_registered.label'),
+      value: 894, // Dynamic
       icon: <FaFemale className="text-2xl" />,
       link: '/view-mothers',
-      change: '+8.3%',
+      change: '8.3', // Dynamic
       changeType: 'positive',
       bgColor: 'bg-rose-500',
       lightBg: 'bg-rose-50',
-      description: 'This month',
+      description: t('main_stats.mothers_registered.description'),
     },
     {
-      label: 'Pending Vaccinations',
-      value: 156,
+      label: t('main_stats.pending_vaccinations.label'),
+      value: 156, // Dynamic
       icon: <FaCalendarAlt className="text-2xl" />,
       link: '/search-records',
-      change: '-5.2%',
+      change: '5.2', // Dynamic
       changeType: 'negative',
       bgColor: 'bg-amber-500',
       lightBg: 'bg-amber-50',
-      description: 'Next 7 days',
+      description: t('main_stats.pending_vaccinations.description'),
     },
     {
-      label: 'Completed Today',
-      value: 23,
+      label: t('main_stats.completed_today.label'),
+      value: 23, // Dynamic
       icon: <FaCheckCircle className="text-2xl" />,
       link: '/search-records',
-      change: '+15.8%',
+      change: '15.8', // Dynamic
       changeType: 'positive',
       bgColor: 'bg-emerald-500',
       lightBg: 'bg-emerald-50',
-      description: 'Today',
+      description: t('main_stats.completed_today.description'),
     },
   ];
 
   const alertsAndNotifications = [
     {
       type: 'urgent',
-      title: 'Vaccination Due',
-      message: '15 children have overdue vaccinations',
-      time: '2 hours ago',
+      title: t('alerts.vaccination_due.title'),
+      message: t('alerts.vaccination_due.message', { count: 15 }), // Dynamic count
+      time: t('alerts.vaccination_due.time', { time: '2 hours' }), // Dynamic time
       icon: <FaExclamationTriangle className="text-red-500" />,
       action: '/view-children?filter=overdue',
     },
     {
       type: 'info',
-      title: 'Weekly Report',
-      message: 'Weekly vaccination report is ready',
-      time: '1 day ago',
+      title: t('alerts.weekly_report.title'),
+      message: t('alerts.weekly_report.message'),
+      time: t('alerts.weekly_report.time', { time: '1 day' }), // Dynamic time
       icon: <FaClipboardList className="text-blue-500" />,
       action: '/reports',
     },
     {
       type: 'success',
-      title: 'Goal Achieved',
-      message: 'Monthly vaccination target reached',
-      time: '2 days ago',
+      title: t('alerts.goal_achieved.title'),
+      message: t('alerts.goal_achieved.message'),
+      time: t('alerts.goal_achieved.time', { time: '2 days' }), // Dynamic time
       icon: <FaCheckCircle className="text-emerald-500" />,
       action: '/dashboard',
     },
@@ -173,112 +173,112 @@ export default function Dashboard() {
 
   const recentActivity = [
     {
-      action: 'Child registration completed',
-      details: 'Rajesh Kumar (Age: 2 months)',
-      by: user?.name || 'Health Worker',
-      time: '5 minutes ago',
+      action: t('recent_activity.child_registration.action'),
+      details: 'Rajesh Kumar (Age: 2 months)', // Dynamic
+      by: t('recent_activity.child_registration.by', { user: user?.name || 'Health Worker' }), // Dynamic user
+      time: t('recent_activity.child_registration.time', { time: '5 minutes' }), // Dynamic time
       icon: <FaChild className="text-blue-500" />,
       status: 'success',
-      location: 'Birtamod Clinic',
+      location: t('recent_activity.child_registration.location', { location: 'Birtamod Clinic' }), // Dynamic location
     },
     {
-      action: 'Vaccination administered',
-      details: 'BCG vaccine for Sita Rai',
-      by: 'Dr. Sharma',
-      time: '12 minutes ago',
+      action: t('recent_activity.vaccination_administered.action'),
+      details: 'BCG vaccine for Sita Rai', // Dynamic
+      by: t('recent_activity.vaccination_administered.by', { user: 'Dr. Sharma' }), // Dynamic user
+      time: t('recent_activity.vaccination_administered.time', { time: '12 minutes' }), // Dynamic time
       icon: <FaCheckCircle className="text-emerald-500" />,
       status: 'success',
-      location: 'Main Health Center',
+      location: t('recent_activity.vaccination_administered.location', { location: 'Main Health Center' }), // Dynamic location
     },
     {
-      action: 'Mother record updated',
-      details: 'Contact information updated',
-      by: 'Registration Officer',
-      time: '25 minutes ago',
+      action: t('recent_activity.mother_record_updated.action'),
+      details: 'Contact information updated', // Dynamic
+      by: t('recent_activity.mother_record_updated.by', { user: 'Registration Officer' }), // Dynamic user
+      time: t('recent_activity.mother_record_updated.time', { time: '25 minutes' }), // Dynamic time
       icon: <FaFemale className="text-rose-500" />,
       status: 'info',
-      location: 'Sub Health Post',
+      location: t('recent_activity.mother_record_updated.location', { location: 'Sub Health Post' }), // Dynamic location
     },
     {
-      action: 'Appointment scheduled',
-      details: '5 children scheduled for next week',
-      by: 'System',
-      time: '45 minutes ago',
+      action: t('recent_activity.appointment_scheduled.action'),
+      details: '5 children scheduled for next week', // Dynamic
+      by: t('recent_activity.appointment_scheduled.by', { user: 'System' }), // Dynamic user
+      time: t('recent_activity.appointment_scheduled.time', { time: '45 minutes' }), // Dynamic time
       icon: <FaCalendarAlt className="text-amber-500" />,
       status: 'info',
-      location: 'Multiple locations',
+      location: t('recent_activity.appointment_scheduled.location', { location: 'Multiple locations' }), // Dynamic location
     },
     {
-      action: 'SMS reminders sent',
-      details: '127 mothers notified about upcoming vaccinations',
-      by: 'System',
-      time: '1 hour ago',
+      action: t('recent_activity.sms_reminders.action'),
+      details: '127 mothers notified about upcoming vaccinations', // Dynamic
+      by: t('recent_activity.sms_reminders.by', { user: 'System' }), // Dynamic user
+      time: t('recent_activity.sms_reminders.time', { time: '1 hour' }), // Dynamic time
       icon: <FaBell className="text-purple-500" />,
       status: 'info',
-      location: 'District wide',
+      location: t('recent_activity.sms_reminders.location', { location: 'District wide' }), // Dynamic location
     },
     {
-      action: 'Stock alert generated',
-      details: 'DPT vaccine stock running low',
-      by: 'Inventory System',
-      time: '2 hours ago',
+      action: t('recent_activity.stock_alert.action'),
+      details: 'DPT vaccine stock running low', // Dynamic
+      by: t('recent_activity.stock_alert.by', { user: 'Inventory System' }), // Dynamic user
+      time: t('recent_activity.stock_alert.time', { time: '2 hours' }), // Dynamic time
       icon: <FaExclamationTriangle className="text-red-500" />,
       status: 'warning',
-      location: 'Central Store',
+      location: t('recent_activity.stock_alert.location', { location: 'Central Store' }), // Dynamic location
     },
   ];
 
   const quickActions = [
     {
-      label: 'Register Child',
+      label: t('quick_actions.register_child.label'),
       icon: <FaChild />,
       to: '/add-child',
-      description: 'Add new child to the system',
+      description: t('quick_actions.register_child.description'),
       color: 'text-blue-600',
       bgColor: 'bg-blue-500',
       count: null,
     },
     {
-      label: 'Register Mother',
+      label: t('quick_actions.register_mother.label'),
       icon: <FaUserPlus />,
       to: '/add-mother',
-      description: 'Register expecting or new mother',
+      description: t('quick_actions.register_mother.description'),
       color: 'text-rose-600',
       bgColor: 'bg-rose-500',
       count: null,
     },
     {
-      label: 'Search Records',
+      label: t('quick_actions.search_records.label'),
       icon: <FaSearch />,
       to: '/search-records',
-      description: 'Find child or mother records',
+      description: t('quick_actions.search_records.description'),
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-500',
       count: null,
     },
     {
-      label: 'View All Children',
+      label: t('quick_actions.view_all_children.label'),
       icon: <FaUsers />,
       to: '/view-children',
-      description: 'Browse all registered children',
+      description: t('quick_actions.view_all_children.description'),
       color: 'text-purple-600',
       bgColor: 'bg-purple-500',
-      count: '1,247',
+      count: t('quick_actions.view_all_children.count', { count: '1,247' }), // Dynamic count
     },
     {
-      label: 'Pending Vaccinations',
+      label: t('quick_actions.pending_vaccinations.label'),
       icon: <FaCalendarAlt />,
       to: '/pending-vaccinations',
-      description: 'View upcoming vaccination schedule',
+      description: t('quick_actions.pending_vaccinations.description'),
       color: 'text-amber-600',
       bgColor: 'bg-amber-500',
-      count: '156',
+      count: t('quick_actions.pending_vaccinations.count', { count: '156' }), // Dynamic count
     },
     {
-      label: 'Generate Report',
+      label: t('quick_actions.generate_report.label'),
       icon: <FaChartLine />,
       to: '/reports',
-      description: 'Create vaccination reports',
+      description: t('quick_actions.generate_report.description'),
       color: 'text-indigo-600',
       bgColor: 'bg-indigo-500',
       count: null,
@@ -297,8 +297,8 @@ export default function Dashboard() {
           <FaBars className="text-base-content" />
         </button>
         <div>
-          <h1 className="font-bold text-base-content">Dashboard</h1>
-          <p className="text-xs text-base-content/60">Vaccine System</p>
+          <h1 className="font-bold text-base-content">{t('mobile_header.title')}</h1>
+          <p className="text-xs text-base-content/60">{t('mobile_header.subtitle')}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -316,7 +316,7 @@ export default function Dashboard() {
         <button
           onClick={logout}
           className="p-2 hover:bg-base-200 rounded-lg transition-colors text-base-content/70"
-          aria-label="Logout"
+          aria-label={t('welcome.logout')}
         >
           <FaSignOutAlt />
         </button>
@@ -354,26 +354,24 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">
-                      Good{' '}
                       {currentTime.getHours() < 12
-                        ? 'Morning'
+                        ? t('welcome.greeting_morning', { name: user?.name || 'User' })
                         : currentTime.getHours() < 17
-                          ? 'Afternoon'
-                          : 'Evening'}
-                      , {user?.name || 'User'}
+                          ? t('welcome.greeting_afternoon', { name: user?.name || 'User' })
+                          : t('welcome.greeting_evening', { name: user?.name || 'User' })}
                     </h1>
                     <p className="text-primary-content/90 text-sm sm:text-base lg:text-lg">
-                      Here's your vaccination management system overview
+                      {t('welcome.overview')}
                     </p>
                   </div>
                   <div className="hidden lg:flex items-center gap-4">
                     <div className="bg-primary-content/10 px-4 py-3 rounded-lg backdrop-blur-sm">
                       <div className="text-sm text-primary-content/70">
-                        System Status
+                        {t('welcome.system_status')}
                       </div>
                       <div className="flex items-center gap-2 text-primary-content font-semibold">
                         <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                        Online
+                        {t('welcome.online')}
                       </div>
                     </div>
                     <button
@@ -381,7 +379,7 @@ export default function Dashboard() {
                       className="bg-primary-content/10 hover:bg-primary-content/20 backdrop-blur-sm px-4 py-3 rounded-lg transition-colors flex items-center gap-2"
                     >
                       <FaSignOutAlt />
-                      <span>Logout</span>
+                      <span>{t('welcome.logout')}</span>
                     </button>
                   </div>
                 </div>
@@ -423,7 +421,7 @@ export default function Dashboard() {
                         ) : (
                           <FaArrowTrendDown className="text-xs" />
                         )}
-                        {change}
+                        {t(`main_stats.${changeType === 'positive' ? 'change_positive' : 'change_negative'}`, { value: change })}
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -451,35 +449,39 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-base-content flex items-center gap-2">
                     <FaBell className="text-amber-500" />
-                    Alerts
+                    {t('alerts.title')}
                   </h3>
                   <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
                     3
                   </span>
                 </div>
                 <div className="space-y-3">
-                  {alertsAndNotifications.slice(0, 3).map((alert, idx) => (
-                    <Link
-                      key={idx}
-                      to={alert.action}
-                      className="block p-3 bg-base-50 hover:bg-base-200 rounded-lg border border-base-200 transition-colors"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="mt-1">{alert.icon}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-base-content text-sm">
-                            {alert.title}
-                          </div>
-                          <div className="text-xs text-base-content/60 mt-1">
-                            {alert.message}
-                          </div>
-                          <div className="text-xs text-base-content/50 mt-1">
-                            {alert.time}
+                  {Array.isArray(alertsAndNotifications) ? (
+                    alertsAndNotifications.slice(0, 3).map((alert, idx) => (
+                      <Link
+                        key={idx}
+                        to={alert.action}
+                        className="block p-3 bg-base-50 hover:bg-base-200 rounded-lg border border-base-200 transition-colors"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1">{alert.icon}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-base-content text-sm">
+                              {alert.title}
+                            </div>
+                            <div className="text-xs text-base-content/60 mt-1">
+                              {alert.message}
+                            </div>
+                            <div className="text-xs text-base-content/50 mt-1">
+                              {alert.time}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    ))
+                  ) : (
+                    <p className="text-red-300">Alerts not available</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -488,7 +490,7 @@ export default function Dashboard() {
             <div className="lg:col-span-2">
               <div className="bg-base-100 border border-base-300 rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-base-content mb-6">
-                  Quick Actions
+                  {t('quick_actions.title')}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {quickActions.map(
@@ -543,11 +545,11 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-base-content flex items-center gap-2">
                 <FaClipboardList className="text-blue-500" />
-                Recent Activity
+                {t('recent_activity.title')}
               </h3>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-base-content/60">
-                  Live updates
+                  {t('recent_activity.live_updates')}
                 </span>
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
               </div>
@@ -560,47 +562,51 @@ export default function Dashboard() {
                 height: isMobile ? 'auto' : `${activityHeight}px`,
               }}
             >
-              {recentActivity.map(
-                (
-                  { action, details, by, time, icon, status, location },
-                  idx,
-                ) => (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-4 p-4 bg-base-50 hover:bg-base-200 rounded-lg border border-base-200 transition-all duration-200"
-                  >
-                    <div className="flex-shrink-0 p-2 bg-base-100 rounded-lg border border-base-300 mt-1">
-                      {icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-semibold text-base-content text-sm">
-                            {action}
-                          </p>
-                          {details && (
-                            <p className="text-sm text-base-content/70 mt-1">
-                              {details}
+              {Array.isArray(recentActivity) ? (
+                recentActivity.map(
+                  (
+                    { action, details, by, time, icon, status, location },
+                    idx,
+                  ) => (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-4 p-4 bg-base-50 hover:bg-base-200 rounded-lg border border-base-200 transition-all duration-200"
+                    >
+                      <div className="flex-shrink-0 p-2 bg-base-100 rounded-lg border border-base-300 mt-1">
+                        {icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-semibold text-base-content text-sm">
+                              {action}
                             </p>
-                          )}
-                          <div className="flex items-center gap-4 mt-2 text-xs text-base-content/60">
-                            <span className="flex items-center gap-1">
-                              <FaUsers className="text-xs" />
-                              by {by}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <FaMapMarkerAlt className="text-xs" />
-                              {location}
-                            </span>
+                            {details && (
+                              <p className="text-sm text-base-content/70 mt-1">
+                                {details}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-4 mt-2 text-xs text-base-content/60">
+                              <span className="flex items-center gap-1">
+                                <FaUsers className="text-xs" />
+                                {by}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <FaMapMarkerAlt className="text-xs" />
+                                {location}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex-shrink-0 text-xs text-base-content/60 font-medium">
-                          {time}
+                          <div className="flex-shrink-0 text-xs text-base-content/60 font-medium">
+                            {time}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ),
+                  ),
+                )
+              ) : (
+                <p className="text-red-300">Activity not available</p>
               )}
             </div>
 

@@ -1,0 +1,119 @@
+{
+  "header": {
+    "title": "Add Child",
+    "description": "Register new child information"
+  },
+  "dashboard_button": {
+    "label": "Dashboard",
+    "title": "Back to Dashboard"
+  },
+  "personalInfo": {
+    "title": "Personal Information",
+    "municipality": {
+      "label": "From another municipality"
+    },
+    "form": {
+      "firstName": {
+        "label": "First Name",
+        "placeholder": "First Name",
+        "required": "First Name is required"
+      },
+      "lastName": {
+        "label": "Last Name",
+        "placeholder": "Last Name"
+      },
+      "gender": {
+        "label": "Gender",
+        "placeholder": "Select Gender",
+        "required": "Gender is required",
+        "options": {
+          "male": "Male",
+          "female": "Female",
+          "other": "Other"
+        }
+      },
+      "wardNumber": {
+        "label": "Ward Number",
+        "placeholder": "Ward Number",
+        "required": "Ward Number is required"
+      },
+      "casteCode": {
+        "label": "Caste Code",
+        "placeholder": "Caste Code",
+        "required": "Caste Code is required"
+      },
+      "parentName": {
+        "label": "Parent's Name",
+        "placeholder": "Parent's Name",
+        "required": "Parent's Name is required"
+      },
+      "tole": {
+        "label": "Tole",
+        "placeholder": "Tole",
+        "required": "Tole is required"
+      },
+      "phoneNumber": {
+        "label": "Phone Number",
+        "placeholder": "Phone Number"
+      },
+      "birthDate": {
+        "label": "Birth Date",
+        "required": "Birth Date is required",
+        "clear_title": "Clear Date"
+      },
+      "purnaKhop": {
+        "label": "Full Vaccination"
+      }
+    },
+    "age": "Age: {{months}} months ({{days}} days)"
+  },
+  "weightTracking": {
+    "title": "Weight Tracking",
+    "date_label": "Date {{index}}",
+    "weight_label": "Weight (kg)",
+    "add_button": "Add First Weight Record",
+    "remove_button_title": "Remove Weight Record",
+    "add_more_button_title": "Add Another Weight Record",
+    "errors": {
+      "weight_positive": "Weight must be positive",
+      "weight_too_large": "Weight is too large"
+    }
+  },
+  "vaccines": {
+    "title": "Vaccines",
+    "dose_label": "Dose {{dose}}",
+    "recommended_at": {
+      "months": "{{value}} months",
+      "weeks": "{{value}} weeks",
+      "days": "{{value}} days"
+    },
+    "not_eligible": "Not yet eligible for vaccination",
+    "remarks": {
+      "label": "Remarks",
+      "placeholder": "Example: Child had a fever..."
+    },
+    "clear_date_title": "Clear Date"
+  },
+  "generalRemarks": {
+    "title": "General Remarks",
+    "label": "Additional Information or Notes (Optional)",
+    "placeholder": "Enter any special remarks, observations, or important information here...",
+    "optional_note": "This field is optional"
+  },
+  "submitSection": {
+    "title": "Ready?",
+    "description": "Review all information and save",
+    "reset_button": "Reset",
+    "reset_confirm": "Are you sure? All data will be lost.",
+    "save_button": "Save Data",
+    "saving": "Saving..."
+  },
+  "toast": {
+    "success": "Child data saved successfully!",
+    "error": "Failed to save data. Please try again.",
+    "validation_error": "Please fill in all required information. ({{message}})"
+  },
+  "scrollToTop": {
+    "title": "Scroll to Top"
+  }
+}

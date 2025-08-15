@@ -12,8 +12,10 @@ import {
 import { useAuth } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
 import { toast, ToastContainer } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 
 export default function Profile() {
+  const { t } = useTranslation('profile');
   const { user, login } = useAuth();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
@@ -30,12 +32,11 @@ export default function Profile() {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fallback user data
   const profileUser = user || {
-    name: 'Guest User',
-    email: 'guest@example.com',
+    name: t('guestUser.name'),
+    email: t('guestUser.email'),
     ward: '',
-    role: 'Guest',
+    role: t('guestUser.role'),
   };
 
   const handleProfileChange = async (e) => {
@@ -49,14 +50,13 @@ export default function Profile() {
         email: profileData.email,
         ward: profileData.ward,
       });
-      // Update user in AuthContext and localStorage
       login({ ...user, ...response.data.user }, user.token);
-      toast.success('Profile updated successfully!');
+      toast.success(t('success.profileUpdated'));
       setIsEditingProfile(false);
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Failed to update profile');
+      toast.error(err?.response?.data?.message || t('error.profileUpdateFailed'));
       setErrors({
-        server: err?.response?.data?.message || 'Failed to update profile',
+        server: err?.response?.data?.message || t('error.profileUpdateFailed'),
       });
     } finally {
       setIsSubmitting(false);
@@ -69,7 +69,7 @@ export default function Profile() {
     setIsSubmitting(true);
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setErrors({ confirmPassword: 'Passwords do not match' });
+      setErrors({ confirmPassword: t('error.passwordMismatch') });
       setIsSubmitting(false);
       return;
     }
@@ -79,7 +79,7 @@ export default function Profile() {
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword,
       });
-      toast.success('Password changed successfully!');
+      toast.success(t('success.passwordChanged'));
       setPasswordData({
         currentPassword: '',
         newPassword: '',
@@ -87,9 +87,9 @@ export default function Profile() {
       });
       setIsEditingPassword(false);
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Failed to change password');
+      toast.error(err?.response?.data?.message || t('error.passwordChangeFailed'));
       setErrors({
-        server: err?.response?.data?.message || 'Failed to change password',
+        server: err?.response?.data?.message || t('error.passwordChangeFailed'),
       });
     } finally {
       setIsSubmitting(false);
@@ -109,18 +109,16 @@ export default function Profile() {
       <ToastContainer position="top-right" autoClose={3000} />
       <main className="min-h-screen bg-base-200 flex items-center justify-center p-4 sm:p-6">
         <div className="max-w-2xl w-full mx-auto card bg-base-100 shadow-xl p-6 sm:p-8">
-          {/* Profile Header */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl sm:text-3xl font-semibold text-base-content tracking-tight">
-              प्रोफाइल
+              {t('header.title')}
             </h2>
             <Link to="/dashboard" className="btn btn-ghost btn-sm text-primary">
               <FaArrowLeft />
-              <span>ड्यासबोर्डमा फर्कनुहोस्</span>
+              <span>{t('header.backToDashboard')}</span>
             </Link>
           </div>
 
-          {/* Profile Card */}
           <div className="card p-5 bg-base-200 border border-base-300 shadow-sm mb-6">
             <div className="flex flex-col sm:flex-row items-center sm:items-start">
               <div className="flex-shrink-0 mb-4 sm:mb-0 sm:mr-6">
@@ -141,24 +139,22 @@ export default function Profile() {
                   className="btn btn-primary btn-outline btn-sm"
                 >
                   <FaEdit />
-                  <span>{isEditingProfile ? 'Cancel' : 'Edit Profile'}</span>
+                  <span>{isEditingProfile ? t('buttons.cancel') : t('buttons.editProfile')}</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Details Section */}
           <div className="mt-6 grid grid-cols-1 gap-6">
-            {/* Personal Information Card */}
             <div className="card bg-base-100 p-5 border border-base-200 shadow-sm">
               <h4 className="text-lg font-medium text-base-content mb-3">
-                व्यक्तिगत जानकारी
+                {t('personalInfo.title')}
               </h4>
               {isEditingProfile ? (
                 <form onSubmit={handleProfileChange} className="space-y-3">
                   <div className="form-control">
                     <label className="label">
-                      <span className="label-text">नाम</span>
+                      <span className="label-text">{t('personalInfo.name')}</span>
                     </label>
                     <div className="relative">
                       <FaUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary" />
@@ -168,14 +164,14 @@ export default function Profile() {
                         value={profileData.name}
                         onChange={handleProfileInputChange}
                         className="input input-bordered w-full pl-10"
-                        placeholder="तपाईंको नाम"
+                        placeholder={t('personalInfo.namePlaceholder')}
                         required
                       />
                     </div>
                   </div>
                   <div className="form-control">
                     <label className="label">
-                      <span className="label-text">इमेल</span>
+                      <span className="label-text">{t('personalInfo.email')}</span>
                     </label>
                     <div className="relative">
                       <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary" />
@@ -185,14 +181,14 @@ export default function Profile() {
                         value={profileData.email}
                         onChange={handleProfileInputChange}
                         className="input input-bordered w-full pl-10"
-                        placeholder="तपाईंको इमेल"
+                        placeholder={t('personalInfo.emailPlaceholder')}
                         required
                       />
                     </div>
                   </div>
                   <div className="form-control">
                     <label className="label">
-                      <span className="label-text">वार्ड</span>
+                      <span className="label-text">{t('personalInfo.ward')}</span>
                     </label>
                     <div className="relative">
                       <FaBuilding className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary" />
@@ -202,7 +198,7 @@ export default function Profile() {
                         value={profileData.ward}
                         onChange={handleProfileInputChange}
                         className="input input-bordered w-full pl-10"
-                        placeholder="वार्ड नम्बर (वैकल्पिक)"
+                        placeholder={t('personalInfo.wardPlaceholder')}
                       />
                     </div>
                   </div>
@@ -215,14 +211,14 @@ export default function Profile() {
                       disabled={isSubmitting}
                       className="btn btn-primary btn-block"
                     >
-                      {isSubmitting ? 'Saving...' : 'Save Profile'}
+                      {isSubmitting ? t('buttons.saving') : t('buttons.saveProfile')}
                     </button>
                     <button
                       type="button"
                       onClick={() => setIsEditingProfile(false)}
                       className="btn btn-ghost btn-block"
                     >
-                      Cancel
+                      {t('buttons.cancel')}
                     </button>
                   </div>
                 </form>
@@ -230,45 +226,44 @@ export default function Profile() {
                 <div className="space-y-3 text-base-content">
                   <div className="flex items-center space-x-2">
                     <FaUser className="text-primary" />
-                    <span className="font-medium">नाम:</span>
+                    <span className="font-medium">{t('personalInfo.name')}:</span>
                     <span className="text-base-content text-opacity-70">
                       {profileUser.name}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <FaEnvelope className="text-primary" />
-                    <span className="font-medium">इमेल:</span>
+                    <span className="font-medium">{t('personalInfo.email')}:</span>
                     <span className="text-base-content text-opacity-70">
                       {profileUser.email}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <FaBuilding className="text-primary" />
-                    <span className="font-medium">वार्ड:</span>
+                    <span className="font-medium">{t('personalInfo.ward')}:</span>
                     <span className="text-base-content text-opacity-70">
-                      {profileUser.ward || 'Not set'}
+                      {profileUser.ward || t('personalInfo.wardNotSet')}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="font-medium">भूमिका:</span>
+                    <span className="font-medium">{t('personalInfo.role')}:</span>
                     <span className="text-base-content text-opacity-70">
-                      {profileUser.role || 'Not set'}
+                      {profileUser.role || t('personalInfo.roleNotSet')}
                     </span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Password Change Card */}
             <div className="card bg-base-100 p-5 border border-base-200 shadow-sm">
               <h4 className="text-lg font-medium text-base-content mb-3">
-                पासवर्ड परिवर्तन गर्नुहोस्
+                {t('password.title')}
               </h4>
               {isEditingPassword ? (
                 <form onSubmit={handlePasswordChange} className="space-y-3">
                   <div className="form-control">
                     <label className="label">
-                      <span className="label-text">हालको पासवर्ड</span>
+                      <span className="label-text">{t('password.current')}</span>
                     </label>
                     <div className="relative">
                       <FaLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary" />
@@ -278,14 +273,14 @@ export default function Profile() {
                         value={passwordData.currentPassword}
                         onChange={handlePasswordInputChange}
                         className="input input-bordered w-full pl-10"
-                        placeholder="हालको पासवर्ड"
+                        placeholder={t('password.currentPlaceholder')}
                         required
                       />
                     </div>
                   </div>
                   <div className="form-control">
                     <label className="label">
-                      <span className="label-text">नयाँ पासवर्ड</span>
+                      <span className="label-text">{t('password.new')}</span>
                     </label>
                     <div className="relative">
                       <FaLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary" />
@@ -295,16 +290,14 @@ export default function Profile() {
                         value={passwordData.newPassword}
                         onChange={handlePasswordInputChange}
                         className="input input-bordered w-full pl-10"
-                        placeholder="नयाँ पासवर्ड"
+                        placeholder={t('password.newPlaceholder')}
                         required
                       />
                     </div>
                   </div>
                   <div className="form-control">
                     <label className="label">
-                      <span className="label-text">
-                        पासवर्ड पुष्टि गर्नुहोस्
-                      </span>
+                      <span className="label-text">{t('password.confirm')}</span>
                     </label>
                     <div className="relative">
                       <FaLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary" />
@@ -314,15 +307,13 @@ export default function Profile() {
                         value={passwordData.confirmPassword}
                         onChange={handlePasswordInputChange}
                         className="input input-bordered w-full pl-10"
-                        placeholder="पासवर्ड पुष्टि गर्नुहोस्"
+                        placeholder={t('password.confirmPlaceholder')}
                         required
                       />
                     </div>
                   </div>
                   {errors.confirmPassword && (
-                    <p className="text-error text-xs mt-1">
-                      {errors.confirmPassword}
-                    </p>
+                    <p className="text-error text-xs mt-1">{errors.confirmPassword}</p>
                   )}
                   {errors.server && (
                     <p className="text-error text-xs mt-1">{errors.server}</p>
@@ -333,14 +324,14 @@ export default function Profile() {
                       disabled={isSubmitting}
                       className="btn btn-primary btn-block"
                     >
-                      {isSubmitting ? 'Saving...' : 'Save Password'}
+                      {isSubmitting ? t('buttons.saving') : t('buttons.savePassword')}
                     </button>
                     <button
                       type="button"
                       onClick={() => setIsEditingPassword(false)}
                       className="btn btn-ghost btn-block"
                     >
-                      Cancel
+                      {t('buttons.cancel')}
                     </button>
                   </div>
                 </form>
@@ -352,7 +343,7 @@ export default function Profile() {
                   }}
                   className="btn btn-secondary btn-block"
                 >
-                  Change Password
+                  {t('buttons.changePassword')}
                 </button>
               )}
             </div>

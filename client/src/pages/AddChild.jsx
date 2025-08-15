@@ -27,8 +27,10 @@ import { useTheme } from '../context/ThemeContext';
 import { useState } from 'react';
 import { calculateAge } from '../../helpers/calculateAge.jsx';
 import { getFirstErrorMessage } from '../../helpers/getFirstErrorMessage.jsx';
+import { useTranslation } from 'react-i18next';
 
 export default function AddChild() {
+  const { t } = useTranslation('addChild');
   const { theme } = useTheme();
   const { addChildToState } = useChildContext();
   const {
@@ -84,18 +86,17 @@ export default function AddChild() {
 
       const res = await axiosClient.post('/api/child', payload);
       addChildToState(res.data);
-      toast.success('बालबालिका डेटा सफलतापूर्वक सेभ भयो!');
+      toast.success(t('toast.success'));
       reset();
     } catch (err) {
       console.error('Submission failed:', err);
-      toast.error('डेटा सेभ गर्न असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।');
+      toast.error(t('toast.error'));
     }
   };
 
-  // This is the new function that runs when submission FAILS due to validation
   const onErrors = (errors) => {
     const errorMessage = getFirstErrorMessage(errors);
-    toast.error(`कृपया सबै आवश्यक जानकारी भर्नुहोस्। (${errorMessage})`);
+    toast.error(t('toast.validation_error', { message: errorMessage }));
   };
 
   const age = calculateAge(birthDate);
@@ -127,10 +128,10 @@ export default function AddChild() {
               </div>
               <div>
                 <h1 className="text-2xl font-semibold text-base-content">
-                  बालबालिका थप्नुहोस्
+                  {t('header.title')}
                 </h1>
                 <p className="text-base text-base-content/70">
-                  नयाँ बालबालिकाको जानकारी दर्ता गर्नुहोस्
+                  {t('header.description')}
                 </p>
               </div>
             </div>
@@ -138,9 +139,10 @@ export default function AddChild() {
               type="button"
               onClick={() => navigate('/dashboard')}
               className="btn btn-outline btn-primary"
+              title={t('dashboard_button.title')}
             >
               <FaArrowLeft className="mr-2" />
-              ड्यासबोर्ड
+              {t('dashboard_button.label')}
             </button>
           </div>
         </div>
@@ -148,7 +150,7 @@ export default function AddChild() {
 
       {/* Main Form */}
       <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="bg-base-100 shadow-sm rounded-xl border border-base-300">
+        <div className="bg-base-100 shadow-sm rounded-xl border border-base-300 min-w-[20rem]">
           <form
             onSubmit={handleSubmit(onSubmit, onErrors)}
             className="p-8 space-y-12"
@@ -160,7 +162,7 @@ export default function AddChild() {
                   <FaUser className="text-primary text-lg" />
                 </div>
                 <h2 className="text-xl font-medium text-base-content">
-                  व्यक्तिगत जानकारी
+                  {t('personalInfo.title')}
                 </h2>
               </div>
 
@@ -184,7 +186,7 @@ export default function AddChild() {
                     htmlFor="isFromOtherMunicipality"
                     className="ml-3 text-base font-medium text-base-content cursor-pointer"
                   >
-                    बाहिरको नगरपालिकाबाट आएको हो
+                    {t('personalInfo.municipality.label')}
                   </label>
                 </div>
               </div>
@@ -194,18 +196,20 @@ export default function AddChild() {
                 <div>
                   <label className="label">
                     <span className="label-text text-base font-medium">
-                      पहिलो नाम <span className="text-error">*</span>
+                      {t('personalInfo.form.firstName.label')}{' '}
+                      <span className="text-error">*</span>
                     </span>
                   </label>
                   <input
                     {...register('fullName')}
-                    className={`input input-bordered w-full ${errors.fullName ? 'input-error' : ''
-                      }`}
-                    placeholder="पहिलो नाम"
+                    className={`input input-bordered w-full ${
+                      errors.fullName ? 'input-error' : ''
+                    }`}
+                    placeholder={t('personalInfo.form.firstName.placeholder')}
                   />
                   {errors.fullName && (
                     <p className="text-error text-sm mt-1">
-                      {errors.fullName.message}
+                      {t('personalInfo.form.firstName.required')}
                     </p>
                   )}
                 </div>
@@ -213,13 +217,13 @@ export default function AddChild() {
                 <div>
                   <label className="label">
                     <span className="label-text text-base font-medium">
-                      थर
+                      {t('personalInfo.form.lastName.label')}
                     </span>
                   </label>
                   <input
                     {...register('lastName')}
                     className="input input-bordered w-full"
-                    placeholder="थर"
+                    placeholder={t('personalInfo.form.lastName.placeholder')}
                   />
                   {errors.lastName && (
                     <p className="text-error text-sm mt-1">
@@ -231,22 +235,24 @@ export default function AddChild() {
                 <div>
                   <label className="label">
                     <span className="label-text text-base font-medium">
-                      लिंग <span className="text-error">*</span>
+                      {t('personalInfo.form.gender.label')}{' '}
+                      <span className="text-error">*</span>
                     </span>
                   </label>
                   <select
                     {...register('gender')}
-                    className={`select select-bordered w-full ${errors.gender ? 'select-error' : ''
-                      }`}
+                    className={`select select-bordered w-full ${
+                      errors.gender ? 'select-error' : ''
+                    }`}
                   >
-                    <option value="">लिंग छान्नुहोस्</option>
-                    <option value="MALE">पुरुष</option>
-                    <option value="FEMALE">महिला</option>
-                    <option value="OTHER">अन्य</option>
+                    <option value="">{t('personalInfo.form.gender.placeholder')}</option>
+                    <option value="MALE">{t('personalInfo.form.gender.options.male')}</option>
+                    <option value="FEMALE">{t('personalInfo.form.gender.options.female')}</option>
+                    <option value="OTHER">{t('personalInfo.form.gender.options.other')}</option>
                   </select>
                   {errors.gender && (
                     <p className="text-error text-sm mt-1">
-                      {errors.gender.message}
+                      {t('personalInfo.form.gender.required')}
                     </p>
                   )}
                 </div>
@@ -254,18 +260,20 @@ export default function AddChild() {
                 <div>
                   <label className="label">
                     <span className="label-text text-base font-medium">
-                      वडा नम्बर <span className="text-error">*</span>
+                      {t('personalInfo.form.wardNumber.label')}{' '}
+                      <span className="text-error">*</span>
                     </span>
                   </label>
                   <input
                     {...register('wardNumber')}
-                    className={`input input-bordered w-full ${errors.wardNumber ? 'input-error' : ''
-                      }`}
-                    placeholder="वडा नम्बर"
+                    className={`input input-bordered w-full ${
+                      errors.wardNumber ? 'input-error' : ''
+                    }`}
+                    placeholder={t('personalInfo.form.wardNumber.placeholder')}
                   />
                   {errors.wardNumber && (
                     <p className="text-error text-sm mt-1">
-                      {errors.wardNumber.message}
+                      {t('personalInfo.form.wardNumber.required')}
                     </p>
                   )}
                 </div>
@@ -273,19 +281,21 @@ export default function AddChild() {
                 <div>
                   <label className="label">
                     <span className="label-text text-base font-medium">
-                      जात कोड <span className="text-error">*</span>
+                      {t('personalInfo.form.casteCode.label')}{' '}
+                      <span className="text-error">*</span>
                     </span>
                   </label>
                   <input
                     type="number"
                     {...register('casteCode')}
-                    className={`input input-bordered w-full ${errors.casteCode ? 'input-error' : ''
-                      }`}
-                    placeholder="जात कोड"
+                    className={`input input-bordered w-full ${
+                      errors.casteCode ? 'input-error' : ''
+                    }`}
+                    placeholder={t('personalInfo.form.casteCode.placeholder')}
                   />
                   {errors.casteCode && (
                     <p className="text-error text-sm mt-1">
-                      {errors.casteCode.message}
+                      {t('personalInfo.form.casteCode.required')}
                     </p>
                   )}
                 </div>
@@ -293,18 +303,20 @@ export default function AddChild() {
                 <div>
                   <label className="label">
                     <span className="label-text text-base font-medium">
-                      अभिभावकको नाम <span className="text-error">*</span>
+                      {t('personalInfo.form.parentName.label')}{' '}
+                      <span className="text-error">*</span>
                     </span>
                   </label>
                   <input
                     {...register('parentName')}
-                    className={`input input-bordered w-full ${errors.parentName ? 'input-error' : ''
-                      }`}
-                    placeholder="अभिभावकको नाम"
+                    className={`input input-bordered w-full ${
+                      errors.parentName ? 'input-error' : ''
+                    }`}
+                    placeholder={t('personalInfo.form.parentName.placeholder')}
                   />
                   {errors.parentName && (
                     <p className="text-error text-sm mt-1">
-                      {errors.parentName.message}
+                      {t('personalInfo.form.parentName.required')}
                     </p>
                   )}
                 </div>
@@ -312,18 +324,20 @@ export default function AddChild() {
                 <div>
                   <label className="label">
                     <span className="label-text text-base font-medium">
-                      टोल <span className="text-error">*</span>
+                      {t('personalInfo.form.tole.label')}{' '}
+                      <span className="text-error">*</span>
                     </span>
                   </label>
                   <input
                     {...register('tole')}
-                    className={`input input-bordered w-full ${errors.tole ? 'input-error' : ''
-                      }`}
-                    placeholder="टोल"
+                    className={`input input-bordered w-full ${
+                      errors.tole ? 'input-error' : ''
+                    }`}
+                    placeholder={t('personalInfo.form.tole.placeholder')}
                   />
                   {errors.tole && (
                     <p className="text-error text-sm mt-1">
-                      {errors.tole.message}
+                      {t('personalInfo.form.tole.required')}
                     </p>
                   )}
                 </div>
@@ -331,13 +345,13 @@ export default function AddChild() {
                 <div>
                   <label className="label">
                     <span className="label-text text-base font-medium">
-                      फोन नम्बर
+                      {t('personalInfo.form.phoneNumber.label')}
                     </span>
                   </label>
                   <input
                     {...register('phoneNumber')}
                     className="input input-bordered w-full"
-                    placeholder="फोन नम्बर"
+                    placeholder={t('personalInfo.form.phoneNumber.placeholder')}
                   />
                   {errors.phoneNumber && (
                     <p className="text-error text-sm mt-1">
@@ -349,7 +363,8 @@ export default function AddChild() {
                 <div>
                   <label className="label">
                     <span className="label-text text-base font-medium">
-                      जन्म मिति <span className="text-error">*</span>
+                      {t('personalInfo.form.birthDate.label')}{' '}
+                      <span className="text-error">*</span>
                     </span>
                   </label>
                   <div className="relative">
@@ -360,8 +375,9 @@ export default function AddChild() {
                         <>
                           <NepaliDatePicker
                             className="w-full"
-                            inputClassName={`input input-bordered w-full pr-10 ${errors.birthDate ? 'input-error' : ''
-                              }`}
+                            inputClassName={`input input-bordered w-full pr-10 ${
+                              errors.birthDate ? 'input-error' : ''
+                            }`}
                             value={field.value || ''}
                             onChange={(value) => field.onChange(value)}
                             language="ne"
@@ -372,7 +388,7 @@ export default function AddChild() {
                               type="button"
                               onClick={() => setValue('birthDate', '')}
                               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/50 hover:text-error transition-colors"
-                              title="मिति मेटाउनुहोस्"
+                              title={t('personalInfo.form.birthDate.clear_title')}
                             >
                               ✕
                             </button>
@@ -383,13 +399,13 @@ export default function AddChild() {
                   </div>
                   {errors.birthDate && (
                     <p className="text-error text-sm mt-1">
-                      {errors.birthDate.message}
+                      {t('personalInfo.form.birthDate.required')}
                     </p>
                   )}
                   {birthDate && (
                     <div className="mt-3 p-3 bg-success/10 rounded-lg border border-success/20">
                       <div className="text-base text-success font-medium">
-                        उमेर: {age.months} महिना ({age.days} दिन)
+                        {t('personalInfo.age', { months: age.months, days: age.days })}
                       </div>
                     </div>
                   )}
@@ -409,7 +425,7 @@ export default function AddChild() {
                     htmlFor="purnaKhop"
                     className="ml-3 text-base font-medium text-base-content cursor-pointer"
                   >
-                    पूर्ण खोप
+                    {t('personalInfo.form.purnaKhop.label')}
                   </label>
                 </div>
               </div>
@@ -422,7 +438,7 @@ export default function AddChild() {
                   <FaWeight className="text-warning text-lg" />
                 </div>
                 <h2 className="text-xl font-medium text-base-content">
-                  तौल ट्र्याकिंग
+                  {t('weightTracking.title')}
                 </h2>
               </div>
 
@@ -436,7 +452,7 @@ export default function AddChild() {
                       <div>
                         <label className="label">
                           <span className="label-text text-base font-medium">
-                            मिति {index + 1}
+                            {t('weightTracking.date_label', { index: index + 1 })}
                           </span>
                         </label>
                         <Controller
@@ -463,7 +479,7 @@ export default function AddChild() {
                       <div>
                         <label className="label">
                           <span className="label-text text-base font-medium">
-                            तौल (किलोग्राम)
+                            {t('weightTracking.weight_label')}
                           </span>
                         </label>
                         <input
@@ -472,12 +488,15 @@ export default function AddChild() {
                           {...register(`weightRecords.${index}.weight`, {
                             min: {
                               value: 0,
-                              message: 'तौल सकारात्मक हुनुपर्छ',
+                              message: t('weightTracking.errors.weight_positive'),
                             },
-                            max: { value: 50, message: 'तौल धेरै ठूलो छ' },
+                            max: {
+                              value: 50,
+                              message: t('weightTracking.errors.weight_too_large'),
+                            },
                           })}
                           className="input input-bordered w-full"
-                          placeholder="तौल"
+                          placeholder={t('weightTracking.weight_label')}
                         />
                         {errors.weightRecords?.[index]?.weight && (
                           <p className="text-error text-sm mt-1">
@@ -492,6 +511,7 @@ export default function AddChild() {
                             type="button"
                             onClick={() => remove(index)}
                             className="btn btn-outline btn-error btn-sm"
+                            title={t('weightTracking.remove_button_title')}
                           >
                             <FaMinus className="w-4 h-4" />
                           </button>
@@ -501,6 +521,7 @@ export default function AddChild() {
                             type="button"
                             onClick={() => append({ date: '', weight: '' })}
                             className="btn btn-outline btn-success btn-sm"
+                            title={t('weightTracking.add_more_button_title')}
                           >
                             <FaPlus className="w-4 h-4" />
                           </button>
@@ -518,7 +539,7 @@ export default function AddChild() {
                       className="btn btn-success btn-lg"
                     >
                       <FaPlus className="mr-2" />
-                      पहिलो तौल रेकर्ड थप्नुहोस्
+                      {t('weightTracking.add_button')}
                     </button>
                   </div>
                 )}
@@ -532,7 +553,7 @@ export default function AddChild() {
                   <FaSyringe className="text-secondary text-lg" />
                 </div>
                 <h2 className="text-xl font-medium text-base-content">
-                  खोपहरू
+                  {t('vaccines.title')}
                 </h2>
               </div>
 
@@ -555,32 +576,41 @@ export default function AddChild() {
                         return (
                           <div
                             key={idx}
-                            className={`p-5 border rounded-lg transition-all ${isAccessible
+                            className={`p-5 border rounded-lg transition-all ${
+                              isAccessible
                                 ? 'bg-base-100 border-success/20'
                                 : 'bg-base-200 border-base-300'
-                              }`}
+                            }`}
                           >
                             <div className="space-y-4">
                               <div className="flex justify-between items-center">
                                 <span
-                                  className={`text-base font-medium ${isAccessible
+                                  className={`text-base font-medium ${
+                                    isAccessible
                                       ? 'text-base-content'
                                       : 'text-base-content/50'
-                                    }`}
+                                  }`}
                                 >
-                                  मात्रा {dose.dose}
+                                  {t('vaccines.dose_label', { dose: dose.dose })}
                                 </span>
                                 <span
-                                  className={`badge ${isAccessible
+                                  className={`badge ${
+                                    isAccessible
                                       ? 'badge-success'
                                       : 'badge-neutral'
-                                    }`}
+                                  }`}
                                 >
                                   {dose.recommendedAtMonths
-                                    ? `${dose.recommendedAtMonths} महिना`
+                                    ? t('vaccines.recommended_at.months', {
+                                        value: dose.recommendedAtMonths,
+                                      })
                                     : dose.recommendedAtWeeks
-                                      ? `${dose.recommendedAtWeeks} हप्ता`
-                                      : `${dose.recommendedAtDays} दिन`}
+                                    ? t('vaccines.recommended_at.weeks', {
+                                        value: dose.recommendedAtWeeks,
+                                      })
+                                    : t('vaccines.recommended_at.days', {
+                                        value: dose.recommendedAtDays,
+                                      })}
                                 </span>
                               </div>
 
@@ -612,7 +642,7 @@ export default function AddChild() {
                                                 )
                                               }
                                               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/50 hover:text-error transition-colors"
-                                              title="मिति मेटाउनुहोस्"
+                                              title={t('vaccines.clear_date_title')}
                                             >
                                               ✕
                                             </button>
@@ -625,7 +655,7 @@ export default function AddChild() {
                                           value=""
                                           disabled
                                           readOnly
-                                          placeholder="उमेर पुगेको छैन"
+                                          placeholder={t('vaccines.not_eligible')}
                                         />
                                       )}
                                     </div>
@@ -636,7 +666,7 @@ export default function AddChild() {
                                   <div className="mt-2">
                                     <div className="text-sm text-warning flex items-center">
                                       <FaInfoCircle className="w-4 h-4 mr-2" />
-                                      खोपको लागि उमेर पुगेको छैन
+                                      {t('vaccines.not_eligible')}
                                     </div>
                                   </div>
                                 )}
@@ -654,11 +684,12 @@ export default function AddChild() {
                                   >
                                     <span className="flex items-center">
                                       <FaClipboardList className="w-4 h-4 mr-2" />
-                                      कैफियत
+                                      {t('vaccines.remarks.label')}
                                     </span>
                                     <span
-                                      className={`transform transition-transform ${showRemark ? 'rotate-180' : ''
-                                        }`}
+                                      className={`transform transition-transform ${
+                                        showRemark ? 'rotate-180' : ''
+                                      }`}
                                     >
                                       ▼
                                     </span>
@@ -671,7 +702,7 @@ export default function AddChild() {
                                           `vaccines.${vaccineName}.${idx}.remarks`,
                                         )}
                                         className="textarea textarea-bordered w-full"
-                                        placeholder="उदाहरण: बच्चालाई ज्वरो भयो..."
+                                        placeholder={t('vaccines.remarks.placeholder')}
                                         rows={3}
                                       />
                                     </div>
@@ -695,24 +726,24 @@ export default function AddChild() {
                   <FaClipboardList className="text-accent text-lg" />
                 </div>
                 <h2 className="text-xl font-medium text-base-content">
-                  सामान्य कैफियत
+                  {t('generalRemarks.title')}
                 </h2>
               </div>
 
               <div>
                 <label className="label">
                   <span className="label-text text-base font-medium">
-                    अतिरिक्त जानकारी वा टिप्पणी (वैकल्पिक)
+                    {t('generalRemarks.label')}
                   </span>
                 </label>
                 <textarea
                   {...register('remarks')}
                   rows={6}
                   className="textarea textarea-bordered w-full"
-                  placeholder="यहाँ कुनै विशेष कैफियत, अवलोकन, वा अन्य महत्वपूर्ण जानकारी लेख्नुहोस्..."
+                  placeholder={t('generalRemarks.placeholder')}
                 />
                 <p className="text-sm text-base-content/60 mt-2">
-                  यो क्षेत्र वैकल्पिक छ
+                  {t('generalRemarks.optional_note')}
                 </p>
               </div>
             </div>
@@ -722,10 +753,10 @@ export default function AddChild() {
               <div className="flex flex-col sm:flex-row gap-6 justify-between items-center">
                 <div>
                   <h3 className="text-lg font-medium text-base-content">
-                    तयार छ?
+                    {t('submitSection.title')}
                   </h3>
                   <p className="text-base text-base-content/70">
-                    सबै जानकारी जाँच गरेर सेभ गर्नुहोस्
+                    {t('submitSection.description')}
                   </p>
                 </div>
 
@@ -733,11 +764,7 @@ export default function AddChild() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (
-                        window.confirm(
-                          'के तपाईं निश्चित हुनुहुन्छ? सबै डेटा हराउनेछ।',
-                        )
-                      ) {
+                      if (window.confirm(t('submitSection.reset_confirm'))) {
                         reset();
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }
@@ -757,19 +784,18 @@ export default function AddChild() {
                         d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                       />
                     </svg>
-                    रिसेट गर्नुहोस्
+                    {t('submitSection.reset_button')}
                   </button>
 
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className={`btn btn-primary ${isSubmitting ? 'loading' : ''
-                      }`}
+                    className={`btn btn-primary ${isSubmitting ? 'loading' : ''}`}
                   >
                     {isSubmitting ? (
                       <>
                         <span className="loading loading-spinner"></span>
-                        सेभ हुँदैछ...
+                        {t('submitSection.saving')}
                       </>
                     ) : (
                       <>
@@ -786,7 +812,7 @@ export default function AddChild() {
                             d="M5 13l4 4L19 7"
                           />
                         </svg>
-                        डेटा सेभ गर्नुहोस्
+                        {t('submitSection.save_button')}
                       </>
                     )}
                   </button>
@@ -802,7 +828,7 @@ export default function AddChild() {
         type="button"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         className="fixed bottom-8 right-8 btn btn-primary btn-circle shadow-lg"
-        title="माथि जानुहोस्"
+        title={t('scrollToTop.title')}
       >
         <svg
           className="w-6 h-6"

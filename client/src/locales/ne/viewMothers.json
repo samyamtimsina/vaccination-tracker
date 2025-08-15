@@ -1,0 +1,97 @@
+{
+  "loading": {
+    "message": "लोड हुँदैछ..."
+  },
+  "error": {
+    "title": "त्रुटि",
+    "message": "त्रुटि भयो: {{error}}",
+    "try_again": "पुन: प्रयास गर्नुहोस्"
+  },
+  "header": {
+    "title": "सबै आमाहरू",
+    "description": "आमाहरूको रेकर्डहरू हेर्नुहोस् र व्यवस्थापन गर्नुहोस्"
+  },
+  "addMotherButton": {
+    "label": "आमा थप्नुहोस्"
+  },
+  "stats": {
+    "totalMothers": "कुल आमाहरू",
+    "fullyVaccinated": "पूर्ण खोप प्राप्त",
+    "pending": "बाँकी",
+    "completionRate": "समापन दर"
+  },
+  "search": {
+    "placeholder": "नामले खोज्नुहोस्..."
+  },
+  "filter": {
+    "all": "सबै स्थिति",
+    "vaccinated": "पूर्ण खोप प्राप्त",
+    "pending": "बाँकी"
+  },
+  "sort": {
+    "name": "नामले क्रमबद्ध गर्नुहोस्",
+    "age": "उमेरले क्रमबद्ध गर्नुहोस्",
+    "ward": "वडाले क्रमबद्ध गर्नुहोस्",
+    "recent": "नवीनतम"
+  },
+  "noResults": {
+    "title_with_search": "कुनै आमा फेला परेन",
+    "description_with_search": "तपाईंको खोज मापदण्डसँग कुनै आमा मेल खाँदैन।",
+    "title_no_data": "कुनै आमा उपलब्ध छैन",
+    "description_no_data": "कुनै आमा रेकर्ड फेला परेन। सुरु गर्न नयाँ आमा थप्नुहोस्।",
+    "clear_search": "खोज हटाउनुहोस्"
+  },
+  "motherCard": {
+    "vaccinated": "✓ खोप प्राप्त",
+    "pending": "⏳ बाँकी",
+    "ageAndSeva": "{{age}} वर्ष पुरानो • सेवा #{{sewa}}",
+    "ward": "वडा",
+    "tole": "टोल",
+    "pregnancy": "गर्भावस्था",
+    "previousTD": "पहिलेको TD",
+    "phone": "फोन",
+    "createdBy": "द्वारा सिर्जना #{{id}}",
+    "viewDetails": "विवरण हेर्नुहोस्"
+  },
+  "motherDetails": {
+    "back": "सूचीमा फर्कनुहोस्",
+    "print": "प्रिन्ट गर्नुहोस्",
+    "age": "{{value}} वर्ष पुरानो",
+    "ward": "वडा {{number}}",
+    "personalInfo": {
+      "title": "व्यक्तिगत जानकारी",
+      "tole": "टोल",
+      "casteCode": "जाति कोड",
+      "sewaDartaNumber": "सेवा दर्ता #",
+      "sewaDartaNumberValue": "#{{number}}",
+      "pregnancies": "गर्भावस्था",
+      "previousTD": "पहिलेको TD",
+      "createdBy": "द्वारा सिर्जना",
+      "createdByValue": "#{{id}}",
+      "recordCreated": "रेकर्ड सिर्जना गरियो"
+    },
+    "notes": {
+      "title": "टिप्पणीहरू"
+    },
+    "tdVaccinationRecords": {
+      "title": "TD खोप रेकर्डहरू",
+      "description": "प्रशासित TD खोप खुराकहरूको विवरण",
+      "given": "दिइएको",
+      "pending": "बाँकी",
+      "administered": "प्रशासित",
+      "bsDate": "BS: {{date}}",
+      "adDate": "AD: {{date}}",
+      "notAdministered": "प्रशासित गरिएको छैन",
+      "tdDose": {
+        "dose1": "खुराक १",
+        "dose2": "खुराक २",
+        "dose2Plus": "खुराक २+"
+      }
+    }
+  },
+  "pagination": {
+    "previous": "अघिल्लो",
+    "next": "अर्को",
+    "page": "पृष्ठ {{current}} मा {{total}}"
+  }
+}

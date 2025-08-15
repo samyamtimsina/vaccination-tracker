@@ -1,0 +1,97 @@
+{
+  "loading": {
+    "message": "Loading..."
+  },
+  "error": {
+    "title": "Error",
+    "message": "An error occurred: {{error}}",
+    "try_again": "Try Again"
+  },
+  "header": {
+    "title": "All Mothers",
+    "description": "View and manage mother records"
+  },
+  "addMotherButton": {
+    "label": "Add Mother"
+  },
+  "stats": {
+    "totalMothers": "Total Mothers",
+    "fullyVaccinated": "Fully Vaccinated",
+    "pending": "Pending",
+    "completionRate": "Completion Rate"
+  },
+  "search": {
+    "placeholder": "Search by name..."
+  },
+  "filter": {
+    "all": "All Status",
+    "vaccinated": "Fully Vaccinated",
+    "pending": "Pending"
+  },
+  "sort": {
+    "name": "Sort by Name",
+    "age": "Sort by Age",
+    "ward": "Sort by Ward",
+    "recent": "Most Recent"
+  },
+  "noResults": {
+    "title_with_search": "No Mothers Found",
+    "description_with_search": "No mothers match your search criteria.",
+    "title_no_data": "No Mothers Available",
+    "description_no_data": "No mother records found. Add a new mother to get started.",
+    "clear_search": "Clear Search"
+  },
+  "motherCard": {
+    "vaccinated": "✓ Vaccinated",
+    "pending": "⏳ Pending",
+    "ageAndSeva": "{{age}} years old • Seva #{{sewa}}",
+    "ward": "Ward",
+    "tole": "Tole",
+    "pregnancy": "Pregnancy",
+    "previousTD": "Previous TD",
+    "phone": "Phone",
+    "createdBy": "Created by #{{id}}",
+    "viewDetails": "View Details"
+  },
+  "motherDetails": {
+    "back": "Back to List",
+    "print": "Print",
+    "age": "{{value}} years old",
+    "ward": "Ward {{number}}",
+    "personalInfo": {
+      "title": "Personal Information",
+      "tole": "Tole",
+      "casteCode": "Caste Code",
+      "sewaDartaNumber": "Seva Darta #",
+      "sewaDartaNumberValue": "#{{number}}",
+      "pregnancies": "Pregnancies",
+      "previousTD": "Previous TD",
+      "createdBy": "Created By",
+      "createdByValue": "#{{id}}",
+      "recordCreated": "Record Created"
+    },
+    "notes": {
+      "title": "Notes"
+    },
+    "tdVaccinationRecords": {
+      "title": "TD Vaccination Records",
+      "description": "Details of TD vaccination doses administered",
+      "given": "Given",
+      "pending": "Pending",
+      "administered": "Administered",
+      "bsDate": "BS: {{date}}",
+      "adDate": "AD: {{date}}",
+      "notAdministered": "Not Administered",
+      "tdDose": {
+        "dose1": "Dose 1",
+        "dose2": "Dose 2",
+        "dose2Plus": "Dose 2+"
+      }
+    }
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{current}} of {{total}}"
+  }
+}

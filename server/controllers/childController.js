@@ -67,7 +67,7 @@ export const createChild = async (req, res) => {
     }
 
     // Wrap everything in a transaction to ensure data consistency
-    const newChild = await prisma.$transaction(async (tx) => {
+    const createdChild = await prisma.$transaction(async (tx) => {
       // 3️⃣ Create child record
       const childData = {
         isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
@@ -83,7 +83,6 @@ export const createChild = async (req, res) => {
         purnaKhop: validatedData.purnaKhop || false,
         remarks: validatedData.remarks || '',
       };
-      // `sewaDartaNumber` is now auto-incrementing, so we don't include it here
       const child = await tx.child.create({ data: childData });
 
       // 4️⃣ Prepare and create vaccinations
@@ -92,7 +91,6 @@ export const createChild = async (req, res) => {
         req.user,
       );
       if (vaccinationCreateData.length > 0) {
-        // Link vaccination records to the new child
         const vaccinationsWithChildId = vaccinationCreateData.map((v) => ({
           ...v,
           citizenId: child.id,
@@ -107,17 +105,51 @@ export const createChild = async (req, res) => {
         const weightCreateData = validatedData.weightRecords.map((w) => ({
           childId: child.id,
           weight: w.weight,
-          date: parseBsDateString(w.date), // Use the correct field name 'date'
+          date: parseBsDateString(w.date),
           createdById: req.user.id,
         }));
         await tx.weightRecord.createMany({ data: weightCreateData });
       }
 
-      return child;
+      // 6️⃣ Perform a final query to get the newly created child with all related data
+      const newChildWithUser = await tx.child.findUnique({
+        where: { id: child.id },
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          vaccinations: {
+            include: {
+              createdBy: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          weightRecords: {
+            include: {
+              createdBy: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // 7️⃣ Return the complete object to be sent as the response
+      return newChildWithUser;
     });
 
-    // 6️⃣ Send response
-    res.status(201).json(newChild);
+    // 8️⃣ Send the full response
+    res.status(201).json(createdChild);
   } catch (error) {
     console.error('Child creation error:', error);
     res.status(500).json({
@@ -129,16 +161,43 @@ export const createChild = async (req, res) => {
 
 // ... the rest of your controller functions
 
-// Rest of your controllers (getAllChildren, getChild) remain the same
-
 // Controller to get all children, including their vaccination records
 export const getAllChildren = async (req, res) => {
   try {
     const children = await prisma.child.findMany({
       include: {
-        vaccinations: true,
-
-        weightRecords: true,
+        // --- ADDED ---
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        // --- ADDED ---
+        vaccinations: {
+          include: {
+            // --- ADDED ---
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            // --- ADDED ---
+          },
+        },
+        weightRecords: {
+          include: {
+            // --- ADDED ---
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            // --- ADDED ---
+          },
+        },
       },
     });
 
@@ -172,10 +231,39 @@ export const getWardChildren = async (req, res) => {
       where: {
         wardNumber: wardId,
       },
-
       include: {
-        vaccinations: true,
-        weightRecords: true,
+        // --- ADDED ---
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        // --- ADDED ---
+        vaccinations: {
+          include: {
+            // --- ADDED ---
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            // --- ADDED ---
+          },
+        },
+        weightRecords: {
+          include: {
+            // --- ADDED ---
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            // --- ADDED ---
+          },
+        },
       },
     });
 
@@ -202,8 +290,38 @@ export const getChild = async (req, res) => {
         id: id,
       },
       include: {
-        vaccinations: true,
-        weightRecords: true,
+        // --- ADDED ---
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        // --- ADDED ---
+        vaccinations: {
+          include: {
+            // --- ADDED ---
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            // --- ADDED ---
+          },
+        },
+        weightRecords: {
+          include: {
+            // --- ADDED ---
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            // --- ADDED ---
+          },
+        },
       },
     });
 
