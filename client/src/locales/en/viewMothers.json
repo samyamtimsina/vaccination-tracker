@@ -1,97 +1,102 @@
 {
+  "header": {
+    "title": "All Mothers",
+    "description": "View and manage the list of mothers and their vaccination records."
+  },
+  "addMotherButton": {
+    "label": "Add New Mother"
+  },
   "loading": {
-    "message": "Loading..."
+    "message": "Loading data, please wait..."
   },
   "error": {
     "title": "Error",
-    "message": "An error occurred: {{error}}",
+    "message": "An error occurred: {error}",
     "try_again": "Try Again"
-  },
-  "header": {
-    "title": "All Mothers",
-    "description": "View and manage mother records"
-  },
-  "addMotherButton": {
-    "label": "Add Mother"
   },
   "stats": {
     "totalMothers": "Total Mothers",
     "fullyVaccinated": "Fully Vaccinated",
-    "pending": "Pending",
+    "pending": "Pending Vaccinations",
     "completionRate": "Completion Rate"
   },
   "search": {
-    "placeholder": "Search by name..."
+    "placeholder": "Search by mother's name..."
   },
   "filter": {
-    "all": "All Status",
+    "all": "All",
     "vaccinated": "Fully Vaccinated",
     "pending": "Pending"
   },
   "sort": {
-    "name": "Sort by Name",
-    "age": "Sort by Age",
-    "ward": "Sort by Ward",
+    "name": "Name",
+    "age": "Age",
+    "ward": "Ward",
     "recent": "Most Recent"
   },
   "noResults": {
     "title_with_search": "No Mothers Found",
-    "description_with_search": "No mothers match your search criteria.",
     "title_no_data": "No Mothers Available",
-    "description_no_data": "No mother records found. Add a new mother to get started.",
+    "description_with_search": "No mothers match your search criteria.",
+    "description_no_data": "There are no mothers registered yet.",
     "clear_search": "Clear Search"
   },
   "motherCard": {
-    "vaccinated": "✓ Vaccinated",
-    "pending": "⏳ Pending",
-    "ageAndSeva": "{{age}} years old • Seva #{{sewa}}",
+    "vaccinated": "Fully Vaccinated",
+    "pending": "Vaccination Pending",
+    "ageAndSeva": "Age: {age}, Sewa #: {sewa}",
     "ward": "Ward",
     "tole": "Tole",
-    "pregnancy": "Pregnancy",
-    "previousTD": "Previous TD",
+    "pregnancy": "Pregnancies",
+    "previousTD": "Previous TD Doses",
     "phone": "Phone",
-    "createdBy": "Created by #{{id}}",
+    "createdBy": "Created By: {name}",
     "viewDetails": "View Details"
   },
   "motherDetails": {
     "back": "Back to List",
     "print": "Print",
-    "age": "{{value}} years old",
-    "ward": "Ward {{number}}",
+    "age": "Age: {value}",
+    "ward": "Ward {number}",
+    "tdDose": {
+      "dose": "Dose {dose}"
+    },
     "personalInfo": {
       "title": "Personal Information",
       "tole": "Tole",
       "casteCode": "Caste Code",
-      "sewaDartaNumber": "Seva Darta #",
-      "sewaDartaNumberValue": "#{{number}}",
-      "pregnancies": "Pregnancies",
-      "previousTD": "Previous TD",
-      "createdBy": "Created By",
-      "createdByValue": "#{{id}}",
-      "recordCreated": "Record Created"
+      "sewaDartaNumber": "Sewa Darta Number",
+      "sewaDartaNumberValue": "#{number}",
+      "pregnancies": "Number of Pregnancies",
+      "previousTD": "Previous TD Doses Taken",
+      "municipalityLabel": "Municipality",
+      "municipality": {
+        "local": "Local",
+        "other": "Other"
+      },
+      "recordCreated": "Record Created",
+      "createdBy": "Created By"
     },
     "notes": {
       "title": "Notes"
     },
     "tdVaccinationRecords": {
       "title": "TD Vaccination Records",
-      "description": "Details of TD vaccination doses administered",
+      "description": "Vaccination history for Tetanus-Diphtheria (TD) doses.",
       "given": "Given",
       "pending": "Pending",
       "administered": "Administered",
-      "bsDate": "BS: {{date}}",
-      "adDate": "AD: {{date}}",
+      "bsDate": "BS: {date}",
+      "adDate": "AD: {date}",
       "notAdministered": "Not Administered",
-      "tdDose": {
-        "dose1": "Dose 1",
-        "dose2": "Dose 2",
-        "dose2Plus": "Dose 2+"
-      }
-    }
-  },
+      "createdBy": "Recorded By",
+      "givenBy": "Administered By",
+      "remarks": "Remarks"
+    },
   "pagination": {
     "previous": "Previous",
     "next": "Next",
-    "page": "Page {{current}} of {{total}}"
+    "page": "Page {current} of {total}"
   }
+}
 }

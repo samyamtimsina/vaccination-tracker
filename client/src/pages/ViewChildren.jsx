@@ -46,7 +46,7 @@ const navigate = useNavigate();
 
   useEffect(() => {
     fetchChildren();
-    console.log('childrenData updated:', childrenData);
+    ('childrenData updated:', childrenData);
   }, [fetchChildren]);
 
   const filteredChildren = useMemo(() => {

@@ -1,68 +1,72 @@
 import { prisma } from '../utils/prisma.js';
-import { createMotherSchema } from '../schemas/motherSchema.js'; // Import the new schema
+import { createMotherSchema } from '../schemas/motherSchema.js';
 import { parseBsDateString } from '../utils/helpers.js';
 
 export const createMother = async (req, res) => {
-  // Use Zod's safeParse to validate the request body
-  const validationResult = createMotherSchema.safeParse(req.body);
-
-  if (!validationResult.success) {
-    return res.status(400).json({
-      error: 'Validation failed',
-      details: validationResult.error.errors,
-    });
-  }
-
-  const { fullName, lastName, ...motherData } = validationResult.data;
-
-  const validatedData = validationResult.data;
-  // Convert BS birth date to AD
-  const bsBirthDateStr = validatedData.birthDate;
-  const bsDose1DateStr = validatedData.tdDose1;
-  const bsDose2DateStr = validatedData.tdDose2;
-  const bsDose2PlusDateStr = validatedData.tdDose2Plus;
-
-  const adBirthDate = parseBsDateString(bsBirthDateStr);
-  const adDose1Date = parseBsDateString(bsDose1DateStr);
-  const adDose2Date = parseBsDateString(bsDose2DateStr);
-  const adDose2PlusDate = parseBsDateString(bsDose2PlusDateStr);
-
   try {
-    // Combine full name and last name inside the controller
+    console.log('Received req.body:', req.body);
+
+    // Validate the request body
+    const validationResult = createMotherSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      console.log('Validation errors:', validationResult.error.errors); // Log specific errors
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: validationResult.error.errors,
+      });
+    }
+
+    console.log('Validated data:', validationResult.data); // Log full validated data
+
+    const { fullName, lastName, tdDoses = [], ...motherData } = validationResult.data; // Default to empty array
+    console.log('Validated mother data:', motherData);
+    console.log('TD Doses:', tdDoses);
+    console.log('Full Name:', fullName);
+    console.log('Last Name:', lastName);
+
+    const user = req.user; // Assuming user is available from auth middleware
     const combinedName = `${fullName} ${lastName || ''}`.trim();
 
-    const mother = await prisma.mother.create({
+    // Prepare TD dose data
+    const tdDosesToCreate = Array.isArray(tdDoses)
+      ? tdDoses.map((dose) => ({
+        ...dose,
+        dateGiven: parseBsDateString(dose.dateGiven),
+        createdById: user.id,
+      }))
+      : [];
+
+    console.log('TD Doses to create:', tdDosesToCreate); // Log before Prisma call
+
+    const newMother = await prisma.mother.create({
       data: {
-        phoneNumber: validatedData.phoneNumber,
-
-        casteCode: parseInt(validatedData.casteCode, 10),
-        age: parseInt(validatedData.age, 10),
-
-        tole: validatedData.tole || '',
-
-        wardNumber: parseInt(validatedData.wardNumber, 10),
-        pregnancyCount: parseInt(validatedData.pregnancyCount),
-        previousTDTakenCount: parseInt(validatedData.previousTDTakenCount),
-        tdDose1: adDose1Date,
-        tdDose2: adDose2Date,
-        tdDose2Plus: adDose2PlusDate,
+        ...motherData,
         name: combinedName,
-        createdById: req.user.id, // Assuming user ID is from auth middleware
-        remarks: validatedData.remarks || '',
-        isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
+        createdById: user.id,
+        tdDoses: {
+          create: tdDosesToCreate,
+        },
+      },
+      include: {
+        tdDoses: {
+          include: {
+            createdBy: {
+              select: { id: true, name: true },
+            },
+            administeredBy: {
+              select: { id: true, name: true },
+            },
+          },
+        },
       },
     });
 
-    res.status(201).json(mother);
+    res.status(201).json(newMother);
   } catch (error) {
-    console.error('Error creating mother:', error);
-    res.status(500).json({
-      error: 'Failed to create mother',
-      details: error.message,
-    });
+    console.error('Error creating mother record:', error);
+    res.status(500).json({ error: 'Something went wrong.', details: error.message });
   }
 };
-
 export const getMothers = async (req, res) => {
   try {
     const mothers = await prisma.mother.findMany();
@@ -75,3 +79,43 @@ export const getMothers = async (req, res) => {
     });
   }
 };
+
+export const getWardMothers = async (req, res) => {
+  try {
+    if (!req.user || !req.user.wardId) {
+      return res
+        .status(401)
+        .json({ error: 'Unauthorized. User or wardId not found.' });
+    }
+    const { wardId } = req.user;
+    const mothers = await prisma.mother.findMany({
+      where: {
+        wardNumber: wardId,
+      },
+      include: {
+        createdBy: {
+          select: { id: true, name: true },
+        },
+        tdDoses: {
+          include: {
+            createdBy: {
+              select: { id: true, name: true },
+            },
+            administeredBy: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!mothers) {
+      return res.status(404).json({ error: 'No mothers found' });
+    }
+
+    res.status(200).json(mothers);
+
+  } catch (error) {
+
+  }
+}

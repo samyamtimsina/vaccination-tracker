@@ -29,7 +29,10 @@ model User {
   createdWeightRecords      WeightRecord[]      @relation(name: "CreatedByWeight")
   administeredWeightRecords WeightRecord[]      @relation(name: "AdministeredByWeight")
   verifiedChildren          Child[]             @relation(name: "VerifiedBy")
+  createdTDDoses      TDDose[]
+  administeredTDDoses TDDose[] @relation("AdministeredByTDDose")
 }
+
 
 model Child {
   id                        String              @id @default(uuid())
@@ -66,14 +69,27 @@ model Mother {
   wardNumber                Int
   pregnancyCount            Int
   previousTDTakenCount      Int
-  tdDose1                   DateTime?
-  tdDose2                   DateTime?
-  tdDose2Plus               DateTime?
   remarks                   String?
   createdAt                 DateTime  @default(now())
   createdById               Int
   createdBy                 User      @relation(fields: [createdById], references: [id])
   isFromOtherMunicipality   Boolean   @default(false)
+ tdDoses                 TDDose[]
+}
+model TDDose {
+  id               String    @id @default(uuid())
+  doseNumber       Int       // To identify if it's the 1st, 2nd, or 2nd+ dose
+  dateGiven        DateTime
+  remarks          String?
+  motherId         String
+  mother           Mother    @relation(fields: [motherId], references: [id])
+  createdAt        DateTime  @default(now())
+  createdById      Int
+  createdBy        User      @relation(fields: [createdById], references: [id])
+
+  // New fields to track the user who administered the vaccine
+  administeredById Int
+  administeredBy   User      @relation("AdministeredByTDDose", fields: [administeredById], references: [id])
 }
 
 model VaccinationRecord {

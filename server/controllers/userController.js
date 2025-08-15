@@ -2,7 +2,6 @@
 import { prisma } from '../utils/prisma.js';
 
 export const getMe = (req, res) => {
-  console.log('called getMe');
   if (req.user) {
     const user = {
       id: req.user.id,
@@ -20,7 +19,6 @@ export const getUsers = async (req, res) => {
 
     // Build the query options based on the `role` query parameter
     const whereClause = role ? { role: role.toLowerCase() } : {};
-    console.log(whereClause,'whereClause');
     
     const users = await prisma.user.findMany({
       where: whereClause,
@@ -40,7 +38,6 @@ export const getUsers = async (req, res) => {
 
 
 export const getUserProfile = async (req, res) => {
-    console.log('called getUserProfile');
 
     try {
         // Validate request parameters
@@ -66,14 +63,12 @@ export const getUserProfile = async (req, res) => {
         });
 
         if (!user) {
-            console.log(`User with ID ${userId} not found.`);
             return res.status(404).json({
                 status: 'error',
                 message: 'User not found'
             });
         }
 
-        console.log('User profile fetched successfully.');
         res.status(200).json({
             status: 'success',
             data: user
@@ -81,7 +76,6 @@ export const getUserProfile = async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching user profile:', error);
-        console.log('error',error)
         // CastError for invalid IDs will be caught here.
         res.status(500).json({
             status: 'error',

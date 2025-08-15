@@ -1,4 +1,4 @@
-import React from 'react';
+import {useState,useEffect}from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { toast, ToastContainer } from 'react-toastify';
 import axiosClient from '../api/axiosClient';
@@ -11,6 +11,23 @@ import { useTranslation } from 'react-i18next';
 import { useMotherContext } from '../context/motherContext';
 
 export default function AddMother() {
+  const [healthWorkers, setHealthWorkers] = useState([]);
+
+  // NEW: Fetch list of health workers from your API
+  useEffect(() => {
+    const fetchHealthWorkers = async () => {
+      try {
+        // You will need to create this API endpoint on your backend
+        const res = await axiosClient.get('/api/users?role=ward_officer');
+        setHealthWorkers(res.data);
+      } catch (err) {
+        console.error('Failed to fetch health workers:', err);
+        // You can set a default or show an error message
+      }
+    };
+    fetchHealthWorkers();
+  }, []);
+
   const {addMotherToState} = useMotherContext();
   const { t } = useTranslation('addMother');
   const {
@@ -22,24 +39,69 @@ export default function AddMother() {
     formState: { errors, isSubmitting },
   } = useForm();
   const navigate = useNavigate();
-
   const onSubmit = async (data) => {
-    try {
-      const payload = {
-        ...data,
-      };
-
-      const response = await axiosClient.post('/api/mothers', payload);
-      addMotherToState(response.data);
-
-      toast.success(t('success_message'));
-      reset();
-    } catch (err) {
-      console.error(err);
-      toast.error(t('error_message'));
+  try {
+    // Validate administeredById if any TD doses are provided
+    if ((data.tdDose1 || data.tdDose2 || data.tdDose2Plus) && !data.administeredById) {
+      toast.error(t('health_worker_required'));
+      return;
     }
-  };
 
+    // Build the tdDoses array
+    const tdDoses = [];
+    if (data.tdDose1) {
+      tdDoses.push({
+        doseNumber: 1,
+        dateGiven: data.tdDose1,
+        administeredById: parseInt(data.administeredById, 10),
+        remarks: '',
+      });
+    }
+    if (data.tdDose2) {
+      tdDoses.push({
+        doseNumber: 2,
+        dateGiven: data.tdDose2,
+        administeredById: parseInt(data.administeredById, 10),
+        remarks: '',
+      });
+    }
+    if (data.tdDose2Plus) {
+      tdDoses.push({
+        doseNumber: 3,
+        dateGiven: data.tdDose2Plus,
+        administeredById: parseInt(data.administeredById, 10),
+        remarks: '',
+      });
+    }
+
+    // Construct the payload
+    const payload = {
+      fullName: data.fullName,
+      lastName: data.lastName || '',
+      casteCode: parseInt(data.casteCode, 10),
+      age: parseInt(data.age, 10),
+      phoneNumber: data.phoneNumber,
+      tole: data.tole,
+      wardNumber: parseInt(data.wardNumber, 10),
+      pregnancyCount: parseInt(data.pregnancyCount, 10),
+      previousTDTakenCount: parseInt(data.previousTDTakenCount, 10),
+      remarks: data.remarks || '',
+      isFromOtherMunicipality: false,
+      tdDoses, // Always include, even if empty
+    };
+
+    console.log('Payload being sent:', payload);
+
+    const response = await axiosClient.post('http://localhost:5000/api/mothers', payload);
+    addMotherToState(response.data);
+
+    toast.success(t('success_message'));
+    reset();
+  } catch (err) {
+    console.error('Frontend error:', err.response?.data || err.message);
+    toast.error(t('error_message'));
+  }
+};
   return (
     <>
       <ToastContainer position="top-right" autoClose={3000} />
@@ -253,6 +315,36 @@ export default function AddMother() {
             </div>
           </div>
         </section>
+              {/* NEW: Administered By Section */}
+<div className="form-control mt-8">
+  <label className="label">
+    <span className="label-text text-base font-medium">
+      {t('administered_by')} <span className="text-error">*</span>
+    </span>
+  </label>
+  <select
+    {...register('administeredById', {
+      required: (data) =>
+        data.tdDose1 || data.tdDose2 || data.tdDose2Plus ? t('health_worker_required') : false,
+    })}
+    className={`select select-bordered w-full ${errors.administeredById ? 'select-error' : ''}`}
+    defaultValue=""
+  >
+    <option value="" disabled>
+      {t('select_health_worker')}
+    </option>
+    {healthWorkers.map((worker) => (
+      <option key={worker.id} value={worker.id}>
+        {worker.name}
+      </option>
+    ))}
+  </select>
+  {errors.administeredById && (
+    <label className="label">
+      <span className="label-text-alt text-error">{errors.administeredById.message}</span>
+    </label>
+  )}
+</div>
 
         <section className="bg-base-200 p-6 rounded-lg border border-base-300 shadow-sm">
           <h3 className="text-lg font-medium text-base-content mb-3">

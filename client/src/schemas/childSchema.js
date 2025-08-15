@@ -83,7 +83,7 @@ const weightRecordSchema = z.object({
 });
 
 export const createChildSchema = z.object({
-  fullName: z.string().min(1, 'पहिलो नाम आवश्यक छ'),
+  firstName: z.string().min(1, 'पहिलो नाम आवश्यक छ'),
   lastName: z.string().optional().nullable(),
   parentName: z.string().min(1, 'अभिभावकको नाम आवश्यक छ'),
   tole: z.string().min(1, 'टोल आवश्यक छ'),

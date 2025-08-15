@@ -12,7 +12,7 @@ export function MotherProvider({ children }) {
   async function fetchMothers() {
     if (fetched) return;     setLoading(true);
     try {
-      const res = await axiosClient.get('/api/mothers');
+      const res = await axiosClient.get('/api/mothers/ward');
       setMothersData(res.data);
       setFetched(true);
     } catch (err) {

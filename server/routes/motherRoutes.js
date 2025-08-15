@@ -1,5 +1,5 @@
 import express from 'express';
-import { createMother, getMothers } from '../controllers/motherController.js';
+import { createMother, getMothers,getWardMothers } from '../controllers/motherController.js';
 
 import { authenticate, authorize } from '../middlewares/auth.js';
 
@@ -19,5 +19,6 @@ router.get(
   authorize('admin', 'ward_officer'),
   getMothers,
 );
+router.get('/ward',authenticate, authorize('admin', 'ward_officer'), getWardMothers);
 
 export default router;

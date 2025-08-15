@@ -102,7 +102,6 @@ export default function AddChild() {
         weightRecords: filteredWeightRecords,
         administeredById: parseInt(data.administeredById), // Ensure it's an integer
       };
-
       const res = await axiosClient.post('/api/child', payload);
       addChildToState(res.data);
       toast.success(t('toast.success'));
@@ -220,13 +219,13 @@ export default function AddChild() {
                     </span>
                   </label>
                   <input
-                    {...register('fullName')}
+                    {...register('firstName')}
                     className={`input input-bordered w-full ${
-                      errors.fullName ? 'input-error' : ''
+                      errors.firstName? 'input-error' : ''
                     }`}
                     placeholder={t('personalInfo.form.firstName.placeholder')}
                   />
-                  {errors.fullName && (
+                  {errors.firstName&& (
                     <p className="text-error text-sm mt-1">
                       {t('personalInfo.form.firstName.required')}
                     </p>
@@ -440,7 +439,7 @@ export default function AddChild() {
                 </label>
                 <select
                   {...register('administeredById')}
-                  className={`select select-bordered w-full ${
+                  className={`select select-bordered w-min ${
                     errors.administeredById ? 'select-error' : ''
                   }`}
                   defaultValue=""

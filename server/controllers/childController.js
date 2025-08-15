@@ -73,7 +73,7 @@ export const createChild = async (req, res) => {
       // Create child record
       const childData = {
         isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
-        fullName: validatedData.fullName,
+        fullName: validatedData.firstName + ' ' + validatedData.lastName || '',
         wardNumber: parseInt(validatedData.wardNumber, 10),
         parentName: validatedData.parentName || '',
         tole: validatedData.tole || '',
@@ -223,7 +223,6 @@ export const getWardChildren = async (req, res) => {
         .json({ error: 'Unauthorized. User or wardId not found.' });
     }
     const { wardId } = req.user;
-    console.log('Fetching children for ward:', wardId);
     const children = await prisma.child.findMany({
       where: {
         wardNumber: wardId,

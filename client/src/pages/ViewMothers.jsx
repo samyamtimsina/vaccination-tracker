@@ -55,11 +55,11 @@ export default function AllMothers() {
 
     if (filterStatus === 'vaccinated') {
       filtered = filtered.filter(mother => 
-        mother.tdDose1 && mother.tdDose2 && mother.tdDose2Plus
+        mother.tdDoses && mother.tdDoses.length >= 3
       );
     } else if (filterStatus === 'pending') {
       filtered = filtered.filter(mother => 
-        !(mother.tdDose1 && mother.tdDose2 && mother.tdDose2Plus)
+        !mother.tdDoses || mother.tdDoses.length < 3
       );
     }
 
@@ -96,7 +96,7 @@ export default function AllMothers() {
   const totalPages = Math.ceil(filteredMothers.length / itemsPerPage);
 
   const vaccinatedCount = mothersData ? mothersData.filter(mother => 
-    mother.tdDose1 && mother.tdDose2 && mother.tdDose2Plus
+    mother.tdDoses && mother.tdDoses.length >= 3
   ).length : 0;
 
   const pendingCount = mothersData ? mothersData.length - vaccinatedCount : 0;
@@ -134,11 +134,13 @@ export default function AllMothers() {
   }
 
   if (selectedMother) {
-    const tdDoses = [
-      { name: t('motherDetails.tdDose.dose1'), date: selectedMother.tdDose1 },
-      { name: t('motherDetails.tdDose.dose2'), date: selectedMother.tdDose2 },
-      { name: t('motherDetails.tdDose.dose2Plus'), date: selectedMother.tdDose2Plus },
-    ];
+    const tdDoses = selectedMother.tdDoses.map((dose, index) => ({
+      name: t('motherDetails.tdDose.dose', { dose: dose.doseNumber }),
+      date: dose.dateGiven,
+      createdBy: dose.createdBy,
+      administeredBy: dose.administeredBy,
+      remarks: dose.remarks,
+    }));
 
     return (
       <div className="min-h-screen bg-base-200 min-w-[20rem]">
@@ -245,10 +247,12 @@ export default function AllMothers() {
 
                   <div>
                     <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
-                      {t('motherDetails.personalInfo.createdBy')}
+                      {t('motherDetails.personalInfo.municipalityLabel')}
                     </label>
                     <p className="font-semibold text-base-content mt-1">
-                      {t('motherDetails.personalInfo.createdByValue', { id: selectedMother.createdById })}
+                      {selectedMother.isFromOtherMunicipality
+                        ? t('motherDetails.personalInfo.municipality.other')
+                        : t('motherDetails.personalInfo.municipality.local')}
                     </p>
                   </div>
 
@@ -260,6 +264,15 @@ export default function AllMothers() {
                     <div className="flex space-x-4 mt-1">
                       <span className="font-semibold text-base-content text-sm">
                         {safeFormatDate(selectedMother.createdAt)}
+                      </span>
+                      <span className="flex items-center space-x-1 text-base-content/70">
+                        <FaUserMd className="text-xs" />
+                        <span 
+                          className="hover:text-primary hover:underline cursor-pointer"
+                          onClick={() => navigate(`/users/${selectedMother.createdBy.id}`)}
+                        >
+                          {t('motherDetails.personalInfo.createdBy')}: {selectedMother.createdBy.name}
+                        </span>
                       </span>
                     </div>
                   </div>
@@ -343,6 +356,40 @@ export default function AllMothers() {
                                     {t('motherDetails.tdVaccinationRecords.adDate', { date: safeFormatDate(dose.date) })}
                                   </div>
                                 </div>
+                                <div className="space-y-1 text-xs mt-2">
+                                  {dose.createdBy && (
+                                    <div className="flex items-center space-x-1 text-base-content/70">
+                                      <FaUserMd className="text-xs" />
+                                      <span 
+                                        className="hover:text-primary hover:underline cursor-pointer"
+                                        onClick={() => navigate(`/users/${dose.createdBy.id}`)}
+                                      >
+                                        {t('motherDetails.tdVaccinationRecords.createdBy')}: {dose.createdBy.name}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {dose.administeredBy && (
+                                    <div className="flex items-center space-x-1 text-base-content/70">
+                                      <FaUserMd className="text-xs" />
+                                      <span 
+                                        className="hover:text-primary hover:underline cursor-pointer"
+                                        onClick={() => navigate(`/users/${dose.administeredBy.id}`)}
+                                      >
+                                        {t('motherDetails.tdVaccinationRecords.givenBy')}: {dose.administeredBy.name}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                {dose.remarks && (
+                                  <div className="mt-2 p-2 bg-base-100 rounded border-l-2 border-primary">
+                                    <div className="text-xs text-base-content/70 mb-1">
+                                      {t('motherDetails.tdVaccinationRecords.remarks')}
+                                    </div>
+                                    <div className="text-sm text-base-content">
+                                      {dose.remarks}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ) : (
@@ -519,7 +566,7 @@ export default function AllMothers() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
               {currentMothers.map((mother) => {
-                const isTDFullyVaccinated = mother.tdDose1 && mother.tdDose2 && mother.tdDose2Plus;
+                const isTDFullyVaccinated = mother.tdDoses && mother.tdDoses.length >= 3;
 
                 return (
                   <div
@@ -574,7 +621,12 @@ export default function AllMothers() {
                         <div className="flex items-center justify-between text-xs pt-2 border-t border-base-300">
                           <span className="text-base-content/60 flex items-center space-x-1">
                             <FaUserMd className="text-xs" />
-                            <span>{t('motherCard.createdBy', { id: mother.createdById })}</span>
+                            <span 
+                              className="hover:text-primary hover:underline cursor-pointer"
+                              onClick={() => navigate(`/users/${mother.createdBy.id}`)}
+                            >
+                              {t('motherCard.createdBy')}: {mother.createdBy.name}
+                            </span>
                           </span>
                           <span className="text-base-content/60">
                             {safeFormatDate(mother.createdAt)}

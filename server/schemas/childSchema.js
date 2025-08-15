@@ -95,7 +95,13 @@ export const createChildSchema = z.object({
   // Re-added the weight records field
   weightRecords: z.array(weightRecordSchema),
 
-  fullName: z.string().min(1, 'Full name is required'),
+  firstName: z.string().min(1, 'First name is required'),
+  
+lastName: z
+  .string()
+  .trim()
+  .optional()
+  .transform((val) => (val === '' ? undefined : val)),
   parentName: z.string().min(1, 'Parent name is required'),
   tole: z.string().min(1, 'Tole is required'),
   phoneNumber: z
