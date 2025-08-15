@@ -38,6 +38,7 @@ export const createChildSchema = z.object({
   wardNumber: numericString,
   casteCode: numericString,
   isFromOtherMunicipality: z.boolean().default(false),
+  administeredById: numericString, // New field to validate the ID of the person who administered the records
 
   gender: z
     .string()
@@ -104,6 +105,5 @@ export const createChildSchema = z.object({
     .refine((val) => !val || /^\+?\d{7,15}$/.test(val), {
       message: 'Phone number must be 7-15 digits, optionally starting with +',
     }),
-  purnaKhop: z.boolean().default(false),
   remarks: z.string().optional(),
 });

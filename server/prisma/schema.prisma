@@ -15,76 +15,83 @@ datasource db {
 }
 
 model User {
-  id                Int                 @id @default(autoincrement())
-  name              String
-  email             String              @unique
-  passwordHash      String
-  role              String
-  wardId            Int?
-  Child             Child[]
-  Mother            Mother[]
-  VaccinationRecord VaccinationRecord[]
-  AuditLogs         AuditLog[]
-  weightRecords     WeightRecord[]
+  id                        Int                 @id @default(autoincrement())
+  name                      String
+  email                     String              @unique
+  passwordHash              String
+  role                      String
+  wardId                    Int?
+  Child                     Child[]
+  Mother                    Mother[]
+  createdVaccinationRecords VaccinationRecord[] @relation(name: "CreatedByVaccination")
+  administeredVaccinations  VaccinationRecord[] @relation(name: "AdministeredByVaccination")
+  AuditLogs                 AuditLog[]
+  createdWeightRecords      WeightRecord[]      @relation(name: "CreatedByWeight")
+  administeredWeightRecords WeightRecord[]      @relation(name: "AdministeredByWeight")
+  verifiedChildren          Child[]             @relation(name: "VerifiedBy")
 }
 
 model Child {
-  id                      String              @id @default(uuid())
-  sewaDartaNumber         Int                 @unique @default(autoincrement())
-  fullName                String // Combined full name (first + last)
-  wardNumber              Int
-  casteCode               Int
-  gender                  String
-  parentName              String
-  tole                    String
-  phoneNumber             String
-  birthDate               DateTime
-  purnaKhop               Boolean             @default(false)
-  remarks                 String?
-  createdById             Int
-  createdBy               User                @relation(fields: [createdById], references: [id])
-  vaccinations            VaccinationRecord[]
-  createdAt               DateTime            @default(now())
-  NotificationLog         NotificationLog[]
-  isFromOtherMunicipality Boolean             @default(false)
-  weightRecords           WeightRecord[]
+  id                        String              @id @default(uuid())
+  sewaDartaNumber           Int                 @unique @default(autoincrement())
+  fullName                  String
+  wardNumber                Int
+  casteCode                 Int
+  gender                    String
+  parentName                String
+  tole                      String
+  phoneNumber               String
+  birthDate                 DateTime
+  purnaKhop                 Boolean             @default(false)
+  remarks                   String?
+  createdById               Int
+  createdBy                 User                @relation(fields: [createdById], references: [id])
+  verifiedById              Int?
+  verifiedBy                User?               @relation(name: "VerifiedBy", fields: [verifiedById], references: [id])
+  vaccinations              VaccinationRecord[]
+  createdAt                 DateTime            @default(now())
+  NotificationLog           NotificationLog[]
+  isFromOtherMunicipality   Boolean             @default(false)
+  weightRecords             WeightRecord[]
 }
 
 model Mother {
-  id                      String    @id @default(uuid())
-  sewaDartaNumber         Int       @unique @default(autoincrement())
-  name                    String
-  casteCode               Int
-  age                     Int
-  phoneNumber             String
-  tole                    String
-  wardNumber              Int
-  pregnancyCount          Int
-  previousTDTakenCount    Int
-  tdDose1                 DateTime?
-  tdDose2                 DateTime?
-  tdDose2Plus             DateTime?
-  remarks                 String?
-  createdAt               DateTime  @default(now())
-  createdById             Int
-  createdBy               User      @relation(fields: [createdById], references: [id])
-  isFromOtherMunicipality Boolean   @default(false)
+  id                        String    @id @default(uuid())
+  sewaDartaNumber           Int       @unique @default(autoincrement())
+  name                      String
+  casteCode                 Int
+  age                       Int
+  phoneNumber               String
+  tole                      String
+  wardNumber                Int
+  pregnancyCount            Int
+  previousTDTakenCount      Int
+  tdDose1                   DateTime?
+  tdDose2                   DateTime?
+  tdDose2Plus               DateTime?
+  remarks                   String?
+  createdAt                 DateTime  @default(now())
+  createdById               Int
+  createdBy                 User      @relation(fields: [createdById], references: [id])
+  isFromOtherMunicipality   Boolean   @default(false)
 }
 
 model VaccinationRecord {
-  id                  String      @id @default(uuid())
-  citizenId           String
-  vaccineType         VaccineType
-  doseNumber          Int
-  dateGiven           DateTime
-  isComplete          Boolean
-  remarks             String?
-  recommendedAtMonths Int
-  customVaccineName   String? // keep optional for "OTHERS" type
-  child               Child       @relation(fields: [citizenId], references: [id])
-  createdById         Int
-  createdBy           User        @relation(fields: [createdById], references: [id])
-  createdAt           DateTime    @default(now())
+  id                        String      @id @default(uuid())
+  citizenId                 String
+  vaccineType               VaccineType
+  doseNumber                Int
+  dateGiven                 DateTime
+  isComplete                Boolean
+  remarks                   String?
+  recommendedAtMonths       Int
+  customVaccineName         String?
+  child                     Child       @relation(fields: [citizenId], references: [id])
+  createdById               Int
+  createdBy                 User        @relation(name: "CreatedByVaccination", fields: [createdById], references: [id])
+  administeredById          Int?
+  administeredBy            User?       @relation(name: "AdministeredByVaccination", fields: [administeredById], references: [id])
+  createdAt                 DateTime    @default(now())
 }
 
 enum VaccineType {
@@ -101,52 +108,54 @@ enum VaccineType {
 }
 
 model NotificationLog {
-  id          Int         @id @default(autoincrement())
-  citizenId   String
-  vaccineType VaccineType
-  doseNumber  Int
-  sentAt      DateTime    @default(now())
-  type        String // "due" or "oneWeekBefore"
-  child       Child       @relation(fields: [citizenId], references: [id])
+  id                        Int         @id @default(autoincrement())
+  citizenId                 String
+  vaccineType               VaccineType
+  doseNumber                Int
+  sentAt                    DateTime    @default(now())
+  type                      String
+  child                     Child       @relation(fields: [citizenId], references: [id])
 }
 
 model AuditLog {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  action    String // 'create_child', 'create_vaccination', 'generate_certificate', 'correction_request', etc.
-  meta      Json?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+  id                        Int       @id @default(autoincrement())
+  userId                    Int
+  action                    String
+  meta                      Json?
+  createdAt                 DateTime  @default(now())
+  user                      User      @relation(fields: [userId], references: [id])
 }
 
 model CorrectionRequest {
-  id            Int       @id @default(autoincrement())
-  vaccinationId String
-  requestedById Int
-  reason        String
-  status        String    @default("pending") // pending, approved, rejected
-  createdAt     DateTime  @default(now())
-  processedById Int?
-  processedAt   DateTime?
+  id                        Int       @id @default(autoincrement())
+  vaccinationId             String
+  requestedById             Int
+  reason                    String
+  status                    String    @default("pending")
+  createdAt                 DateTime  @default(now())
+  processedById             Int?
+  processedAt               DateTime?
 }
 
 model Certificate {
-  id         Int      @id @default(autoincrement())
-  childId    String
-  issuedById Int
-  issuedAt   DateTime @default(now())
-  token      String   @unique // UUID or secure token
-  pdfPath    String? // optional if you store pdfs
+  id                        Int       @id @default(autoincrement())
+  childId                   String
+  issuedById                Int
+  issuedAt                  DateTime  @default(now())
+  token                     String    @unique
+  pdfPath                   String?
 }
 
 model WeightRecord {
-  id          String   @id @default(uuid())
-  date        DateTime
-  weight      Float
-  child       Child    @relation(fields: [childId], references: [id])
-  childId     String
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdById Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                        String   @id @default(uuid())
+  date                      DateTime
+  weight                    Float
+  child                     Child    @relation(fields: [childId], references: [id])
+  childId                   String
+  createdById               Int
+  createdBy                 User     @relation(name: "CreatedByWeight", fields: [createdById], references: [id])
+  administeredById          Int?
+  administeredBy            User?    @relation(name: "AdministeredByWeight", fields: [administeredById], references: [id])
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 }

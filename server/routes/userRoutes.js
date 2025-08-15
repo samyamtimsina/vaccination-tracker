@@ -1,6 +1,6 @@
 // src/routes/userRoutes.js
 import express from 'express';
-import { getUserProfile, getMe, updateUserProfile } from '../controllers/userController.js';
+import { getUserProfile, getMe, updateUserProfile ,getUsers} from '../controllers/userController.js';
 import { authenticate, authorize } from '../middlewares/auth.js';
 
 const router = express.Router();
@@ -13,4 +13,5 @@ router.get('/:userId', authenticate,
     getUserProfile);
 
 
+router.get('/',authenticate,authorize('admin','ward_officer'), getUsers);
 export default router;

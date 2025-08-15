@@ -14,6 +14,29 @@ export const getMe = (req, res) => {
     res.status(404).json({ message: 'User not found' });
   }
 };
+export const getUsers = async (req, res) => {
+  try {
+    const { role } = req.query;
+
+    // Build the query options based on the `role` query parameter
+    const whereClause = role ? { role: role.toLowerCase() } : {};
+    console.log(whereClause,'whereClause');
+    
+    const users = await prisma.user.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    // Return the list of users
+    return res.status(200).json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    return res.status(500).json({ error: 'Something went wrong.' });
+  }
+};
 
 
 export const getUserProfile = async (req, res) => {
