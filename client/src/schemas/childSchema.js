@@ -9,8 +9,6 @@ const numericString = z.coerce
     message: 'मान सकारात्मक संख्या हुनुपर्छ',
   });
 
-// A robust date schema that accepts either "YYYY-MM-DD" or the full ISO string
-// and then transforms it to "YYYY-MM-DD"
 const dateSchema = z
   .union([
     z.string({
@@ -23,9 +21,8 @@ const dateSchema = z
   ])
   .transform((val) => {
     if (val instanceof Date) {
-      // Get UTC date parts to avoid timezone shift
       const year = val.getUTCFullYear();
-      const month = val.getUTCMonth(); // still 0-indexed
+      const month = val.getUTCMonth();
       const day = val.getUTCDate();
       const nepDate = new NepaliDate(year, month, day);
       return `${nepDate.getYear()}-${String(nepDate.getMonth() + 1).padStart(2, '0')}-${String(nepDate.getDate()).padStart(2, '0')}`;
@@ -69,7 +66,6 @@ const dateSchema = z
       ),
   );
 
-// Schema for a single vaccine dose object
 const vaccineDoseSchema = z.object({
   date: z
     .string()
@@ -81,7 +77,6 @@ const vaccineDoseSchema = z.object({
   remarks: z.string().optional().nullable(),
 });
 
-// Schema for a single weight record
 const weightRecordSchema = z.object({
   date: dateSchema,
   weight: numericString,
@@ -96,6 +91,7 @@ export const createChildSchema = z.object({
   casteCode: numericString,
   birthDate: dateSchema,
   isFromOtherMunicipality: z.boolean().default(false),
+  administeredById: numericString, // नयाँ: प्रशासकको ID
   gender: z
     .string()
     .min(1, 'लिङ्ग आवश्यक छ')
@@ -115,17 +111,9 @@ export const createChildSchema = z.object({
       message:
         'फोन नम्बर 7-15 अंकको हुनुपर्छ, वैकल्पिक रूपमा + बाट सुरु हुन सक्छ',
     }),
-  purnaKhop: z.boolean().default(false),
   remarks: z.string().optional().nullable(),
-
-  // Use the new vaccineDoseSchema to validate the array of vaccine doses
   vaccines: z
-    .record(
-      z.string(), // The key can be any string (vaccine name)
-      z.array(vaccineDoseSchema),
-    )
+    .record(z.string(), z.array(vaccineDoseSchema))
     .optional(),
-
-  // Add the schema for the weightRecords array
   weightRecords: z.array(weightRecordSchema).optional(),
 });

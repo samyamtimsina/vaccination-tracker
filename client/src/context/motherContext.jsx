@@ -5,13 +5,12 @@ const MotherContext = createContext();
 
 export function MotherProvider({ children }) {
   const [mothersData, setMothersData] = useState([]);
-  const [fetched, setFetched] = useState(false); // To avoid refetch
+  const [fetched, setFetched] = useState(false); 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   async function fetchMothers() {
-    if (fetched) return; // Skip if already fetched
-    setLoading(true);
+    if (fetched) return;     setLoading(true);
     try {
       const res = await axiosClient.get('/api/mothers');
       setMothersData(res.data);

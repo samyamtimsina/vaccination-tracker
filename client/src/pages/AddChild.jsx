@@ -1,6 +1,6 @@
 import { useForm, Controller, useWatch, useFieldArray } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { vaccineSchedule } from '../utils/vaccineSchedule';
 import axiosClient from '../api/axiosClient.js';
 import { NepaliDatePicker } from 'nepali-datepicker-reactjs';
@@ -24,7 +24,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { createChildSchema } from '../schemas/childSchema.js';
 import { useChildContext } from '../context/ChildContext';
 import { useTheme } from '../context/ThemeContext';
-import { useState } from 'react';
 import { calculateAge } from '../../helpers/calculateAge.jsx';
 import { getFirstErrorMessage } from '../../helpers/getFirstErrorMessage.jsx';
 import { useTranslation } from 'react-i18next';
@@ -46,6 +45,7 @@ export default function AddChild() {
     defaultValues: {
       isFromOtherMunicipality: false,
       birthDate: '',
+      administeredById: '', // Add default value for the new field
       vaccines: Object.fromEntries(
         Object.entries(vaccineSchedule).map(([vaccineName, doses]) => [
           vaccineName,
@@ -60,7 +60,24 @@ export default function AddChild() {
   const gender = useWatch({ control, name: 'gender', defaultValue: '' });
   const birthDate = useWatch({ control, name: 'birthDate', defaultValue: '' });
 
+  // NEW: State to hold the list of users/health workers
+  const [healthWorkers, setHealthWorkers] = useState([]);
   const [showRemarks, setShowRemarks] = useState({});
+
+  // NEW: Fetch list of health workers from your API
+  useEffect(() => {
+    const fetchHealthWorkers = async () => {
+      try {
+        // You will need to create this API endpoint on your backend
+        const res = await axiosClient.get('/api/users?role=ward_officer');
+        setHealthWorkers(res.data);
+      } catch (err) {
+        console.error('Failed to fetch health workers:', err);
+        // You can set a default or show an error message
+      }
+    };
+    fetchHealthWorkers();
+  }, []);
 
   // Use useFieldArray to manage the weightRecords array
   const { fields, append, remove } = useFieldArray({
@@ -73,6 +90,7 @@ export default function AddChild() {
     setShowRemarks((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // UPDATED: onSubmit function to include administeredById in the payload
   const onSubmit = async (data) => {
     try {
       const filteredWeightRecords = data.weightRecords.filter(
@@ -82,6 +100,7 @@ export default function AddChild() {
       const payload = {
         ...data,
         weightRecords: filteredWeightRecords,
+        administeredById: parseInt(data.administeredById), // Ensure it's an integer
       };
 
       const res = await axiosClient.post('/api/child', payload);
@@ -412,23 +431,34 @@ export default function AddChild() {
                 </div>
               </div>
 
-              {/* Purna Khop */}
-              <div className="mt-8 p-4 bg-success/10 border border-success/20 rounded-lg">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    {...register('purnaKhop')}
-                    id="purnaKhop"
-                    className="checkbox checkbox-success"
-                  />
-                  <label
-                    htmlFor="purnaKhop"
-                    className="ml-3 text-base font-medium text-base-content cursor-pointer"
-                  >
-                    {t('personalInfo.form.purnaKhop.label')}
-                  </label>
-                </div>
+              {/* NEW: Administered By Section */}
+              <div className="mt-8">
+                <label className="label">
+                  <span className="label-text text-base font-medium">
+                    Administered by: <span className="text-error">*</span>
+                  </span>
+                </label>
+                <select
+                  {...register('administeredById')}
+                  className={`select select-bordered w-full ${
+                    errors.administeredById ? 'select-error' : ''
+                  }`}
+                  defaultValue=""
+                >
+                  <option value="" disabled>Select health worker</option>
+                  {healthWorkers.map(worker => (
+                    <option key={worker.id} value={worker.id}>
+                      {worker.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.administeredById && (
+                  <p className="text-error text-sm mt-1">
+                    {errors.administeredById.message}
+                  </p>
+                )}
               </div>
+              {/* Note: `purnaKhop` checkbox removed */}
             </div>
 
             {/* Weight Tracking */}
