@@ -17,26 +17,23 @@ function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
     const schedule = vaccineSchedule[vaccineTypeEnum] || [];
 
     return doses
-      .map((doseObj) => {
+      .map((doseObj, index) => { // Added index parameter here
         if (!doseObj?.date) return null;
 
         const adDateGiven = parseBsDateString(doseObj.date);
         if (!adDateGiven) {
-          console.error(
-            `Invalid vaccination date for ${vaccineName}`,
-          );
+          console.error(`Invalid vaccination date for ${vaccineName}`);
           return null;
         }
 
-        const doseNumber = doseObj.doseNumber || 1;
+        const doseNumber = index + 1; // Use the dose index to determine the dose number
         const doseSchedule = schedule.find((d) => d.dose === doseNumber);
         const recommendedAtMonths = doseSchedule
           ? Math.round(toMonths(doseSchedule) * 100) / 100
           : 0;
 
-        // Changed VaccineType to vaccineType to match Prisma schema
         return {
-          vaccineType: vaccineTypeEnum, // Fixed case here
+          vaccineType: vaccineTypeEnum,
           doseNumber,
           dateGiven: adDateGiven,
           isComplete: true,
@@ -50,11 +47,11 @@ function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
       .filter(Boolean);
   });
 }
-
 // --- UPDATED: createChild controller
 // It now expects administeredById for vaccines and weights in the request body
 export const createChild = async (req, res) => {
   console.log('req.body create child',req.body)
+  console.log('req.body vaccines',req.body.vaccines)
   try {
     const validationResult = createChildSchema.safeParse(req.body);
     console.log('Validation result:', validationResult);

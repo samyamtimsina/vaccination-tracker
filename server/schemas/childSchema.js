@@ -5,6 +5,7 @@ export const createChildSchema = z.object({
   lastName: z.string().optional(),
   parentName: z.string().min(1),
   tole: z.string().min(1),
+  
   wardNumber: z.number(),
   casteCode: z.number(),
   birthDate: z.string(),
@@ -18,61 +19,61 @@ export const createChildSchema = z.object({
     BCG: z.array(z.object({
       date: z.string(),
       remarks: z.string().optional().nullable(),
-      type: z.enum(['routine', 'catchup']).default('routine'),
+      type: z.enum(['current', 'booster']).default('current'),
       doseNumber: z.number()
     })).optional(),
     DPT_HepB_hib: z.array(z.object({
       date: z.string(),
       remarks: z.string().optional().nullable(),
-      type: z.enum(['routine', 'catchup']).default('routine'),
+      type: z.enum(['current', 'booster']).default('current'),
       doseNumber: z.number()
     })).optional(),
     ROTA: z.array(z.object({
       date: z.string(),
       remarks: z.string().optional().nullable(),
-      type: z.enum(['routine', 'catchup']).default('routine'),
+      type: z.enum(['current', 'booster']).default('current'),
       doseNumber: z.number()
     })).optional(),
     OPV: z.array(z.object({
       date: z.string(),
       remarks: z.string().optional().nullable(),
-      type: z.enum(['routine', 'catchup']).default('routine'),
+      type: z.enum(['current', 'booster']).default('current'),
       doseNumber: z.number()
     })).optional(),
     fIPV: z.array(z.object({
       date: z.string(),
       remarks: z.string().optional().nullable(),
-      type: z.enum(['routine', 'catchup']).default('routine'),
+      type: z.enum(['current', 'booster']).default('current'),
       doseNumber: z.number()
     })).optional(),
     PCV: z.array(z.object({
       date: z.string(),
       remarks: z.string().optional().nullable(),
-      type: z.enum(['routine', 'catchup']).default('routine'),
+      type: z.enum(['current', 'booster']).default('current'),
       doseNumber: z.number()
     })).optional(),
     MR: z.array(z.object({
       date: z.string(),
       remarks: z.string().optional().nullable(),
-      type: z.enum(['routine', 'catchup']).default('routine'),
+      type: z.enum(['current', 'booster']).default('current'),
       doseNumber: z.number()
     })).optional(),
     JE: z.array(z.object({
       date: z.string(),
       remarks: z.string().optional().nullable(),
-      type: z.enum(['routine', 'catchup']).default('routine'),
+      type: z.enum(['current', 'booster']).default('current'),
       doseNumber: z.number()
     })).optional(),
     TCV: z.array(z.object({
       date: z.string(),
       remarks: z.string().optional().nullable(),
-      type: z.enum(['routine', 'catchup']).default('routine'),
+      type: z.enum(['current', 'booster']).default('current'),
       doseNumber: z.number()
     })).optional(),
     HPV: z.array(z.object({
       date: z.string(),
       remarks: z.string().optional().nullable(),
-      type: z.enum(['routine', 'catchup']).default('routine'),
+      type: z.enum(['current', 'booster']).default('current'),
       doseNumber: z.number()
     })).optional()
   }).optional(),

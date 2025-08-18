@@ -20,9 +20,9 @@ import {
   FaPhone,
   FaBirthdayCake,
   FaExclamationTriangle,
-  FaClock,
-  FaLock,
+  FaHistory,
   FaCheckCircle,
+  FaLock
 } from 'react-icons/fa';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createChildSchema } from '../schemas/childSchema.js';
@@ -35,73 +35,63 @@ import { useTranslation } from 'react-i18next';
 // Enhanced vaccine categorization logic
 const getVaccineStatus = (dose, childAge) => {
   const ageInDays = childAge.days;
-  
+
   // Calculate recommended age in days
   let recommendedAgeDays = 0;
   if (dose.recommendedAtDays !== undefined) recommendedAgeDays = dose.recommendedAtDays;
   if (dose.recommendedAtWeeks !== undefined) recommendedAgeDays = dose.recommendedAtWeeks * 7;
   if (dose.recommendedAtMonths !== undefined) recommendedAgeDays = dose.recommendedAtMonths * 30;
   if (dose.recommendedAtYears !== undefined) recommendedAgeDays = dose.recommendedAtYears * 365;
-  
+
   const daysDifference = ageInDays - recommendedAgeDays;
-  
+
   // Status categories with grace periods
-  if (daysDifference < -30) return { 
-    status: 'NOT_YET_ELIGIBLE', 
-    priority: 4, 
+  if (daysDifference < -30) return {
+    status: 'NOT_YET_ELIGIBLE',
+    priority: 4,
     color: 'text-gray-500',
     bgColor: 'bg-gray-50',
     borderColor: 'border-gray-200'
   };
-  if (daysDifference >= -30 && daysDifference <= 30) return { 
-    status: 'DUE_NOW', 
-    priority: 2, 
+  if (daysDifference >= -30 && daysDifference <= 30) return {
+    status: 'DUE_NOW',
+    priority: 2,
     color: 'text-yellow-700',
     bgColor: 'bg-yellow-50',
     borderColor: 'border-yellow-300'
   };
-  if (daysDifference > 30 && daysDifference <= 90) return { 
-    status: 'OVERDUE', 
-    priority: 1, 
+  if (daysDifference > 30 && daysDifference <= 90) return {
+    status: 'OVERDUE',
+    priority: 1,
     color: 'text-orange-700',
     bgColor: 'bg-orange-50',
     borderColor: 'border-orange-300'
   };
-  if (daysDifference > 90) return { 
-    status: 'SEVERELY_OVERDUE', 
-    priority: 1, 
+  if (daysDifference > 90) return {
+    status: 'SEVERELY_OVERDUE',
+    priority: 1,
     color: 'text-red-700',
     bgColor: 'bg-red-50',
     borderColor: 'border-red-300'
   };
-  
-  return { 
-    status: 'ACCESSIBLE', 
-    priority: 3, 
+
+  return {
+    status: 'ACCESSIBLE',
+    priority: 3,
     color: 'text-blue-700',
     bgColor: 'bg-blue-50',
     borderColor: 'border-blue-300'
   };
 };
-// Add this function
-const handleTabChange = (tabKey) => {
-  setActiveTab(tabKey);
-  // Clear any existing validation errors
-  const formValues = getValues();
-  handleSubmit(() => {})(formValues); // Triggers revalidation without submitting
-};
 
-// Update tab buttons to use this handler
 const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
   const categories = {
-    URGENT: { vaccines: [], count: 0, icon: FaExclamationTriangle, color: 'text-red-600' },
-    CURRENT: { vaccines: [], count: 0, icon: FaCheckCircle, color: 'text-blue-600' },
-    FUTURE: { vaccines: [], count: 0, icon: FaClock, color: 'text-gray-600' },
-    NOT_APPLICABLE: { vaccines: [], count: 0, icon: FaLock, color: 'text-gray-400' }
+    CURRENT: { vaccines: [], count: 0, icon: FaExclamationTriangle, color: 'text-red-600', title: 'Current & Overdue' },
+    CATCH_UP: { vaccines: [], count: 0, icon: FaHistory, color: 'text-orange-600', title: 'Catch-up' },
+    NOT_APPLICABLE: { vaccines: [], count: 0, icon: FaLock, color: 'text-gray-400', title: 'Not Applicable' }
   };
-  
+
   Object.entries(vaccineSchedule).forEach(([vaccineName, doses]) => {
-    // Skip HPV for males
     if (vaccineName === 'HPV' && gender !== 'FEMALE') {
       categories.NOT_APPLICABLE.vaccines.push({
         vaccineName,
@@ -110,58 +100,53 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
       });
       return;
     }
-    
+
     const vaccineDoses = doses.map((dose, index) => {
       const statusInfo = getVaccineStatus(dose, childAge);
       return {
         doseIndex: index,
         dose: dose.dose,
         doseInfo: dose,
-        ...statusInfo
+        ...statusInfo,
+        doseType: dose.isBooster ? 'booster' : 'current'
       };
     });
-    
-    // Group doses by status
-    const urgentDoses = vaccineDoses.filter(d => d.status.includes('OVERDUE'));
-    const currentDoses = vaccineDoses.filter(d => ['DUE_NOW', 'ACCESSIBLE'].includes(d.status));
-    const futureDoses = vaccineDoses.filter(d => d.status === 'NOT_YET_ELIGIBLE');
-    
-    if (urgentDoses.length > 0) {
-      categories.URGENT.vaccines.push({ vaccineName, doses: urgentDoses });
-      categories.URGENT.count += urgentDoses.length;
-    }
-    
+
+    const currentDoses = vaccineDoses.filter(d => d.doseType === 'current');
+    const boosterDoses = vaccineDoses.filter(d => d.doseType === 'booster');
+
     if (currentDoses.length > 0) {
       categories.CURRENT.vaccines.push({ vaccineName, doses: currentDoses });
       categories.CURRENT.count += currentDoses.length;
     }
-    
-    if (futureDoses.length > 0) {
-      categories.FUTURE.vaccines.push({ vaccineName, doses: futureDoses });
-      categories.FUTURE.count += futureDoses.length;
+
+    if (boosterDoses.length > 0) {
+      categories.CATCH_UP.vaccines.push({ vaccineName, doses: boosterDoses });
+      categories.CATCH_UP.count += boosterDoses.length;
     }
   });
-  
+
   return categories;
 };
 
+
 // Vaccine Card Component
-const VaccineCard = ({ 
-  vaccineName, 
-  dose, 
-  sectionType, 
-  control, 
-  register, 
-  setValue, 
-  showRemarks, 
-  toggleRemarks, 
-  theme, 
-  t 
+const VaccineCard = ({
+  vaccineName,
+  dose,
+  sectionType,
+  control,
+  register,
+  setValue,
+  showRemarks,
+  toggleRemarks,
+  theme,
+  t
 }) => {
-  const isAccessible = sectionType !== 'NOT_APPLICABLE' && sectionType !== 'FUTURE';
+  const isAccessible = dose.status !== 'NOT_YET_ELIGIBLE';
   const remarksKey = `${vaccineName}-${dose.doseIndex}`;
   const showRemark = showRemarks[remarksKey] || false;
-  
+
   return (
     <div className={`p-4 border rounded-lg transition-all ${dose.bgColor} ${dose.borderColor} border-l-4`}>
       <div className="space-y-3">
@@ -185,11 +170,11 @@ const VaccineCard = ({
           </div>
           <div className="flex flex-col items-end space-y-1">
             <span className={`badge ${
-              dose.status === 'SEVERELY_OVERDUE' 
-                ? 'badge-error' 
+              dose.status === 'SEVERELY_OVERDUE'
+                ? 'badge-error'
                 : dose.status === 'OVERDUE'
                 ? 'badge-warning'
-                : dose.status === 'DUE_NOW' 
+                : dose.status === 'DUE_NOW'
                 ? 'badge-info'
                 : dose.status === 'ACCESSIBLE'
                 ? 'badge-success'
@@ -197,7 +182,7 @@ const VaccineCard = ({
             } text-xs`}>
               {dose.status.replace('_', ' ')}
             </span>
-            {dose.doseInfo.isBooster && (
+            {dose.doseType === 'booster' && (
               <span className="badge badge-outline badge-xs">Booster</span>
             )}
           </div>
@@ -243,15 +228,13 @@ const VaccineCard = ({
                     disabled
                     readOnly
                     placeholder={
-                      sectionType === 'FUTURE' 
-                        ? `Available at ${
-                            dose.doseInfo.recommendedAtMonths 
-                              ? `${dose.doseInfo.recommendedAtMonths} months`
-                              : dose.doseInfo.recommendedAtWeeks
-                              ? `${dose.doseInfo.recommendedAtWeeks} weeks`
-                              : `${dose.doseInfo.recommendedAtYears} years`
-                          }`
-                        : 'Not applicable'
+                      `Available at ${
+                        dose.doseInfo.recommendedAtMonths
+                          ? `${dose.doseInfo.recommendedAtMonths} months`
+                          : dose.doseInfo.recommendedAtWeeks
+                          ? `${dose.doseInfo.recommendedAtWeeks} weeks`
+                          : `${dose.doseInfo.recommendedAtYears} years`
+                      }`
                     }
                   />
                 )}
@@ -297,33 +280,31 @@ const VaccineCard = ({
 };
 
 // Vaccine Section Component
-const VaccineSection = ({ 
-  sectionKey, 
-  sectionData, 
-  expandedSections, 
-  toggleSection, 
+const VaccineSection = ({
+  sectionKey,
+  sectionData,
+  expandedSections,
+  toggleSection,
   control,
   register,
   setValue,
   showRemarks,
   toggleRemarks,
   theme,
-  t 
+  t
 }) => {
   const isExpanded = expandedSections[sectionKey];
   const isEmpty = sectionData.count === 0;
   const IconComponent = sectionData.icon;
-  
-  // Hide empty sections for future and not applicable
-  if (isEmpty && (sectionKey === 'NOT_APPLICABLE' || sectionKey === 'FUTURE')) {
+
+  if (isEmpty) {
     return null;
   }
 
   const getSectionTitle = () => {
     const titles = {
-      URGENT: `Overdue Vaccines (${sectionData.count})`,
-      CURRENT: `Current Schedule (${sectionData.count})`,
-      FUTURE: `Future Vaccines (${sectionData.count})`,
+      CURRENT: `Current & Overdue Vaccines (${sectionData.count})`,
+      CATCH_UP: `Catch-up Vaccines (${sectionData.count})`,
       NOT_APPLICABLE: `Not Applicable (${sectionData.count})`
     };
     return titles[sectionKey];
@@ -331,51 +312,15 @@ const VaccineSection = ({
 
   const getSectionDescription = () => {
     const descriptions = {
-      URGENT: 'These vaccines are overdue and require immediate attention',
-      CURRENT: 'These vaccines are currently due or accessible based on age',
-      FUTURE: 'These vaccines will become available as the child grows',
+      CURRENT: 'These are routine doses for the child. Some may be due, overdue, or upcoming.',
+      CATCH_UP: 'These are booster doses for the child. They are administered at specific ages.',
       NOT_APPLICABLE: 'These vaccines are not applicable for this child'
     };
     return descriptions[sectionKey];
   };
 
-  const getSectionBg = () => {
-    const backgrounds = {
-      URGENT: 'bg-red-50 border-red-200 hover:bg-red-100',
-      CURRENT: 'bg-blue-50 border-blue-200 hover:bg-blue-100',
-      FUTURE: 'bg-gray-50 border-gray-200 hover:bg-gray-100',
-      NOT_APPLICABLE: 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-    };
-    return backgrounds[sectionKey];
-  };
-
   return (
     <div className="mb-6">
-      <button
-        type="button"
-        onClick={() => toggleSection(sectionKey)}
-        className={`w-full p-4 rounded-lg border-2 transition-all ${getSectionBg()}`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <IconComponent className={`text-xl ${sectionData.color}`} />
-            <div className="text-left">
-              <h3 className={`font-semibold text-lg ${sectionData.color}`}>
-                {getSectionTitle()}
-              </h3>
-              <p className="text-sm text-gray-600 mt-1">
-                {getSectionDescription()}
-              </p>
-            </div>
-          </div>
-          <span className={`transform transition-transform ${
-            isExpanded ? 'rotate-180' : ''
-          }`}>
-            ▼
-          </span>
-        </div>
-      </button>
-
       {isExpanded && !isEmpty && (
         <div className="mt-4 space-y-4">
           {sectionData.vaccines.map((vaccine) => (
@@ -453,11 +398,12 @@ export default function AddChild() {
   const [healthWorkers, setHealthWorkers] = useState([]);
   const [showRemarks, setShowRemarks] = useState({});
   const [expandedSections, setExpandedSections] = useState({
-    URGENT: true,
     CURRENT: true,
-    FUTURE: false,
+    CATCH_UP: false,
     NOT_APPLICABLE: false
   });
+  const [activeTab, setActiveTab] = useState('CURRENT');
+
 
   // Fetch health workers
   useEffect(() => {
@@ -490,57 +436,40 @@ export default function AddChild() {
     }));
   };
 
-  const onSubmit = async (data) => {
+const onSubmit = async (data) => {
+  console.log('Form data before submission:', data);
     try {
-      // Filter out empty weight records
       const filteredWeightRecords = data.weightRecords.filter(
-        (record) => record.date && record.weight
+        (record) => record.date && record.weight,
       );
 
-      // Clean up vaccines object
-      const cleanedVaccines = {};
+      const filteredVaccines = {};
       Object.entries(data.vaccines).forEach(([vaccineName, doses]) => {
-        // Only keep doses that have dates
-        const validDoses = doses
-          .map((dose, index) => {
-            if (!dose.date) return null; // Skip doses without dates
-            
-            // Get vaccine info from schedule
-            const scheduleInfo = vaccineSchedule[vaccineName][index];
-            
-            return {
+        const administeredDoses = [];
+        doses.forEach((dose, index) => {
+          if (dose.date) {
+            const scheduleDose = vaccineSchedule[vaccineName][index];
+            administeredDoses.push({
               ...dose,
-              type: scheduleInfo.isBooster ? 'catchup' : 'routine',
-              doseNumber: index + 1,
-              remarks: dose.remarks || undefined // Remove empty remarks
-            };
-          })
-          .filter(Boolean); // Remove null entries
-
-        // Only add vaccine if it has valid doses
-        if (validDoses.length > 0) {
-          cleanedVaccines[vaccineName] = validDoses;
+              doseNumber: scheduleDose.dose,
+              type: scheduleDose.isBooster ? 'booster' : 'current'
+            });
+          }
+        });
+        if (administeredDoses.length > 0) {
+          filteredVaccines[vaccineName] = administeredDoses;
         }
       });
 
-      const payload = {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        parentName: data.parentName,
-        tole: data.tole,
-        wardNumber: data.wardNumber,
-        casteCode: data.casteCode,
-        birthDate: data.birthDate,
-        isFromOtherMunicipality: data.isFromOtherMunicipality,
-        administeredById: parseInt(data.administeredById),
-        gender: data.gender,
-        phoneNumber: data.phoneNumber || undefined, // Remove if empty
-        remarks: data.remarks || undefined, // Remove if empty
-        vaccines: cleanedVaccines,
-        weightRecords: filteredWeightRecords
-      };
+      console.log('Filtered Vaccines:', filteredVaccines);
 
-      console.log('Cleaned payload:', payload);
+      const payload = {
+        ...data,
+        vaccines: filteredVaccines,
+        weightRecords: filteredWeightRecords,
+        administeredById: parseInt(data.administeredById),
+      };
+      console.log('payload', payload);
       const res = await axiosClient.post('/api/child', payload);
       addChildToState(res.data);
       toast.success(t('toast.success'));
@@ -551,22 +480,20 @@ export default function AddChild() {
       toast.error(t('toast.error'));
     }
   };
-
   const onErrors = (errors) => {
     const errorMessage = getFirstErrorMessage(errors);
     toast.error(t('toast.validation_error', { message: errorMessage }));
   };
 
   const age = calculateAge(birthDate);
-  
+
   // Categorize vaccines based on age and gender
   const categorizedVaccines = useMemo(() => {
     if (!birthDate || !gender) {
       return {
-        URGENT: { vaccines: [], count: 0, icon: FaExclamationTriangle, color: 'text-red-600' },
-        CURRENT: { vaccines: [], count: 0, icon: FaCheckCircle, color: 'text-blue-600' },
-        FUTURE: { vaccines: [], count: 0, icon: FaClock, color: 'text-gray-600' },
-        NOT_APPLICABLE: { vaccines: [], count: 0, icon: FaLock, color: 'text-gray-400' }
+        CURRENT: { vaccines: [], count: 0, icon: FaExclamationTriangle, color: 'text-red-600', title: 'Current & Overdue' },
+        CATCH_UP: { vaccines: [], count: 0, icon: FaHistory, color: 'text-orange-600', title: 'Catch-up' },
+        NOT_APPLICABLE: { vaccines: [], count: 0, icon: FaLock, color: 'text-gray-400', title: 'Not Applicable' }
       };
     }
     return categorizeVaccines(vaccineSchedule, age, gender);
@@ -1055,64 +982,52 @@ export default function AddChild() {
                 </div>
               )}
 
-              {/* Quick Stats */}
+              {/* Vaccine Tabs */}
               {birthDate && gender && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-                    <FaExclamationTriangle className="text-red-500 text-2xl mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-red-600">
-                      {categorizedVaccines.URGENT.count}
-                    </div>
-                    <div className="text-sm text-red-700">Overdue</div>
+                  <>
+                  <div className="tabs tabs-boxed mb-6">
+                    {Object.entries(categorizedVaccines).map(([sectionKey, sectionData]) => {
+                      if (sectionData.count > 0 || sectionKey === 'NOT_APPLICABLE') {
+                        const IconComponent = sectionData.icon;
+                        return (
+                          <button
+                            key={sectionKey}
+                            type="button"
+                            onClick={() => setActiveTab(sectionKey)}
+                            className={`tab flex items-center gap-2 ${activeTab === sectionKey ? 'tab-active' : ''}`}
+                          >
+                            <IconComponent className={`text-xl ${sectionData.color}`} />
+                            {sectionData.title} ({sectionData.count})
+                          </button>
+                        );
+                      }
+                      return null;
+                    })}
                   </div>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                    <FaCheckCircle className="text-blue-500 text-2xl mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-blue-600">
-                      {categorizedVaccines.CURRENT.count}
-                    </div>
-                    <div className="text-sm text-blue-700">Current</div>
-                  </div>
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-                    <FaClock className="text-gray-500 text-2xl mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-gray-600">
-                      {categorizedVaccines.FUTURE.count}
-                    </div>
-                    <div className="text-sm text-gray-700">Future</div>
-                  </div>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                    <FaSyringe className="text-green-500 text-2xl mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-green-600">
-                      {totalVaccines}
-                    </div>
-                    <div className="text-sm text-green-700">Total</div>
-                  </div>
-                </div>
+                  {Object.entries(categorizedVaccines).map(([sectionKey, sectionData]) => (
+                    activeTab === sectionKey && (
+                      <VaccineSection
+                        key={sectionKey}
+                        sectionKey={sectionKey}
+                        sectionData={sectionData}
+                        expandedSections={{ [sectionKey]: true }}
+                        toggleSection={() => {}}
+                        control={control}
+                        register={register}
+                        setValue={setValue}
+                        showRemarks={showRemarks}
+                        toggleRemarks={toggleRemarks}
+                        theme={theme}
+                        t={t}
+                      />
+                    )
+                  ))}
+                  </>
               )}
 
-              {/* Vaccine Sections */}
-              {birthDate && gender && (
-                <div className="space-y-6">
-                  {Object.entries(categorizedVaccines).map(([sectionKey, sectionData]) => (
-                    <VaccineSection
-                      key={sectionKey}
-                      sectionKey={sectionKey}
-                      sectionData={sectionData}
-                      expandedSections={expandedSections}
-                      toggleSection={toggleSection}
-                      control={control}
-                      register={register}
-                      setValue={setValue}
-                      showRemarks={showRemarks}
-                      toggleRemarks={toggleRemarks}
-                      theme={theme}
-                      t={t}
-                    />
-                  ))}
-                </div>
-              )}
 
               {/* Summary for completed vaccines */}
-              {birthDate && gender && categorizedVaccines.URGENT.count === 0 && categorizedVaccines.CURRENT.count === 0 && (
+              {birthDate && gender && categorizedVaccines.CURRENT.count === 0 && (
                 <div className="text-center py-8 mt-8 bg-green-50 border border-green-200 rounded-lg">
                   <div className="text-6xl mb-4">🎉</div>
                   <h3 className="text-xl font-semibold text-green-600 mb-2">
@@ -1174,9 +1089,8 @@ export default function AddChild() {
                         reset();
                         setShowRemarks({});
                         setExpandedSections({
-                          URGENT: true,
                           CURRENT: true,
-                          FUTURE: false,
+                          CATCH_UP: false,
                           NOT_APPLICABLE: false
                         });
                         window.scrollTo({ top: 0, behavior: 'smooth' });
