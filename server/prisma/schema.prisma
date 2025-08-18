@@ -102,6 +102,7 @@ model VaccinationRecord {
   remarks                   String?
   recommendedAtMonths       Int
   customVaccineName         String?
+  type                      String      @default("routine")
   child                     Child       @relation(fields: [citizenId], references: [id])
   createdById               Int
   createdBy                 User        @relation(name: "CreatedByVaccination", fields: [createdById], references: [id])
@@ -112,15 +113,16 @@ model VaccinationRecord {
 
 enum VaccineType {
   BCG
+  DPT_HEPB_HIB
   ROTA
   OPV
-  fIPV
+  FIPV
   PCV
-  DPT_HepB_hib
   MR
   JE
   TCV
   HPV
+  OTHERS
 }
 
 model NotificationLog {

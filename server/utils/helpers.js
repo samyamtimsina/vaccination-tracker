@@ -12,38 +12,29 @@ export function toMonths({
 import { faker } from '@faker-js/faker';
 
 // Maps a vaccine name string to a standardized enum-like string
-export function mapVaccineNameToEnum(name) {
-  if (!name) return 'OTHERS';
-  const normalized = name.toLowerCase();
+export const mapVaccineNameToEnum = (vaccineName) => {
+  // Map frontend vaccine names to Prisma VaccineType enum values
+  const vaccineMap = {
+    'BCG': 'BCG',
+    'DPT_HepB_hib': 'DPT_HEPB_HIB',
+    'ROTA': 'ROTA',
+    'OPV': 'OPV',
+    'fIPV': 'FIPV',
+    'PCV': 'PCV',
+    'MR': 'MR',
+    'JE': 'JE',
+    'TCV': 'TCV',
+    'HPV': 'HPV'
+  };
 
-  switch (normalized) {
-    case 'bcg':
-      return 'BCG';
-    case 'rota':
-      return 'ROTA';
-    case 'polio':
-    case 'opv':
-      return 'OPV';
-    case 'fipv':
-      return 'fIPV';
-    case 'pcv':
-      return 'PCV';
-    case 'dpt-hepb-hib':
-    case 'dpt_hepb_hib':
-    case 'dpthepbhib':
-      return 'DPT_HepB_hib';
-    case 'mr':
-      return 'MR';
-    case 'je':
-      return 'JE';
-    case 'tcv':
-      return 'TCV';
-    case 'hpv':
-      return 'HPV';
-    default:
-      return 'OTHERS';
+  // Get the enum value or default to 'OTHERS'
+  const enumValue = vaccineMap[vaccineName];
+  if (!enumValue) {
+    console.warn(`Unknown vaccine type: ${vaccineName}, defaulting to OTHERS`);
+    return 'OTHERS';
   }
-}
+  return enumValue;
+};
 
 // Helper function to convert BS date string to JS Date object
 export function parseBsDateString(bsDateStr) {

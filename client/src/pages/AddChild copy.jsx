@@ -83,15 +83,7 @@ const getVaccineStatus = (dose, childAge) => {
     borderColor: 'border-blue-300'
   };
 };
-// Add this function
-const handleTabChange = (tabKey) => {
-  setActiveTab(tabKey);
-  // Clear any existing validation errors
-  const formValues = getValues();
-  handleSubmit(() => {})(formValues); // Triggers revalidation without submitting
-};
 
-// Update tab buttons to use this handler
 const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
   const categories = {
     URGENT: { vaccines: [], count: 0, icon: FaExclamationTriangle, color: 'text-red-600' },
@@ -492,59 +484,20 @@ export default function AddChild() {
 
   const onSubmit = async (data) => {
     try {
-      // Filter out empty weight records
       const filteredWeightRecords = data.weightRecords.filter(
-        (record) => record.date && record.weight
+        (record) => record.date && record.weight,
       );
 
-      // Clean up vaccines object
-      const cleanedVaccines = {};
-      Object.entries(data.vaccines).forEach(([vaccineName, doses]) => {
-        // Only keep doses that have dates
-        const validDoses = doses
-          .map((dose, index) => {
-            if (!dose.date) return null; // Skip doses without dates
-            
-            // Get vaccine info from schedule
-            const scheduleInfo = vaccineSchedule[vaccineName][index];
-            
-            return {
-              ...dose,
-              type: scheduleInfo.isBooster ? 'catchup' : 'routine',
-              doseNumber: index + 1,
-              remarks: dose.remarks || undefined // Remove empty remarks
-            };
-          })
-          .filter(Boolean); // Remove null entries
-
-        // Only add vaccine if it has valid doses
-        if (validDoses.length > 0) {
-          cleanedVaccines[vaccineName] = validDoses;
-        }
-      });
-
       const payload = {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        parentName: data.parentName,
-        tole: data.tole,
-        wardNumber: data.wardNumber,
-        casteCode: data.casteCode,
-        birthDate: data.birthDate,
-        isFromOtherMunicipality: data.isFromOtherMunicipality,
+        ...data,
+        weightRecords: filteredWeightRecords,
         administeredById: parseInt(data.administeredById),
-        gender: data.gender,
-        phoneNumber: data.phoneNumber || undefined, // Remove if empty
-        remarks: data.remarks || undefined, // Remove if empty
-        vaccines: cleanedVaccines,
-        weightRecords: filteredWeightRecords
       };
-
-      console.log('Cleaned payload:', payload);
       const res = await axiosClient.post('/api/child', payload);
       addChildToState(res.data);
       toast.success(t('toast.success'));
       reset();
+      // Scroll to top after successful submission
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       console.error('Submission failed:', err);

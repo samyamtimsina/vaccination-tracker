@@ -1,0 +1,1192 @@
+diff --git a/client/src/context/motherContext.jsx b/client/src/context/motherContext.jsx
+index 812b3b9..deb29d8 100644
+--- a/client/src/context/motherContext.jsx
++++ b/client/src/context/motherContext.jsx
+@@ -12,7 +12,7 @@ export function MotherProvider({ children }) {
+   async function fetchMothers() {
+     if (fetched) return;     setLoading(true);
+     try {
+-      const res = await axiosClient.get('/api/mothers');
++      const res = await axiosClient.get('/api/mothers/ward');
+       setMothersData(res.data);
+       setFetched(true);
+     } catch (err) {
+diff --git a/client/src/locales/en/viewMothers.json b/client/src/locales/en/viewMothers.json
+index 9288503..7b66277 100644
+--- a/client/src/locales/en/viewMothers.json
++++ b/client/src/locales/en/viewMothers.json
+@@ -1,97 +1,102 @@
+ {
++  "header": {
++    "title": "All Mothers",
++    "description": "View and manage the list of mothers and their vaccination records."
++  },
++  "addMotherButton": {
++    "label": "Add New Mother"
++  },
+   "loading": {
+-    "message": "Loading..."
++    "message": "Loading data, please wait..."
+   },
+   "error": {
+     "title": "Error",
+-    "message": "An error occurred: {{error}}",
++    "message": "An error occurred: {error}",
+     "try_again": "Try Again"
+   },
+-  "header": {
+-    "title": "All Mothers",
+-    "description": "View and manage mother records"
+-  },
+-  "addMotherButton": {
+-    "label": "Add Mother"
+-  },
+   "stats": {
+     "totalMothers": "Total Mothers",
+     "fullyVaccinated": "Fully Vaccinated",
+-    "pending": "Pending",
++    "pending": "Pending Vaccinations",
+     "completionRate": "Completion Rate"
+   },
+   "search": {
+-    "placeholder": "Search by name..."
++    "placeholder": "Search by mother's name..."
+   },
+   "filter": {
+-    "all": "All Status",
++    "all": "All",
+     "vaccinated": "Fully Vaccinated",
+     "pending": "Pending"
+   },
+   "sort": {
+-    "name": "Sort by Name",
+-    "age": "Sort by Age",
+-    "ward": "Sort by Ward",
++    "name": "Name",
++    "age": "Age",
++    "ward": "Ward",
+     "recent": "Most Recent"
+   },
+   "noResults": {
+     "title_with_search": "No Mothers Found",
+-    "description_with_search": "No mothers match your search criteria.",
+     "title_no_data": "No Mothers Available",
+-    "description_no_data": "No mother records found. Add a new mother to get started.",
++    "description_with_search": "No mothers match your search criteria.",
++    "description_no_data": "There are no mothers registered yet.",
+     "clear_search": "Clear Search"
+   },
+   "motherCard": {
+-    "vaccinated": "✓ Vaccinated",
+-    "pending": "⏳ Pending",
+-    "ageAndSeva": "{{age}} years old • Seva #{{sewa}}",
++    "vaccinated": "Fully Vaccinated",
++    "pending": "Vaccination Pending",
++    "ageAndSeva": "Age: {age}, Sewa #: {sewa}",
+     "ward": "Ward",
+     "tole": "Tole",
+-    "pregnancy": "Pregnancy",
+-    "previousTD": "Previous TD",
++    "pregnancy": "Pregnancies",
++    "previousTD": "Previous TD Doses",
+     "phone": "Phone",
+-    "createdBy": "Created by #{{id}}",
++    "createdBy": "Created By: {name}",
+     "viewDetails": "View Details"
+   },
+   "motherDetails": {
+     "back": "Back to List",
+     "print": "Print",
+-    "age": "{{value}} years old",
+-    "ward": "Ward {{number}}",
++    "age": "Age: {value}",
++    "ward": "Ward {number}",
++    "tdDose": {
++      "dose": "Dose {dose}"
++    },
+     "personalInfo": {
+       "title": "Personal Information",
+       "tole": "Tole",
+       "casteCode": "Caste Code",
+-      "sewaDartaNumber": "Seva Darta #",
+-      "sewaDartaNumberValue": "#{{number}}",
+-      "pregnancies": "Pregnancies",
+-      "previousTD": "Previous TD",
+-      "createdBy": "Created By",
+-      "createdByValue": "#{{id}}",
+-      "recordCreated": "Record Created"
++      "sewaDartaNumber": "Sewa Darta Number",
++      "sewaDartaNumberValue": "#{number}",
++      "pregnancies": "Number of Pregnancies",
++      "previousTD": "Previous TD Doses Taken",
++      "municipalityLabel": "Municipality",
++      "municipality": {
++        "local": "Local",
++        "other": "Other"
++      },
++      "recordCreated": "Record Created",
++      "createdBy": "Created By"
+     },
+     "notes": {
+       "title": "Notes"
+     },
+     "tdVaccinationRecords": {
+       "title": "TD Vaccination Records",
+-      "description": "Details of TD vaccination doses administered",
++      "description": "Vaccination history for Tetanus-Diphtheria (TD) doses.",
+       "given": "Given",
+       "pending": "Pending",
+       "administered": "Administered",
+-      "bsDate": "BS: {{date}}",
+-      "adDate": "AD: {{date}}",
++      "bsDate": "BS: {date}",
++      "adDate": "AD: {date}",
+       "notAdministered": "Not Administered",
+-      "tdDose": {
+-        "dose1": "Dose 1",
+-        "dose2": "Dose 2",
+-        "dose2Plus": "Dose 2+"
+-      }
+-    }
+-  },
++      "createdBy": "Recorded By",
++      "givenBy": "Administered By",
++      "remarks": "Remarks"
++    },
+   "pagination": {
+     "previous": "Previous",
+     "next": "Next",
+-    "page": "Page {{current}} of {{total}}"
++    "page": "Page {current} of {total}"
+   }
++}
+ }
+\ No newline at end of file
+diff --git a/client/src/locales/ne/viewMothers.json b/client/src/locales/ne/viewMothers.json
+index dc0411b..5b410c9 100644
+--- a/client/src/locales/ne/viewMothers.json
++++ b/client/src/locales/ne/viewMothers.json
+@@ -1,97 +1,102 @@
+ {
++  "header": {
++    "title": "सबै आमाहरू",
++    "description": "आमाहरूको सूची र तिनीहरूको खोप रेकर्डहरू हेर्नुहोस् र व्यवस्थापन गर्नुहोस्।"
++  },
++  "addMotherButton": {
++    "label": "नयाँ आमा थप्नुहोस्"
++  },
+   "loading": {
+-    "message": "लोड हुँदैछ..."
++    "message": "डेटा लोड हुँदैछ, कृपया पर्खनुहोस्..."
+   },
+   "error": {
+     "title": "त्रुटि",
+-    "message": "त्रुटि भयो: {{error}}",
++    "message": "एउटा त्रुटि भयो: {error}",
+     "try_again": "पुन: प्रयास गर्नुहोस्"
+   },
+-  "header": {
+-    "title": "सबै आमाहरू",
+-    "description": "आमाहरूको रेकर्डहरू हेर्नुहोस् र व्यवस्थापन गर्नुहोस्"
+-  },
+-  "addMotherButton": {
+-    "label": "आमा थप्नुहोस्"
+-  },
+   "stats": {
+     "totalMothers": "कुल आमाहरू",
+     "fullyVaccinated": "पूर्ण खोप प्राप्त",
+-    "pending": "बाँकी",
++    "pending": "खोप बाँकी",
+     "completionRate": "समापन दर"
+   },
+   "search": {
+-    "placeholder": "नामले खोज्नुहोस्..."
++    "placeholder": "आमाको नामले खोज्नुहोस्..."
+   },
+   "filter": {
+-    "all": "सबै स्थिति",
++    "all": "सबै",
+     "vaccinated": "पूर्ण खोप प्राप्त",
+     "pending": "बाँकी"
+   },
+   "sort": {
+-    "name": "नामले क्रमबद्ध गर्नुहोस्",
+-    "age": "उमेरले क्रमबद्ध गर्नुहोस्",
+-    "ward": "वडाले क्रमबद्ध गर्नुहोस्",
+-    "recent": "नवीनतम"
++    "name": "नाम",
++    "age": "उमेर",
++    "ward": "वडा",
++    "recent": "हालैको"
+   },
+   "noResults": {
+     "title_with_search": "कुनै आमा फेला परेन",
+-    "description_with_search": "तपाईंको खोज मापदण्डसँग कुनै आमा मेल खाँदैन।",
+     "title_no_data": "कुनै आमा उपलब्ध छैन",
+-    "description_no_data": "कुनै आमा रेकर्ड फेला परेन। सुरु गर्न नयाँ आमा थप्नुहोस्।",
++    "description_with_search": "तपाईंको खोज मापदण्डसँग कुनै आमा मेल खाँदैन।",
++    "description_no_data": "हालसम्म कुनै आमा दर्ता भएका छैनन्।",
+     "clear_search": "खोज हटाउनुहोस्"
+   },
+   "motherCard": {
+-    "vaccinated": "✓ खोप प्राप्त",
+-    "pending": "⏳ बाँकी",
+-    "ageAndSeva": "{{age}} वर्ष पुरानो • सेवा #{{sewa}}",
++    "vaccinated": "पूर्ण खोप प्राप्त",
++    "pending": "खोप बाँकी",
++    "ageAndSeva": "उमेर: {age}, सेवा #: {sewa}",
+     "ward": "वडा",
+     "tole": "टोल",
+     "pregnancy": "गर्भावस्था",
+-    "previousTD": "पहिलेको TD",
++    "previousTD": "पहिलेको टीडी डोज",
+     "phone": "फोन",
+-    "createdBy": "द्वारा सिर्जना #{{id}}",
++    "createdBy": "द्वारा सिर्जना: {name}",
+     "viewDetails": "विवरण हेर्नुहोस्"
+   },
+   "motherDetails": {
+     "back": "सूचीमा फर्कनुहोस्",
+     "print": "प्रिन्ट गर्नुहोस्",
+-    "age": "{{value}} वर्ष पुरानो",
+-    "ward": "वडा {{number}}",
++    "age": "उमेर: {value}",
++    "ward": "वडा {number}",
++    "tdDose": {
++      "dose": "डोज {dose}"
++    },
+     "personalInfo": {
+       "title": "व्यक्तिगत जानकारी",
+       "tole": "टोल",
+-      "casteCode": "जाति कोड",
+-      "sewaDartaNumber": "सेवा दर्ता #",
+-      "sewaDartaNumberValue": "#{{number}}",
+-      "pregnancies": "गर्भावस्था",
+-      "previousTD": "पहिलेको TD",
+-      "createdBy": "द्वारा सिर्जना",
+-      "createdByValue": "#{{id}}",
+-      "recordCreated": "रेकर्ड सिर्जना गरियो"
++      "casteCode": "जात कोड",
++      "sewaDartaNumber": "सेवा दर्ता नम्बर",
++      "sewaDartaNumberValue": "#{number}",
++      "pregnancies": "गर्भावस्थाको संख्या",
++      "previousTD": "पहिले लिएको टीडी डोज",
++      "municipalityLabel": "नगरपालिका",
++      "municipality": {
++        "local": "स्थानीय",
++        "other": "अन्य"
++      },
++      "recordCreated": "रेकर्ड सिर्जना गरिएको",
++      "createdBy": "द्वारा सिर्जना"
+     },
+     "notes": {
+       "title": "टिप्पणीहरू"
+     },
+     "tdVaccinationRecords": {
+-      "title": "TD खोप रेकर्डहरू",
+-      "description": "प्रशासित TD खोप खुराकहरूको विवरण",
++      "title": "टीडी खोप रेकर्डहरू",
++      "description": "टिटानस-डिप्थेरिया (टीडी) डोजहरूको खोप इतिहास।",
+       "given": "दिइएको",
+       "pending": "बाँकी",
+       "administered": "प्रशासित",
+-      "bsDate": "BS: {{date}}",
+-      "adDate": "AD: {{date}}",
++      "bsDate": "वि.सं.: {date}",
++      "adDate": "ई.सं.: {date}",
+       "notAdministered": "प्रशासित गरिएको छैन",
+-      "tdDose": {
+-        "dose1": "खुराक १",
+-        "dose2": "खुराक २",
+-        "dose2Plus": "खुराक २+"
+-      }
+-    }
+-  },
++      "createdBy": "रेकर्ड गरेको",
++      "givenBy": "प्रशासित गरेको",
++      "remarks": "टिप्पणीहरू"
++    },
+   "pagination": {
+     "previous": "अघिल्लो",
+     "next": "अर्को",
+-    "page": "पृष्ठ {{current}} मा {{total}}"
++    "page": "पृष्ठ {current} / {total}"
+   }
++}
+ }
+\ No newline at end of file
+diff --git a/client/src/pages/AddChild.jsx b/client/src/pages/AddChild.jsx
+index 86b9e13..80670b8 100644
+--- a/client/src/pages/AddChild.jsx
++++ b/client/src/pages/AddChild.jsx
+@@ -102,7 +102,6 @@ export default function AddChild() {
+         weightRecords: filteredWeightRecords,
+         administeredById: parseInt(data.administeredById), // Ensure it's an integer
+       };
+-
+       const res = await axiosClient.post('/api/child', payload);
+       addChildToState(res.data);
+       toast.success(t('toast.success'));
+@@ -220,13 +219,13 @@ export default function AddChild() {
+                     </span>
+                   </label>
+                   <input
+-                    {...register('fullName')}
++                    {...register('firstName')}
+                     className={`input input-bordered w-full ${
+-                      errors.fullName ? 'input-error' : ''
++                      errors.firstName? 'input-error' : ''
+                     }`}
+                     placeholder={t('personalInfo.form.firstName.placeholder')}
+                   />
+-                  {errors.fullName && (
++                  {errors.firstName&& (
+                     <p className="text-error text-sm mt-1">
+                       {t('personalInfo.form.firstName.required')}
+                     </p>
+@@ -440,7 +439,7 @@ export default function AddChild() {
+                 </label>
+                 <select
+                   {...register('administeredById')}
+-                  className={`select select-bordered w-full ${
++                  className={`select select-bordered w-min ${
+                     errors.administeredById ? 'select-error' : ''
+                   }`}
+                   defaultValue=""
+diff --git a/client/src/pages/AddMother.jsx b/client/src/pages/AddMother.jsx
+index 22db358..7bf8b5c 100644
+--- a/client/src/pages/AddMother.jsx
++++ b/client/src/pages/AddMother.jsx
+@@ -1,4 +1,4 @@
+-import React from 'react';
++import {useState,useEffect}from 'react';
+ import { useForm, Controller } from 'react-hook-form';
+ import { toast, ToastContainer } from 'react-toastify';
+ import axiosClient from '../api/axiosClient';
+@@ -11,6 +11,23 @@ import { useTranslation } from 'react-i18next';
+ import { useMotherContext } from '../context/motherContext';
+ 
+ export default function AddMother() {
++  const [healthWorkers, setHealthWorkers] = useState([]);
++
++  // NEW: Fetch list of health workers from your API
++  useEffect(() => {
++    const fetchHealthWorkers = async () => {
++      try {
++        // You will need to create this API endpoint on your backend
++        const res = await axiosClient.get('/api/users?role=ward_officer');
++        setHealthWorkers(res.data);
++      } catch (err) {
++        console.error('Failed to fetch health workers:', err);
++        // You can set a default or show an error message
++      }
++    };
++    fetchHealthWorkers();
++  }, []);
++
+   const {addMotherToState} = useMotherContext();
+   const { t } = useTranslation('addMother');
+   const {
+@@ -22,24 +39,69 @@ export default function AddMother() {
+     formState: { errors, isSubmitting },
+   } = useForm();
+   const navigate = useNavigate();
+-
+   const onSubmit = async (data) => {
+-    try {
+-      const payload = {
+-        ...data,
+-      };
+-
+-      const response = await axiosClient.post('/api/mothers', payload);
+-      addMotherToState(response.data);
++  try {
++    // Validate administeredById if any TD doses are provided
++    if ((data.tdDose1 || data.tdDose2 || data.tdDose2Plus) && !data.administeredById) {
++      toast.error(t('health_worker_required'));
++      return;
++    }
+ 
+-      toast.success(t('success_message'));
+-      reset();
+-    } catch (err) {
+-      console.error(err);
+-      toast.error(t('error_message'));
++    // Build the tdDoses array
++    const tdDoses = [];
++    if (data.tdDose1) {
++      tdDoses.push({
++        doseNumber: 1,
++        dateGiven: data.tdDose1,
++        administeredById: parseInt(data.administeredById, 10),
++        remarks: '',
++      });
+     }
+-  };
++    if (data.tdDose2) {
++      tdDoses.push({
++        doseNumber: 2,
++        dateGiven: data.tdDose2,
++        administeredById: parseInt(data.administeredById, 10),
++        remarks: '',
++      });
++    }
++    if (data.tdDose2Plus) {
++      tdDoses.push({
++        doseNumber: 3,
++        dateGiven: data.tdDose2Plus,
++        administeredById: parseInt(data.administeredById, 10),
++        remarks: '',
++      });
++    }
++
++    // Construct the payload
++    const payload = {
++      fullName: data.fullName,
++      lastName: data.lastName || '',
++      casteCode: parseInt(data.casteCode, 10),
++      age: parseInt(data.age, 10),
++      phoneNumber: data.phoneNumber,
++      tole: data.tole,
++      wardNumber: parseInt(data.wardNumber, 10),
++      pregnancyCount: parseInt(data.pregnancyCount, 10),
++      previousTDTakenCount: parseInt(data.previousTDTakenCount, 10),
++      remarks: data.remarks || '',
++      isFromOtherMunicipality: false,
++      tdDoses, // Always include, even if empty
++    };
++
++    console.log('Payload being sent:', payload);
++
++    const response = await axiosClient.post('http://localhost:5000/api/mothers', payload);
++    addMotherToState(response.data);
+ 
++    toast.success(t('success_message'));
++    reset();
++  } catch (err) {
++    console.error('Frontend error:', err.response?.data || err.message);
++    toast.error(t('error_message'));
++  }
++};
+   return (
+     <>
+       <ToastContainer position="top-right" autoClose={3000} />
+@@ -253,6 +315,36 @@ export default function AddMother() {
+             </div>
+           </div>
+         </section>
++              {/* NEW: Administered By Section */}
++<div className="form-control mt-8">
++  <label className="label">
++    <span className="label-text text-base font-medium">
++      {t('administered_by')} <span className="text-error">*</span>
++    </span>
++  </label>
++  <select
++    {...register('administeredById', {
++      required: (data) =>
++        data.tdDose1 || data.tdDose2 || data.tdDose2Plus ? t('health_worker_required') : false,
++    })}
++    className={`select select-bordered w-full ${errors.administeredById ? 'select-error' : ''}`}
++    defaultValue=""
++  >
++    <option value="" disabled>
++      {t('select_health_worker')}
++    </option>
++    {healthWorkers.map((worker) => (
++      <option key={worker.id} value={worker.id}>
++        {worker.name}
++      </option>
++    ))}
++  </select>
++  {errors.administeredById && (
++    <label className="label">
++      <span className="label-text-alt text-error">{errors.administeredById.message}</span>
++    </label>
++  )}
++</div>
+ 
+         <section className="bg-base-200 p-6 rounded-lg border border-base-300 shadow-sm">
+           <h3 className="text-lg font-medium text-base-content mb-3">
+diff --git a/client/src/pages/ViewChildren.jsx b/client/src/pages/ViewChildren.jsx
+index c6f4764..7e9a43b 100644
+--- a/client/src/pages/ViewChildren.jsx
++++ b/client/src/pages/ViewChildren.jsx
+@@ -46,7 +46,7 @@ const navigate = useNavigate();
+ 
+   useEffect(() => {
+     fetchChildren();
+-    console.log('childrenData updated:', childrenData);
++    ('childrenData updated:', childrenData);
+   }, [fetchChildren]);
+ 
+   const filteredChildren = useMemo(() => {
+diff --git a/client/src/pages/ViewMothers.jsx b/client/src/pages/ViewMothers.jsx
+index 25c18ec..5a5864c 100644
+--- a/client/src/pages/ViewMothers.jsx
++++ b/client/src/pages/ViewMothers.jsx
+@@ -55,11 +55,11 @@ export default function AllMothers() {
+ 
+     if (filterStatus === 'vaccinated') {
+       filtered = filtered.filter(mother => 
+-        mother.tdDose1 && mother.tdDose2 && mother.tdDose2Plus
++        mother.tdDoses && mother.tdDoses.length >= 3
+       );
+     } else if (filterStatus === 'pending') {
+       filtered = filtered.filter(mother => 
+-        !(mother.tdDose1 && mother.tdDose2 && mother.tdDose2Plus)
++        !mother.tdDoses || mother.tdDoses.length < 3
+       );
+     }
+ 
+@@ -96,7 +96,7 @@ export default function AllMothers() {
+   const totalPages = Math.ceil(filteredMothers.length / itemsPerPage);
+ 
+   const vaccinatedCount = mothersData ? mothersData.filter(mother => 
+-    mother.tdDose1 && mother.tdDose2 && mother.tdDose2Plus
++    mother.tdDoses && mother.tdDoses.length >= 3
+   ).length : 0;
+ 
+   const pendingCount = mothersData ? mothersData.length - vaccinatedCount : 0;
+@@ -134,11 +134,13 @@ export default function AllMothers() {
+   }
+ 
+   if (selectedMother) {
+-    const tdDoses = [
+-      { name: t('motherDetails.tdDose.dose1'), date: selectedMother.tdDose1 },
+-      { name: t('motherDetails.tdDose.dose2'), date: selectedMother.tdDose2 },
+-      { name: t('motherDetails.tdDose.dose2Plus'), date: selectedMother.tdDose2Plus },
+-    ];
++    const tdDoses = selectedMother.tdDoses.map((dose, index) => ({
++      name: t('motherDetails.tdDose.dose', { dose: dose.doseNumber }),
++      date: dose.dateGiven,
++      createdBy: dose.createdBy,
++      administeredBy: dose.administeredBy,
++      remarks: dose.remarks,
++    }));
+ 
+     return (
+       <div className="min-h-screen bg-base-200 min-w-[20rem]">
+@@ -245,10 +247,12 @@ export default function AllMothers() {
+ 
+                   <div>
+                     <label className="text-xs font-medium text-base-content/60 uppercase tracking-wider">
+-                      {t('motherDetails.personalInfo.createdBy')}
++                      {t('motherDetails.personalInfo.municipalityLabel')}
+                     </label>
+                     <p className="font-semibold text-base-content mt-1">
+-                      {t('motherDetails.personalInfo.createdByValue', { id: selectedMother.createdById })}
++                      {selectedMother.isFromOtherMunicipality
++                        ? t('motherDetails.personalInfo.municipality.other')
++                        : t('motherDetails.personalInfo.municipality.local')}
+                     </p>
+                   </div>
+ 
+@@ -261,6 +265,15 @@ export default function AllMothers() {
+                       <span className="font-semibold text-base-content text-sm">
+                         {safeFormatDate(selectedMother.createdAt)}
+                       </span>
++                      <span className="flex items-center space-x-1 text-base-content/70">
++                        <FaUserMd className="text-xs" />
++                        <span 
++                          className="hover:text-primary hover:underline cursor-pointer"
++                          onClick={() => navigate(`/users/${selectedMother.createdBy.id}`)}
++                        >
++                          {t('motherDetails.personalInfo.createdBy')}: {selectedMother.createdBy.name}
++                        </span>
++                      </span>
+                     </div>
+                   </div>
+                 </div>
+@@ -343,6 +356,40 @@ export default function AllMothers() {
+                                     {t('motherDetails.tdVaccinationRecords.adDate', { date: safeFormatDate(dose.date) })}
+                                   </div>
+                                 </div>
++                                <div className="space-y-1 text-xs mt-2">
++                                  {dose.createdBy && (
++                                    <div className="flex items-center space-x-1 text-base-content/70">
++                                      <FaUserMd className="text-xs" />
++                                      <span 
++                                        className="hover:text-primary hover:underline cursor-pointer"
++                                        onClick={() => navigate(`/users/${dose.createdBy.id}`)}
++                                      >
++                                        {t('motherDetails.tdVaccinationRecords.createdBy')}: {dose.createdBy.name}
++                                      </span>
++                                    </div>
++                                  )}
++                                  {dose.administeredBy && (
++                                    <div className="flex items-center space-x-1 text-base-content/70">
++                                      <FaUserMd className="text-xs" />
++                                      <span 
++                                        className="hover:text-primary hover:underline cursor-pointer"
++                                        onClick={() => navigate(`/users/${dose.administeredBy.id}`)}
++                                      >
++                                        {t('motherDetails.tdVaccinationRecords.givenBy')}: {dose.administeredBy.name}
++                                      </span>
++                                    </div>
++                                  )}
++                                </div>
++                                {dose.remarks && (
++                                  <div className="mt-2 p-2 bg-base-100 rounded border-l-2 border-primary">
++                                    <div className="text-xs text-base-content/70 mb-1">
++                                      {t('motherDetails.tdVaccinationRecords.remarks')}
++                                    </div>
++                                    <div className="text-sm text-base-content">
++                                      {dose.remarks}
++                                    </div>
++                                  </div>
++                                )}
+                               </div>
+                             </div>
+                           ) : (
+@@ -519,7 +566,7 @@ export default function AllMothers() {
+           <>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+               {currentMothers.map((mother) => {
+-                const isTDFullyVaccinated = mother.tdDose1 && mother.tdDose2 && mother.tdDose2Plus;
++                const isTDFullyVaccinated = mother.tdDoses && mother.tdDoses.length >= 3;
+ 
+                 return (
+                   <div
+@@ -574,7 +621,12 @@ export default function AllMothers() {
+                         <div className="flex items-center justify-between text-xs pt-2 border-t border-base-300">
+                           <span className="text-base-content/60 flex items-center space-x-1">
+                             <FaUserMd className="text-xs" />
+-                            <span>{t('motherCard.createdBy', { id: mother.createdById })}</span>
++                            <span 
++                              className="hover:text-primary hover:underline cursor-pointer"
++                              onClick={() => navigate(`/users/${mother.createdBy.id}`)}
++                            >
++                              {t('motherCard.createdBy')}: {mother.createdBy.name}
++                            </span>
+                           </span>
+                           <span className="text-base-content/60">
+                             {safeFormatDate(mother.createdAt)}
+diff --git a/client/src/schemas/childSchema.js b/client/src/schemas/childSchema.js
+index a3ee657..b71ddb5 100644
+--- a/client/src/schemas/childSchema.js
++++ b/client/src/schemas/childSchema.js
+@@ -83,7 +83,7 @@ const weightRecordSchema = z.object({
+ });
+ 
+ export const createChildSchema = z.object({
+-  fullName: z.string().min(1, 'पहिलो नाम आवश्यक छ'),
++  firstName: z.string().min(1, 'पहिलो नाम आवश्यक छ'),
+   lastName: z.string().optional().nullable(),
+   parentName: z.string().min(1, 'अभिभावकको नाम आवश्यक छ'),
+   tole: z.string().min(1, 'टोल आवश्यक छ'),
+diff --git a/client/src/schemas/motherSchema.js b/client/src/schemas/motherSchema.js
+index 107b708..ac959ed 100644
+--- a/client/src/schemas/motherSchema.js
++++ b/client/src/schemas/motherSchema.js
+@@ -1,39 +1,46 @@
++// File: schemas/motherSchema.js
+ import { z } from 'zod';
++import NepaliDate from 'nepali-date-converter';
+ 
+-const numericString = z.coerce.number().refine((val) => val > 0, {
+-  message: 'Value must be a positive number',
++// A reusable schema for dates in Nepali B.S. format
++const bsDateSchema = z
++  .string()
++  .min(1, 'मिति आवश्यक छ')
++  .regex(/^\\d{4}-\\d{2}-\\d{2}$/, "मितिले 'YYYY-MM-DD' ढाँचा पछ्याउनुपर्छ")
++  .refine(
++    (val) => {
++      try {
++        const [year, month, day] = val.split('-').map(Number);
++        new NepaliDate(year, month - 1, day); // month is 0-indexed in the library
++        return true;
++      } catch {
++        return false;
++      }
++    },
++    {
++      message: 'अमान्य बिक्रम सम्बत मिति',
++    },
++  );
++
++// Schema for a single TD vaccine dose
++const tdDoseSchema = z.object({
++  doseNumber: z.number().int().min(1, 'खोपको मात्रा नम्बर आवश्यक छ'),
++  dateGiven: bsDateSchema,
++  administeredById: z.number().int().min(1, 'प्रशासक ID आवश्यक छ'),
++  remarks: z.string().optional().nullable(),
+ });
+ 
++// Main schema for creating a new Mother record
+ export const createMotherSchema = z.object({
+-  fullName: z.string().min(1, 'Full name is required'),
+-  lastName: z.string().optional(),
+-  casteCode: numericString.refine((val) => val > 0, {
+-    message: 'Caste code is required',
+-  }),
+-  age: numericString.refine((val) => val > 0, {
+-    message: 'Age is required',
+-  }),
+-  phoneNumber: z.string().optional(),
+-  tole: z.string().optional(),
+-  wardNumber: numericString.refine((val) => val > 0, {
+-    message: 'Ward number is required',
+-  }),
+-  pregnancyCount: numericString.optional(),
+-  previousTDTakenCount: numericString.optional(),
+-
+-  // Transform date string to Date object for optional fields
+-  tdDose1: z
+-    .string()
+-    .transform((val) => new Date(val))
+-    .optional(),
+-  tdDose2: z
+-    .string()
+-    .transform((val) => new Date(val))
+-    .optional(),
+-  tdDose2Plus: z
+-    .string()
+-    .transform((val) => new Date(val))
+-    .optional(),
+-
+-  remarks: z.string().optional(),
++  fullName: z.string().min(1, 'पूरा नाम आवश्यक छ'),
++  lastName: z.string().optional().nullable(),
++  casteCode: z.number().int().min(1, 'जाति कोड आवश्यक छ'),
++  age: z.number().int().min(10, 'उमेर १० भन्दा बढी हुनुपर्छ'),
++  phoneNumber: z.string().optional().nullable(),
++  tole: z.string().min(1, 'टोल आवश्यक छ'),
++  wardNumber: z.number().int().min(1, 'वार्ड नम्बर आवश्यक छ'),
++  isFromOtherMunicipality: z.boolean().default(false),
++  remarks: z.string().optional().nullable(),
++  // Use z.array to validate that tdDoses is an array of tdDoseSchema objects
++  tdDoses: z.array(tdDoseSchema),
+ });
+diff --git a/server/controllers/authController.js b/server/controllers/authController.js
+index 187fbd5..dcd78b4 100644
+--- a/server/controllers/authController.js
++++ b/server/controllers/authController.js
+@@ -13,7 +13,6 @@ if (!JWT_SECRET) {
+ export const register = async (req, res) => {
+   const validationResult = registerSchema.safeParse(req.body);
+ 
+-  console.log(validationResult);
+ 
+   if (!validationResult.success) {
+     // Return detailed Zod validation errors
+diff --git a/server/controllers/childController.js b/server/controllers/childController.js
+index 498bc0d..1fd9caa 100644
+--- a/server/controllers/childController.js
++++ b/server/controllers/childController.js
+@@ -73,7 +73,7 @@ export const createChild = async (req, res) => {
+       // Create child record
+       const childData = {
+         isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
+-        fullName: validatedData.fullName,
++        fullName: validatedData.firstName + ' ' + validatedData.lastName || '',
+         wardNumber: parseInt(validatedData.wardNumber, 10),
+         parentName: validatedData.parentName || '',
+         tole: validatedData.tole || '',
+@@ -223,7 +223,6 @@ export const getWardChildren = async (req, res) => {
+         .json({ error: 'Unauthorized. User or wardId not found.' });
+     }
+     const { wardId } = req.user;
+-    console.log('Fetching children for ward:', wardId);
+     const children = await prisma.child.findMany({
+       where: {
+         wardNumber: wardId,
+diff --git a/server/controllers/motherController.js b/server/controllers/motherController.js
+index fd9bdff..31e07fb 100644
+--- a/server/controllers/motherController.js
++++ b/server/controllers/motherController.js
+@@ -1,68 +1,72 @@
+ import { prisma } from '../utils/prisma.js';
+-import { createMotherSchema } from '../schemas/motherSchema.js'; // Import the new schema
++import { createMotherSchema } from '../schemas/motherSchema.js';
+ import { parseBsDateString } from '../utils/helpers.js';
+ 
+ export const createMother = async (req, res) => {
+-  // Use Zod's safeParse to validate the request body
+-  const validationResult = createMotherSchema.safeParse(req.body);
+-
+-  if (!validationResult.success) {
+-    return res.status(400).json({
+-      error: 'Validation failed',
+-      details: validationResult.error.errors,
+-    });
+-  }
++  try {
++    console.log('Received req.body:', req.body);
+ 
+-  const { fullName, lastName, ...motherData } = validationResult.data;
++    // Validate the request body
++    const validationResult = createMotherSchema.safeParse(req.body);
++    if (!validationResult.success) {
++      console.log('Validation errors:', validationResult.error.errors); // Log specific errors
++      return res.status(400).json({
++        error: 'Validation failed',
++        details: validationResult.error.errors,
++      });
++    }
+ 
+-  const validatedData = validationResult.data;
+-  // Convert BS birth date to AD
+-  const bsBirthDateStr = validatedData.birthDate;
+-  const bsDose1DateStr = validatedData.tdDose1;
+-  const bsDose2DateStr = validatedData.tdDose2;
+-  const bsDose2PlusDateStr = validatedData.tdDose2Plus;
++    console.log('Validated data:', validationResult.data); // Log full validated data
+ 
+-  const adBirthDate = parseBsDateString(bsBirthDateStr);
+-  const adDose1Date = parseBsDateString(bsDose1DateStr);
+-  const adDose2Date = parseBsDateString(bsDose2DateStr);
+-  const adDose2PlusDate = parseBsDateString(bsDose2PlusDateStr);
++    const { fullName, lastName, tdDoses = [], ...motherData } = validationResult.data; // Default to empty array
++    console.log('Validated mother data:', motherData);
++    console.log('TD Doses:', tdDoses);
++    console.log('Full Name:', fullName);
++    console.log('Last Name:', lastName);
+ 
+-  try {
+-    // Combine full name and last name inside the controller
++    const user = req.user; // Assuming user is available from auth middleware
+     const combinedName = `${fullName} ${lastName || ''}`.trim();
+ 
+-    const mother = await prisma.mother.create({
+-      data: {
+-        phoneNumber: validatedData.phoneNumber,
+-
+-        casteCode: parseInt(validatedData.casteCode, 10),
+-        age: parseInt(validatedData.age, 10),
++    // Prepare TD dose data
++    const tdDosesToCreate = Array.isArray(tdDoses)
++      ? tdDoses.map((dose) => ({
++        ...dose,
++        dateGiven: parseBsDateString(dose.dateGiven),
++        createdById: user.id,
++      }))
++      : [];
+ 
+-        tole: validatedData.tole || '',
++    console.log('TD Doses to create:', tdDosesToCreate); // Log before Prisma call
+ 
+-        wardNumber: parseInt(validatedData.wardNumber, 10),
+-        pregnancyCount: parseInt(validatedData.pregnancyCount),
+-        previousTDTakenCount: parseInt(validatedData.previousTDTakenCount),
+-        tdDose1: adDose1Date,
+-        tdDose2: adDose2Date,
+-        tdDose2Plus: adDose2PlusDate,
++    const newMother = await prisma.mother.create({
++      data: {
++        ...motherData,
+         name: combinedName,
+-        createdById: req.user.id, // Assuming user ID is from auth middleware
+-        remarks: validatedData.remarks || '',
+-        isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
++        createdById: user.id,
++        tdDoses: {
++          create: tdDosesToCreate,
++        },
++      },
++      include: {
++        tdDoses: {
++          include: {
++            createdBy: {
++              select: { id: true, name: true },
++            },
++            administeredBy: {
++              select: { id: true, name: true },
++            },
++          },
++        },
+       },
+     });
+ 
+-    res.status(201).json(mother);
++    res.status(201).json(newMother);
+   } catch (error) {
+-    console.error('Error creating mother:', error);
+-    res.status(500).json({
+-      error: 'Failed to create mother',
+-      details: error.message,
+-    });
++    console.error('Error creating mother record:', error);
++    res.status(500).json({ error: 'Something went wrong.', details: error.message });
+   }
+ };
+-
+ export const getMothers = async (req, res) => {
+   try {
+     const mothers = await prisma.mother.findMany();
+@@ -75,3 +79,43 @@ export const getMothers = async (req, res) => {
+     });
+   }
+ };
++
++export const getWardMothers = async (req, res) => {
++  try {
++    if (!req.user || !req.user.wardId) {
++      return res
++        .status(401)
++        .json({ error: 'Unauthorized. User or wardId not found.' });
++    }
++    const { wardId } = req.user;
++    const mothers = await prisma.mother.findMany({
++      where: {
++        wardNumber: wardId,
++      },
++      include: {
++        createdBy: {
++          select: { id: true, name: true },
++        },
++        tdDoses: {
++          include: {
++            createdBy: {
++              select: { id: true, name: true },
++            },
++            administeredBy: {
++              select: { id: true, name: true },
++            },
++          },
++        },
++      },
++    });
++
++    if (!mothers) {
++      return res.status(404).json({ error: 'No mothers found' });
++    }
++
++    res.status(200).json(mothers);
++
++  } catch (error) {
++
++  }
++}
+diff --git a/server/controllers/userController.js b/server/controllers/userController.js
+index 8439891..253978f 100644
+--- a/server/controllers/userController.js
++++ b/server/controllers/userController.js
+@@ -2,7 +2,6 @@
+ import { prisma } from '../utils/prisma.js';
+ 
+ export const getMe = (req, res) => {
+-  console.log('called getMe');
+   if (req.user) {
+     const user = {
+       id: req.user.id,
+@@ -20,7 +19,6 @@ export const getUsers = async (req, res) => {
+ 
+     // Build the query options based on the `role` query parameter
+     const whereClause = role ? { role: role.toLowerCase() } : {};
+-    console.log(whereClause,'whereClause');
+     
+     const users = await prisma.user.findMany({
+       where: whereClause,
+@@ -40,7 +38,6 @@ export const getUsers = async (req, res) => {
+ 
+ 
+ export const getUserProfile = async (req, res) => {
+-    console.log('called getUserProfile');
+ 
+     try {
+         // Validate request parameters
+@@ -66,14 +63,12 @@ export const getUserProfile = async (req, res) => {
+         });
+ 
+         if (!user) {
+-            console.log(`User with ID ${userId} not found.`);
+             return res.status(404).json({
+                 status: 'error',
+                 message: 'User not found'
+             });
+         }
+ 
+-        console.log('User profile fetched successfully.');
+         res.status(200).json({
+             status: 'success',
+             data: user
+@@ -81,7 +76,6 @@ export const getUserProfile = async (req, res) => {
+ 
+     } catch (error) {
+         console.error('Error fetching user profile:', error);
+-        console.log('error',error)
+         // CastError for invalid IDs will be caught here.
+         res.status(500).json({
+             status: 'error',
+diff --git a/server/prisma/migrations/20250815155104_add_td_dose_model/migration.sql b/server/prisma/migrations/20250815155104_add_td_dose_model/migration.sql
+new file mode 100644
+index 0000000..8ea58e4
+--- /dev/null
++++ b/server/prisma/migrations/20250815155104_add_td_dose_model/migration.sql
+@@ -0,0 +1,35 @@
++/*
++  Warnings:
++
++  - You are about to drop the column `tdDose1` on the `Mother` table. All the data in the column will be lost.
++  - You are about to drop the column `tdDose2` on the `Mother` table. All the data in the column will be lost.
++  - You are about to drop the column `tdDose2Plus` on the `Mother` table. All the data in the column will be lost.
++
++*/
++-- AlterTable
++ALTER TABLE "public"."Mother" DROP COLUMN "tdDose1",
++DROP COLUMN "tdDose2",
++DROP COLUMN "tdDose2Plus";
++
++-- CreateTable
++CREATE TABLE "public"."TDDose" (
++    "id" TEXT NOT NULL,
++    "doseNumber" INTEGER NOT NULL,
++    "dateGiven" TIMESTAMP(3) NOT NULL,
++    "remarks" TEXT,
++    "motherId" TEXT NOT NULL,
++    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "createdById" INTEGER NOT NULL,
++    "administeredById" INTEGER NOT NULL,
++
++    CONSTRAINT "TDDose_pkey" PRIMARY KEY ("id")
++);
++
++-- AddForeignKey
++ALTER TABLE "public"."TDDose" ADD CONSTRAINT "TDDose_motherId_fkey" FOREIGN KEY ("motherId") REFERENCES "public"."Mother"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
++
++-- AddForeignKey
++ALTER TABLE "public"."TDDose" ADD CONSTRAINT "TDDose_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
++
++-- AddForeignKey
++ALTER TABLE "public"."TDDose" ADD CONSTRAINT "TDDose_administeredById_fkey" FOREIGN KEY ("administeredById") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+diff --git a/server/prisma/schema.prisma b/server/prisma/schema.prisma
+index 153f404..25c9cae 100644
+--- a/server/prisma/schema.prisma
++++ b/server/prisma/schema.prisma
+@@ -29,8 +29,11 @@ model User {
+   createdWeightRecords      WeightRecord[]      @relation(name: "CreatedByWeight")
+   administeredWeightRecords WeightRecord[]      @relation(name: "AdministeredByWeight")
+   verifiedChildren          Child[]             @relation(name: "VerifiedBy")
++  createdTDDoses      TDDose[]
++  administeredTDDoses TDDose[] @relation("AdministeredByTDDose")
+ }
+ 
++
+ model Child {
+   id                        String              @id @default(uuid())
+   sewaDartaNumber           Int                 @unique @default(autoincrement())
+@@ -66,14 +69,27 @@ model Mother {
+   wardNumber                Int
+   pregnancyCount            Int
+   previousTDTakenCount      Int
+-  tdDose1                   DateTime?
+-  tdDose2                   DateTime?
+-  tdDose2Plus               DateTime?
+   remarks                   String?
+   createdAt                 DateTime  @default(now())
+   createdById               Int
+   createdBy                 User      @relation(fields: [createdById], references: [id])
+   isFromOtherMunicipality   Boolean   @default(false)
++ tdDoses                 TDDose[]
++}
++model TDDose {
++  id               String    @id @default(uuid())
++  doseNumber       Int       // To identify if it's the 1st, 2nd, or 2nd+ dose
++  dateGiven        DateTime
++  remarks          String?
++  motherId         String
++  mother           Mother    @relation(fields: [motherId], references: [id])
++  createdAt        DateTime  @default(now())
++  createdById      Int
++  createdBy        User      @relation(fields: [createdById], references: [id])
++
++  // New fields to track the user who administered the vaccine
++  administeredById Int
++  administeredBy   User      @relation("AdministeredByTDDose", fields: [administeredById], references: [id])
+ }
+ 
+ model VaccinationRecord {
+diff --git a/server/routes/motherRoutes.js b/server/routes/motherRoutes.js
+index b148889..fb64779 100644
+--- a/server/routes/motherRoutes.js
++++ b/server/routes/motherRoutes.js
+@@ -1,5 +1,5 @@
+ import express from 'express';
+-import { createMother, getMothers } from '../controllers/motherController.js';
++import { createMother, getMothers,getWardMothers } from '../controllers/motherController.js';
+ 
+ import { authenticate, authorize } from '../middlewares/auth.js';
+ 
+@@ -19,5 +19,6 @@ router.get(
+   authorize('admin', 'ward_officer'),
+   getMothers,
+ );
++router.get('/ward',authenticate, authorize('admin', 'ward_officer'), getWardMothers);
+ 
+ export default router;
+diff --git a/server/schemas/childSchema.js b/server/schemas/childSchema.js
+index 03d75d3..d3aa0b4 100644
+--- a/server/schemas/childSchema.js
++++ b/server/schemas/childSchema.js
+@@ -95,7 +95,13 @@ export const createChildSchema = z.object({
+   // Re-added the weight records field
+   weightRecords: z.array(weightRecordSchema),
+ 
+-  fullName: z.string().min(1, 'Full name is required'),
++  firstName: z.string().min(1, 'First name is required'),
++  
++lastName: z
++  .string()
++  .trim()
++  .optional()
++  .transform((val) => (val === '' ? undefined : val)),
+   parentName: z.string().min(1, 'Parent name is required'),
+   tole: z.string().min(1, 'Tole is required'),
+   phoneNumber: z
+diff --git a/server/schemas/motherSchema.js b/server/schemas/motherSchema.js
+index 6d0901e..7ad2cd5 100644
+--- a/server/schemas/motherSchema.js
++++ b/server/schemas/motherSchema.js
+@@ -19,27 +19,36 @@ const bsDateSchema = z
+     },
+   );
+ 
++// Schema for a single TD dose
++const tdDoseSchema = z.object({
++  doseNumber: z.number().int().min(1, 'Dose number must be at least 1'),
++  dateGiven: bsDateSchema,
++  administeredById: z.number().int().min(1, 'Administered by ID is required'),
++  remarks: z.string().optional().nullable(),
++});
++
++// Main schema for creating a Mother record
+ export const createMotherSchema = z.object({
+   fullName: z.string().min(1, 'Full name is required'),
+-  lastName: z.string().optional(),
++  lastName: z.string().optional().nullable(),
+   casteCode: numericString.refine((val) => val > 0, {
+     message: 'Caste code is required',
+   }),
+   age: numericString.refine((val) => val > 0, {
+     message: 'Age is required',
+   }),
+-  phoneNumber: z.string().optional(),
+-  tole: z.string().optional(),
++  phoneNumber: z.string().optional().nullable(),
++  tole: z.string().optional().nullable(),
+   wardNumber: numericString.refine((val) => val > 0, {
+     message: 'Ward number is required',
+   }),
+-  pregnancyCount: numericString.optional(),
+-  previousTDTakenCount: numericString.optional(),
+-
+-  // The date fields now use the same bsDateSchema for validation
+-  tdDose1: bsDateSchema.optional().nullable(),
+-  tdDose2: bsDateSchema.optional().nullable(),
+-  tdDose2Plus: bsDateSchema.optional().nullable(),
+-
+-  remarks: z.string().optional(),
+-});
++  pregnancyCount: numericString.refine((val) => val >= 0, {
++    message: 'Pregnancy count cannot be negative',
++  }),
++  previousTDTakenCount: numericString.refine((val) => val >= 0, {
++    message: 'Previous TD taken count cannot be negative',
++  }),
++  isFromOtherMunicipality: z.boolean().default(false),
++  remarks: z.string().optional().nullable(),
++  tdDoses: z.array(tdDoseSchema).min(0, 'TD doses must be an array'), // Allow empty array
++});
+\ No newline at end of file

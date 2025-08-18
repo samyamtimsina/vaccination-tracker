@@ -27,7 +27,7 @@ import {
   safeFormatDate,
   safeFormatDateYYMMDD,
 } from '../utils/date.js';
-import { vaccineSchedule } from '../utils/vaccineSchedule.js';
+import { vaccineSchedule} from '../utils/vaccineSchedule.js';
 import { adToBs } from '@sbmdkl/nepali-date-converter';
 import VaccinationCardOverlay from '../components/print';
 import { useChildContext } from '../context/ChildContext';

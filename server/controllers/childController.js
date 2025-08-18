@@ -17,32 +17,34 @@ function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
     const schedule = vaccineSchedule[vaccineTypeEnum] || [];
 
     return doses
-      .map((doseObj, idx) => {
+      .map((doseObj) => {
         if (!doseObj?.date) return null;
 
         const adDateGiven = parseBsDateString(doseObj.date);
         if (!adDateGiven) {
           console.error(
-            `Invalid vaccination date for ${vaccineName} dose ${idx + 1}`,
+            `Invalid vaccination date for ${vaccineName}`,
           );
           return null;
         }
 
-        const doseNumber = idx + 1;
+        const doseNumber = doseObj.doseNumber || 1;
         const doseSchedule = schedule.find((d) => d.dose === doseNumber);
         const recommendedAtMonths = doseSchedule
           ? Math.round(toMonths(doseSchedule) * 100) / 100
           : 0;
 
+        // Changed VaccineType to vaccineType to match Prisma schema
         return {
-          vaccineType: vaccineTypeEnum,
+          vaccineType: vaccineTypeEnum, // Fixed case here
           doseNumber,
           dateGiven: adDateGiven,
           isComplete: true,
           recommendedAtMonths,
           remarks: doseObj.remarks || null,
-          createdById: user.id, // The person entering the data
-          administeredById: administeredByUserId, // The ID of the person who administered it
+          type: doseObj.type || 'routine',
+          createdById: user.id,
+          administeredById: administeredByUserId,
         };
       })
       .filter(Boolean);
@@ -52,8 +54,10 @@ function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
 // --- UPDATED: createChild controller
 // It now expects administeredById for vaccines and weights in the request body
 export const createChild = async (req, res) => {
+  console.log('req.body create child',req.body)
   try {
     const validationResult = createChildSchema.safeParse(req.body);
+    console.log('Validation result:', validationResult);
 
     if (!validationResult.success) {
       return res.status(400).json({

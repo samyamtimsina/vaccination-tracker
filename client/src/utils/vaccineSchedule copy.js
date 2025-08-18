@@ -75,3 +75,65 @@ export const catchUpRules = {
   TCV: { maxAgeMonths: 180, totalDoses: 1 },
   HPV: { maxAgeYears: 26, totalDoses: 2 }, // optional catch-up for missed adolescent series
 };
+// // src/utils/vaccineSchedule.js
+//second verions
+
+// // Full master schedule with type field for each dose
+// export const fullSchedule = {
+//   BCG: [
+//     { dose: 1, recommendedAtDays: 0, type: 'routine' }
+//   ],
+
+//   DPT_HepB_hib: [
+//     { dose: 1, recommendedAtWeeks: 6, type: 'routine' },
+//     { dose: 2, recommendedAtWeeks: 10, type: 'routine' },
+//     { dose: 3, recommendedAtWeeks: 14, type: 'routine' },
+//     { dose: 4, recommendedAtMonths: 18, type: 'booster' },
+//     { dose: 5, recommendedAtYears: 5, type: 'booster' },
+//   ],
+
+//   ROTA: [
+//     { dose: 1, recommendedAtWeeks: 6, type: 'routine' },
+//     { dose: 2, recommendedAtWeeks: 10, type: 'routine' },
+//   ],
+
+//   OPV: [
+//     { dose: 1, recommendedAtWeeks: 6, type: 'routine' },
+//     { dose: 2, recommendedAtWeeks: 10, type: 'routine' },
+//     { dose: 3, recommendedAtWeeks: 14, type: 'routine' },
+//     { dose: 4, recommendedAtMonths: 18, type: 'booster' },
+//     { dose: 5, recommendedAtYears: 5, type: 'booster' },
+//   ],
+
+//   fIPV: [
+//     { dose: 1, recommendedAtWeeks: 14, type: 'routine' },
+//     { dose: 2, recommendedAtMonths: 9, type: 'routine' },
+//   ],
+
+//   PCV: [
+//     { dose: 1, recommendedAtWeeks: 6, type: 'routine' },
+//     { dose: 2, recommendedAtWeeks: 10, type: 'routine' },
+//     { dose: 3, recommendedAtMonths: 9, type: 'routine' },
+//     { dose: 4, recommendedAtYears: 5, type: 'booster' },
+//   ],
+
+//   MR: [
+//     { dose: 1, recommendedAtMonths: 9, type: 'routine' },
+//     { dose: 2, recommendedAtMonths: 15, type: 'routine' },
+//   ],
+
+//   JE: [
+//     { dose: 1, recommendedAtMonths: 12, type: 'routine' },
+//     { dose: 2, recommendedAtYears: 2, type: 'booster' },
+//   ],
+
+//   TCV: [
+//     { dose: 1, recommendedAtMonths: 9, type: 'routine' }
+//   ],
+
+//   HPV: [
+//     { dose: 1, recommendedAtYears: 9, type: 'booster' },
+//     { dose: 2, recommendedAtYears: 14, type: 'booster' },
+//   ],
+
+// };V
