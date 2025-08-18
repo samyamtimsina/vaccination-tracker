@@ -1,111 +1,117 @@
 {
-  "header": {
-    "title": "Children Health Records",
-    "description": "Manage and track children's health information and vaccination records"
-  },
   "loading": {
-    "message": "Loading children records..."
+    "message": "Loading children data..."
   },
   "error": {
-    "title": "Error Loading Data",
-    "message": "{{error}}"
+    "title": "Error fetching data",
+    "message": "An unexpected error occurred: {{error}}"
+  },
+  "header": {
+    "title": "All Children",
+    "description": "Browse and manage vaccination records for all registered children."
+  },
+  "addChildButton": {
+    "label": "Add New Child"
   },
   "search": {
-    "placeholder": "Search children by name..."
+    "placeholder": "Search by full name..."
   },
   "stats": {
     "totalChildren": "Total Children",
     "fullyVaccinated": "Fully Vaccinated"
   },
   "noResults": {
-    "title_with_search": "No matching children found",
-    "title_no_data": "No children records found",
-    "description_with_search": "Try adjusting your search terms or clear the search to see all children.",
-    "description_no_data": "Get started by adding your first child record.",
-    "clear_search": "Clear Search"
-  },
-  "addChildButton": {
-    "label": "Add New Child"
+    "title_with_search": "No children found",
+    "description_with_search": "There are no children that match your search criteria.",
+    "clear_search": "Clear Search",
+    "title_no_data": "No children registered",
+    "description_no_data": "There are no children currently registered in the system."
   },
   "childCard": {
     "vaccinated": "Vaccinated",
     "pending": "Pending",
-    "birthDateBS": "Birth Date (B.S.)",
-    "birthDateAD": "Birth Date (A.D.)",
-    "ward": "Ward",
-    "vaccinations": "Vaccinations",
+    "birthDateBS": "Date of Birth (BS)",
+    "birthDateAD": "Date of Birth (AD)",
+    "ward": "Ward No.",
+    "vaccinations": "vaccinations",
     "latestWeight": "Latest Weight",
-    "createdBy": "Created by User #{{id}}",
+    "createdBy": "Created By",
     "viewDetails": "View Details"
   },
+  "pagination": {
+    "previous": "Previous",
+    "page": "Page {{current}} of {{total}}",
+    "next": "Next"
+  },
   "childDetails": {
-    "back": "Back to All Children",
-    "print": "Print Record",
-    "age": "{{formatted}} old",
+    "back": "Back to List",
+    "print": "Print Card",
+    "age": "Age: {{formatted}}",
     "fullyVaccinated": "Fully Vaccinated",
     "incomplete": "Incomplete",
     "personalInfo": {
       "title": "Personal Information",
-      "serviceRegistration": "Service Registration",
+      "serviceRegistration": "Service Registration No.",
       "gender": "Gender",
-      "parentName": "Parent Name",
+      "parentName": "Parent's Name",
       "tole": "Tole",
-      "phone": "Phone",
+      "phone": "Phone Number",
       "municipalityLabel": "Municipality",
       "municipality": {
-        "other": "Other Municipality",
+        "other": "From Other Municipality",
         "local": "Local Municipality"
       },
       "casteCode": "Caste Code",
-      "birthDate": "Birth Date",
+      "birthDate": "Date of Birth",
       "recordInfo": "Record Information",
-      "createdBy": "Created by User #{{id}}",
-      "createdOn": "Created on"
+      "createdBy": "Created By",
+      "createdOn": "Created On"
     },
     "vaccinationSummary": {
       "title": "Vaccination Summary",
-      "overallProgress": "Overall Progress",
-      "dosesGiven": "{{given}} of {{required}} doses given",
+      "overallProgress": "Overall Vaccination Progress",
+      "dosesGiven": "{{given}} out of {{required}} doses given",
       "complete": "Complete",
-      "progress": "Progress",
+      "progress": "In Progress",
       "pending": "Pending"
     },
     "weightTracking": {
-      "title": "Weight Tracking",
+      "title": "Weight Records",
       "latest": "Latest",
-      "recordedBy": "Recorded by User #{{id}}",
-      "recordedOn": "Recorded on"
+      "recordedBy": "Recorded By",
+      "recordedOn": "Recorded On"
     },
     "notes": {
-      "title": "Notes"
+      "title": "Notes/Remarks"
     },
     "vaccinationRecords": {
       "title": "Vaccination Records",
-      "description": "Detailed immunization tracking with administration details",
+      "description": "Track the vaccination history of the child below.",
       "legend": {
         "given": "Given",
         "pending": "Pending"
       },
       "dose": "Dose {{dose}}",
-      "givenOnBS": "Given on: {{date}} (B.S)",
-      "givenOnAD": "A.D: {{date}}",
-      "givenBy": "Given by User #{{id}}",
-      "recorded": "Recorded: {{date}}",
-      "remarks": "Remarks:",
-      "customVaccine": "Custom: {{name}}",
-      "notAdministered": "Not yet administered",
       "recommendedAt": {
-        "atBirth": "At birth",
+        "atBirth": "At Birth",
         "days": "{{value}} days",
         "weeks": "{{value}} weeks",
         "months": "{{value}} months",
         "unknown": "Unknown"
+      },
+      "givenOnBS": "Given on (BS): {{date}}",
+      "givenOnAD": "Given on (AD): {{date}}",
+      "givenBy": "Given By",
+      "recorded": "Recorded on {{date}}",
+      "remarks": "Remarks",
+      "customVaccine": "Custom Vaccine: {{name}}",
+      "notAdministered": "Not Administered",
+      "vaccineType": {
+        "routine": "Routine",
+        "current": "Current",
+        "booster": "Booster",
+        "unknown": "Unknown"
       }
     }
-  },
-  "pagination": {
-    "previous": "Previous",
-    "next": "Next",
-    "page": "Page {{current}} of {{total}}"
   }
 }

@@ -154,17 +154,17 @@ const VaccineCard = ({
         <div className="flex justify-between items-start">
           <div>
             <h4 className={`font-medium ${dose.color}`}>
-              {vaccineName} - Dose {dose.dose}
+              {vaccineName} - {t('vaccine_card.dose', { dose: dose.dose })}
             </h4>
             <p className="text-xs text-gray-600 mt-1">
-              Recommended: {
+              {t('vaccine_card.recommended_at')}{
                 dose.doseInfo.recommendedAtMonths
-                  ? `${dose.doseInfo.recommendedAtMonths} months`
+                  ? t('vaccine_card.months', { count: dose.doseInfo.recommendedAtMonths })
                   : dose.doseInfo.recommendedAtWeeks
-                  ? `${dose.doseInfo.recommendedAtWeeks} weeks`
+                  ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
                   : dose.doseInfo.recommendedAtYears
-                  ? `${dose.doseInfo.recommendedAtYears} years`
-                  : `${dose.doseInfo.recommendedAtDays} days`
+                  ? t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
+                  : t('vaccine_card.days', { count: dose.doseInfo.recommendedAtDays })
               }
             </p>
           </div>
@@ -180,10 +180,10 @@ const VaccineCard = ({
                 ? 'badge-success'
                 : 'badge-neutral'
             } text-xs`}>
-              {dose.status.replace('_', ' ')}
+              {t(`vaccine_card.status.${dose.status.toLowerCase()}`)}
             </span>
             {dose.doseType === 'booster' && (
-              <span className="badge badge-outline badge-xs">Booster</span>
+              <span className="badge badge-outline badge-xs">{t('vaccine_card.booster')}</span>
             )}
           </div>
         </div>
@@ -204,7 +204,7 @@ const VaccineCard = ({
                       onChange={(value) => field.onChange(value)}
                       language="ne"
                       theme={theme}
-                      placeholder="Select vaccination date"
+                      placeholder={t('vaccine_card.date_placeholder')}
                     />
                     {field.value && (
                       <button
@@ -214,7 +214,7 @@ const VaccineCard = ({
                           ''
                         )}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
-                        title="Clear date"
+                        title={t('vaccine_card.clear_date_title')}
                       >
                         ✕
                       </button>
@@ -228,13 +228,13 @@ const VaccineCard = ({
                     disabled
                     readOnly
                     placeholder={
-                      `Available at ${
-                        dose.doseInfo.recommendedAtMonths
-                          ? `${dose.doseInfo.recommendedAtMonths} months`
+                      t('vaccine_card.unavailable_placeholder', {
+                        age: dose.doseInfo.recommendedAtMonths
+                          ? t('vaccine_card.months', { count: dose.doseInfo.recommendedAtMonths })
                           : dose.doseInfo.recommendedAtWeeks
-                          ? `${dose.doseInfo.recommendedAtWeeks} weeks`
-                          : `${dose.doseInfo.recommendedAtYears} years`
-                      }`
+                          ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
+                          : t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
+                      })
                     }
                   />
                 )}
@@ -253,7 +253,7 @@ const VaccineCard = ({
             >
               <span className="flex items-center text-xs">
                 <FaClipboardList className="w-3 h-3 mr-1" />
-                Remarks
+                {t('vaccine_card.remarks')}
               </span>
               <span className={`text-xs transform transition-transform ${
                 showRemark ? 'rotate-180' : ''
@@ -267,7 +267,7 @@ const VaccineCard = ({
                 <textarea
                   {...register(`vaccines.${vaccineName}.${dose.doseIndex}.remarks`)}
                   className="textarea textarea-bordered textarea-xs w-full"
-                  placeholder="Add professional remarks..."
+                  placeholder={t('vaccine_card.remarks_placeholder')}
                   rows={2}
                 />
               </div>
@@ -301,13 +301,13 @@ const VaccineSection = ({
     return null;
   }
 
-  const getSectionTitle = () => {
+  const getSectionTitle = (key) => {
     const titles = {
-      CURRENT: `Current & Overdue Vaccines (${sectionData.count})`,
-      CATCH_UP: `Catch-up Vaccines (${sectionData.count})`,
-      NOT_APPLICABLE: `Not Applicable (${sectionData.count})`
+      CURRENT: t('vaccine_section.current', { count: sectionData.count }),
+      CATCH_UP: t('vaccine_section.catch_up', { count: sectionData.count }),
+      NOT_APPLICABLE: t('vaccine_section.not_applicable', { count: sectionData.count })
     };
-    return titles[sectionKey];
+    return titles[key];
   };
 
   const getSectionDescription = () => {
@@ -354,7 +354,7 @@ const VaccineSection = ({
         <div className="mt-4 ml-4 p-4 bg-green-50 border border-green-200 rounded-lg">
           <div className="text-center">
             <FaCheckCircle className="text-green-500 text-2xl mx-auto mb-2" />
-            <p className="text-green-700 font-medium">No vaccines in this category</p>
+            <p className="text-green-700 font-medium">{t('vaccine_section.no_vaccines_in_category')}</p>
           </div>
         </div>
       )}
@@ -363,7 +363,7 @@ const VaccineSection = ({
 };
 
 export default function AddChild() {
-  const { t } = useTranslation('addChild');
+  const { t, i18n } = useTranslation('addChild');
   const { theme } = useTheme();
   const { addChildToState } = useChildContext();
   const {
@@ -614,7 +614,7 @@ const onSubmit = async (data) => {
                   />
                   {errors.lastName && (
                     <p className="text-error text-sm mt-1">
-                      {errors.lastName.message}
+                      {t('personalInfo.form.lastName.required')}
                     </p>
                   )}
                 </div>
@@ -742,7 +742,7 @@ const onSubmit = async (data) => {
                   />
                   {errors.phoneNumber && (
                     <p className="text-error text-sm mt-1">
-                      {errors.phoneNumber.message}
+                      {t('personalInfo.form.phoneNumber.required')}
                     </p>
                   )}
                 </div>
@@ -803,7 +803,7 @@ const onSubmit = async (data) => {
               <div className="mt-8">
                 <label className="label">
                   <span className="label-text text-base font-medium">
-                    Administered by: <span className="text-error">*</span>
+                    {t('personalInfo.administered_by.label')} <span className="text-error">*</span>
                   </span>
                 </label>
                 <select
@@ -813,7 +813,7 @@ const onSubmit = async (data) => {
                   }`}
                   defaultValue=""
                 >
-                  <option value="" disabled>Select health worker</option>
+                  <option value="" disabled>{t('personalInfo.administered_by.placeholder')}</option>
                   {healthWorkers.map(worker => (
                     <option key={worker.id} value={worker.id}>
                       {worker.name}
@@ -822,7 +822,7 @@ const onSubmit = async (data) => {
                 </select>
                 {errors.administeredById && (
                   <p className="text-error text-sm mt-1">
-                    {errors.administeredById.message}
+                    {t('personalInfo.administered_by.required')}
                   </p>
                 )}
               </div>
@@ -868,7 +868,7 @@ const onSubmit = async (data) => {
                         />
                         {errors.weightRecords?.[index]?.date && (
                           <p className="text-error text-sm mt-1">
-                            {errors.weightRecords[index].date.message}
+                            {t('weightTracking.errors.date_required')}
                           </p>
                         )}
                       </div>
@@ -952,11 +952,11 @@ const onSubmit = async (data) => {
                   </div>
                   <div>
                     <h2 className="text-xl font-medium text-base-content">
-                      Vaccination Schedule
+                      {t('vaccine_section.title')}
                     </h2>
                     {age.months >= 0 && birthDate && gender && (
                       <p className="text-sm text-base-content/70">
-                        Child age: {age.months} months, {age.days % 30} days | Gender: {gender}
+                        {t('vaccine_section.age_gender', { months: age.months, days: age.days % 30, gender: t(`personalInfo.form.gender.options.${gender.toLowerCase()}`) })}
                       </p>
                     )}
                   </div>
@@ -964,7 +964,7 @@ const onSubmit = async (data) => {
                 {birthDate && gender && (
                   <div className="text-right">
                     <div className="text-2xl font-bold text-primary">{totalVaccines}</div>
-                    <div className="text-sm text-base-content/70">Total Vaccines</div>
+                    <div className="text-sm text-base-content/70">{t('vaccine_section.total_vaccines')}</div>
                   </div>
                 )}
               </div>
@@ -974,10 +974,10 @@ const onSubmit = async (data) => {
                 <div className="text-center py-12 bg-base-200 rounded-lg border-2 border-dashed border-base-300">
                   <FaInfoCircle className="text-4xl text-base-content/40 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-base-content/60 mb-2">
-                    Vaccine Schedule Not Available
+                    {t('vaccine_section.unavailable.title')}
                   </h3>
                   <p className="text-base-content/50">
-                    Please select birth date and gender to view the appropriate vaccine schedule
+                    {t('vaccine_section.unavailable.description')}
                   </p>
                 </div>
               )}
@@ -997,7 +997,7 @@ const onSubmit = async (data) => {
                             className={`tab flex items-center gap-2 ${activeTab === sectionKey ? 'tab-active' : ''}`}
                           >
                             <IconComponent className={`text-xl ${sectionData.color}`} />
-                            {sectionData.title} ({sectionData.count})
+                            {t(`vaccine_section.tabs.${sectionKey.toLowerCase()}`, { count: sectionData.count })}
                           </button>
                         );
                       }
@@ -1031,10 +1031,10 @@ const onSubmit = async (data) => {
                 <div className="text-center py-8 mt-8 bg-green-50 border border-green-200 rounded-lg">
                   <div className="text-6xl mb-4">🎉</div>
                   <h3 className="text-xl font-semibold text-green-600 mb-2">
-                    All Current Vaccines Up to Date!
+                    {t('vaccine_section.all_up_to_date.title')}
                   </h3>
                   <p className="text-base-content/70">
-                    No immediate vaccinations required for this child's age group.
+                    {t('vaccine_section.all_up_to_date.description')}
                   </p>
                 </div>
               )}

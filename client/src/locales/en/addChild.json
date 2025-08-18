@@ -1,119 +1,149 @@
 {
   "header": {
-    "title": "Add Child",
-    "description": "Register new child information"
+    "title": "Add New Child",
+    "description": "Enter the details to register a new child"
   },
   "dashboard_button": {
-    "label": "Dashboard",
-    "title": "Back to Dashboard"
+    "title": "Go back to dashboard",
+    "label": "Back to Dashboard"
   },
   "personalInfo": {
     "title": "Personal Information",
     "municipality": {
-      "label": "From another municipality"
+      "label": "Is the child from other Municipality?"
     },
     "form": {
       "firstName": {
         "label": "First Name",
-        "placeholder": "First Name",
-        "required": "First Name is required"
+        "placeholder": "Enter first name",
+        "required": "First name is required."
       },
       "lastName": {
         "label": "Last Name",
-        "placeholder": "Last Name"
+        "placeholder": "Enter last name",
+        "required": "Last name is required."
       },
       "gender": {
         "label": "Gender",
-        "placeholder": "Select Gender",
-        "required": "Gender is required",
+        "placeholder": "Select gender",
         "options": {
           "male": "Male",
           "female": "Female",
           "other": "Other"
-        }
+        },
+        "required": "Gender is required."
       },
       "wardNumber": {
         "label": "Ward Number",
-        "placeholder": "Ward Number",
-        "required": "Ward Number is required"
+        "placeholder": "Enter ward number",
+        "required": "Ward number is required."
       },
       "casteCode": {
         "label": "Caste Code",
-        "placeholder": "Caste Code",
-        "required": "Caste Code is required"
+        "placeholder": "Enter caste code",
+        "required": "Caste code is required."
       },
       "parentName": {
-        "label": "Parent's Name",
-        "placeholder": "Parent's Name",
-        "required": "Parent's Name is required"
+        "label": "Parent Name",
+        "placeholder": "Enter parent name",
+        "required": "Parent name is required."
       },
       "tole": {
-        "label": "Tole",
-        "placeholder": "Tole",
-        "required": "Tole is required"
+        "label": "Tole/Village",
+        "placeholder": "Enter Tole/Village",
+        "required": "Tole/Village is required."
       },
       "phoneNumber": {
         "label": "Phone Number",
-        "placeholder": "Phone Number"
+        "placeholder": "Enter phone number",
+        "required": "Phone number is required."
       },
       "birthDate": {
         "label": "Birth Date",
-        "required": "Birth Date is required",
-        "clear_title": "Clear Date"
-      },
-      "purnaKhop": {
-        "label": "Full Vaccination"
+        "clear_title": "Clear date",
+        "required": "Birth date is required."
       }
     },
-    "age": "Age: {{months}} months ({{days}} days)"
+    "age": "Child age: {{months}} months, {{days}} days | Gender: {{gender}}",
+    "administered_by": {
+      "label": "Administered by",
+      "placeholder": "Select health worker",
+      "required": "Health worker selection is required."
+    }
   },
   "weightTracking": {
     "title": "Weight Tracking",
     "date_label": "Date {{index}}",
     "weight_label": "Weight (kg)",
-    "add_button": "Add First Weight Record",
-    "remove_button_title": "Remove Weight Record",
-    "add_more_button_title": "Add Another Weight Record",
     "errors": {
-      "weight_positive": "Weight must be positive",
-      "weight_too_large": "Weight is too large"
+      "date_required": "Date is required.",
+      "weight_positive": "Weight must be a positive number.",
+      "weight_too_large": "Weight cannot be more than 50 kg."
+    },
+    "remove_button_title": "Remove weight record",
+    "add_more_button_title": "Add another weight record",
+    "add_button": "Add Weight Record"
+  },
+  "vaccine_section": {
+    "title": "Vaccination Schedule",
+    "age_gender": "Child age: {{months}} months, {{days}} days | Gender: {{gender}}",
+    "total_vaccines": "Total Vaccines",
+    "unavailable": {
+      "title": "Vaccine Schedule Not Available",
+      "description": "Please select birth date and gender to view the appropriate vaccine schedule"
+    },
+    "tabs": {
+      "current": "Current & Overdue Vaccines ({{count}})",
+      "catch_up": "Catch-up Vaccines ({{count}})",
+      "not_applicable": "Not Applicable ({{count}})"
+    },
+    "no_vaccines_in_category": "No vaccines in this category",
+    "all_up_to_date": {
+      "title": "All Current Vaccines Up to Date!",
+      "description": "No immediate vaccinations required for this child's age group."
     }
   },
-  "vaccines": {
-    "title": "Vaccines",
-    "dose_label": "Dose {{dose}}",
-    "recommended_at": {
-      "months": "{{value}} months",
-      "weeks": "{{value}} weeks",
-      "days": "{{value}} days"
+  "vaccine_card": {
+    "dose": "Dose {{dose}}",
+    "recommended_at": "Recommended: ",
+    "months": "{{count}} months",
+    "weeks": "{{count}} weeks",
+    "years": "{{count}} years",
+    "days": "{{count}} days",
+    "status": {
+      "not_yet_eligible": "NOT YET ELIGIBLE",
+      "due_now": "DUE NOW",
+      "overdue": "OVERDUE",
+      "severely_overdue": "SEVERELY OVERDUE",
+      "accessible": "ACCESSIBLE"
     },
-    "not_eligible": "Not yet eligible for vaccination",
-    "remarks": {
-      "label": "Remarks",
-      "placeholder": "Example: Child had a fever..."
-    },
-    "clear_date_title": "Clear Date"
+    "booster": "Booster",
+    "date_placeholder": "Select vaccination date",
+    "clear_date_title": "Clear date",
+    "unavailable_placeholder": "Available at {{age}}",
+    "remarks": "Remarks",
+    "remarks_placeholder": "Add professional remarks..."
   },
   "generalRemarks": {
     "title": "General Remarks",
-    "label": "Additional Information or Notes (Optional)",
-    "placeholder": "Enter any special remarks, observations, or important information here...",
-    "optional_note": "This field is optional"
+    "label": "Remarks",
+    "placeholder": "Enter any general remarks about the child's health or vaccination history...",
+    "optional_note": "This section is optional and can be used for any additional notes."
   },
   "submitSection": {
-    "title": "Ready?",
-    "description": "Review all information and save",
-    "reset_button": "Reset",
-    "reset_confirm": "Are you sure? All data will be lost.",
-    "save_button": "Save Data",
-    "saving": "Saving..."
-  },
-  "toast": {
-    "success": "Child data saved successfully!",
-    "error": "Failed to save data. Please try again.",
-    "validation_error": "Please fill in all required information. ({{message}})"
+    "title": "Save & Submit",
+    "description": "Once you have verified all the information, save the record.",
+    "reset_confirm": "Are you sure you want to reset the form? All entered data will be lost.",
+    "reset_button": "Reset Form",
+    "saving": "Saving...",
+    "save_button": "Save & Submit"
   },
   "scrollToTop": {
-    "title": "Scroll to Top"
+    "title": "Scroll to top"
+  },
+  "toast": {
+    "success": "Child record added successfully!",
+    "error": "Failed to add child record. Please try again.",
+    "validation_error": "Validation failed: {{message}}"
   }
 }

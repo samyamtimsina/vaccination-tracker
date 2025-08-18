@@ -36,13 +36,18 @@ import { useNavigate } from 'react-router-dom';
 
 export default function AllChildren() {
 const navigate = useNavigate();
-  const { t } = useTranslation('viewChildren');
+  const { t, i18n } = useTranslation('viewChildren');
   const [selectedChild, setSelectedChild] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showPrintComponent, setShowPrintComponent] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   const { childrenData, error, loading, fetchChildren } = useChildContext();
+
+  // Function to change language
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng);
+  };
 
   useEffect(() => {
     fetchChildren();
@@ -91,6 +96,19 @@ const navigate = useNavigate();
     return t('childDetails.vaccinationRecords.recommendedAt.unknown');
   };
 
+  const getVaccineTypeLabel = (type) => {
+    switch (type) {
+      case 'routine':
+        return { label: t('childDetails.vaccinationRecords.vaccineType.routine'), class: 'bg-blue-100 text-blue-800' };
+      case 'current':
+        return { label: t('childDetails.vaccinationRecords.vaccineType.current'), class: 'bg-green-100 text-green-800' };
+      case 'booster':
+        return { label: t('childDetails.vaccinationRecords.vaccineType.booster'), class: 'bg-orange-100 text-orange-800' };
+      default:
+        return { label: t('childDetails.vaccinationRecords.vaccineType.unknown'), class: 'bg-gray-100 text-gray-800' };
+    }
+  };
+
   const getOverallVaccinationStats = (child) => {
     const givenVaccinations = child.vaccinations || [];
     const vaccinationMap = {};
@@ -108,6 +126,7 @@ const navigate = useNavigate();
         isComplete: vacc.isComplete,
         customVaccineName: vacc.customVaccineName,
         createdBy: vacc.createdBy, // Include createdBy
+        type: vacc.type, // Include vaccine type
       });
     });
 
@@ -619,6 +638,13 @@ const navigate = useNavigate();
                                             <div className="text-base-content/60">
                                               {t('childDetails.vaccinationRecords.givenOnAD', { date: safeFormatDate(dose.date) })}
                                             </div>
+                                            {dose.type && (
+                                              <div className="mt-1">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getVaccineTypeLabel(dose.type).class}`}>
+                                                  {getVaccineTypeLabel(dose.type).label}
+                                                </span>
+                                              </div>
+                                            )}
                                           </div>
                                           <div className="space-y-1">
                                             <div className="flex items-center space-x-1 text-base-content/70">
@@ -688,10 +714,25 @@ const navigate = useNavigate();
                 {t('header.description')}
               </p>
             </div>
-            <button className="inline-flex items-center space-x-2 bg-primary hover:bg-primary-focus text-primary-content px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-sm hover:shadow-md cursor-pointer">
-              <FaPlus />
-              <span>{t('addChildButton.label')}</span>
-            </button>
+            <div className="flex items-center space-x-4">
+              <button 
+                onClick={() => changeLanguage('en')}
+                className={`text-sm font-medium ${i18n.language === 'en' ? 'text-primary' : 'text-base-content/60'}`}
+              >
+                English
+              </button>
+              <span className="text-base-content/30">|</span>
+              <button 
+                onClick={() => changeLanguage('ne')}
+                className={`text-sm font-medium ${i18n.language === 'ne' ? 'text-primary' : 'text-base-content/60'}`}
+              >
+                नेपाली
+              </button>
+              <button className="inline-flex items-center space-x-2 bg-primary hover:bg-primary-focus text-primary-content px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-sm hover:shadow-md cursor-pointer">
+                <FaPlus />
+                <span>{t('addChildButton.label')}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

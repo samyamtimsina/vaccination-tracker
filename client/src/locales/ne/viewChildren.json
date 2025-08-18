@@ -1,111 +1,117 @@
 {
-  "header": {
-    "title": "बालबालिकाको स्वास्थ्य रेकर्डहरू",
-    "description": "बालबालिकाको स्वास्थ्य जानकारी र खोप रेकर्डहरू व्यवस्थापन र ट्र्याक गर्नुहोस्"
-  },
   "loading": {
-    "message": "बालबालिकाको रेकर्डहरू लोड हुँदैछ..."
+    "message": "बालबालिकाको डाटा लोड गर्दै..."
   },
   "error": {
-    "title": "डेटा लोड गर्न त्रुटि",
-    "message": "{{error}}"
+    "title": "डाटा ल्याउनमा त्रुटि",
+    "message": "अप्रत्याशित त्रुटि भयो: {{error}}"
+  },
+  "header": {
+    "title": "सबै बालबालिका",
+    "description": "सबै दर्ता भएका बालबालिकाको खोप रेकर्डहरू हेर्नुहोस् र व्यवस्थापन गर्नुहोस्।"
+  },
+  "addChildButton": {
+    "label": "नयाँ बच्चा थप्नुहोस्"
   },
   "search": {
-    "placeholder": "नामबाट बालबालिका खोज्नुहोस्..."
+    "placeholder": "पूरा नामबाट खोज्नुहोस्..."
   },
   "stats": {
     "totalChildren": "कुल बालबालिका",
     "fullyVaccinated": "पूर्ण खोप प्राप्त"
   },
   "noResults": {
-    "title_with_search": "कुनै मिल्दो बालबालिका फेला परेन",
-    "title_no_data": "कुनै बालबालिकाको रेकर्ड फेला परेन",
-    "description_with_search": "खोज शब्दहरू समायोजन गर्नुहोस् वा सबै बालबालिका हेर्न खोज मेटाउनुहोस्।",
-    "description_no_data": "पहिलो बालबालिका रेकर्ड थपेर सुरु गर्नुहोस्।",
-    "clear_search": "खोज मेटाउनुहोस्"
-  },
-  "addChildButton": {
-    "label": "नयाँ बालबालिका थप्नुहोस्"
+    "title_with_search": "कुनै बालबालिका भेटिएन",
+    "description_with_search": "तपाईंको खोजी मापदण्डसँग मेल खाने कुनै बालबालिका छैनन्।",
+    "clear_search": "खोज खाली गर्नुहोस्",
+    "title_no_data": "कुनै बालबालिका दर्ता छैनन्",
+    "description_no_data": "प्रणालीमा हाल कुनै पनि बालबालिका दर्ता छैनन्।"
   },
   "childCard": {
     "vaccinated": "खोप प्राप्त",
     "pending": "बाँकी",
     "birthDateBS": "जन्म मिति (वि.सं.)",
     "birthDateAD": "जन्म मिति (ई.सं.)",
-    "ward": "वडा",
-    "vaccinations": "खोपहरू",
-    "latestWeight": "नवीनतम तौल",
-    "createdBy": "प्रयोगकर्ता #{{id}} द्वारा सिर्जना गरिएको",
+    "ward": "वडा नं.",
+    "vaccinations": "खोप",
+    "latestWeight": "पछिल्लो तौल",
+    "createdBy": "दर्ता गर्ने व्यक्ति",
     "viewDetails": "विवरण हेर्नुहोस्"
   },
+  "pagination": {
+    "previous": "अघिल्लो",
+    "page": "पृष्ठ {{current}} मध्ये {{total}}",
+    "next": "अर्को"
+  },
   "childDetails": {
-    "back": "सबै बालबालिकामा फर्कनुहोस्",
-    "print": "रेकर्ड प्रिन्ट गर्नुहोस्",
-    "age": "{{formatted}} को उमेर",
+    "back": "सूचीमा फर्कनुहोस्",
+    "print": "कार्ड प्रिन्ट गर्नुहोस्",
+    "age": "उमेर: {{formatted}}",
     "fullyVaccinated": "पूर्ण खोप प्राप्त",
     "incomplete": "अपूर्ण",
     "personalInfo": {
       "title": "व्यक्तिगत जानकारी",
-      "serviceRegistration": "सेवा दर्ता",
-      "gender": "लिंग",
+      "serviceRegistration": "सेवा दर्ता नं.",
+      "gender": "लिङ्ग",
       "parentName": "अभिभावकको नाम",
       "tole": "टोल",
-      "phone": "फोन",
+      "phone": "फोन नम्बर",
       "municipalityLabel": "नगरपालिका",
       "municipality": {
-        "other": "अन्य नगरपालिका",
+        "other": "अन्य नगरपालिकाबाट",
         "local": "स्थानीय नगरपालिका"
       },
-      "casteCode": "जात कोड",
+      "casteCode": "जाति कोड",
       "birthDate": "जन्म मिति",
       "recordInfo": "रेकर्ड जानकारी",
-      "createdBy": "प्रयोगकर्ता #{{id}} द्वारा सिर्जना गरिएको",
-      "createdOn": "सिर्जना गरिएको मिति"
+      "createdBy": "दर्ता गर्ने व्यक्ति",
+      "createdOn": "दर्ता गरिएको मिति"
     },
     "vaccinationSummary": {
       "title": "खोप सारांश",
-      "overallProgress": "समग्र प्रगति",
-      "dosesGiven": "{{given}} मध्ये {{required}} मात्रा दिइएको",
+      "overallProgress": "समग्र खोप प्रगति",
+      "dosesGiven": "{{required}} मध्ये {{given}} मात्रा दिइएको छ",
       "complete": "पूरा",
       "progress": "प्रगतिमा",
       "pending": "बाँकी"
     },
     "weightTracking": {
-      "title": "तौल ट्र्याकिंग",
-      "latest": "नवीनतम",
-      "recordedBy": "प्रयोगकर्ता #{{id}} द्वारा रेकर्ड गरिएको",
+      "title": "तौलको रेकर्ड",
+      "latest": "पछिल्लो",
+      "recordedBy": "रेकर्ड गर्ने व्यक्ति",
       "recordedOn": "रेकर्ड गरिएको मिति"
     },
     "notes": {
-      "title": "टिप्पणीहरू"
+      "title": "नोट/टिप्पणी"
     },
     "vaccinationRecords": {
-      "title": "खोप रेकर्डहरू",
-      "description": "प्रशासन विवरणहरूसँग विस्तृत खोप ट्र्याकिंग",
+      "title": "खोप रेकर्ड",
+      "description": "बच्चाको खोप इतिहास ट्र्याक गर्नुहोस्।",
       "legend": {
         "given": "दिइएको",
         "pending": "बाँकी"
       },
       "dose": "मात्रा {{dose}}",
-      "givenOnBS": "दिइएको मिति: {{date}} (वि.सं.)",
-      "givenOnAD": "ई.सं.: {{date}}",
-      "givenBy": "प्रयोगकर्ता #{{id}} द्वारा दिइएको",
-      "recorded": "रेकर्ड गरिएको: {{date}}",
-      "remarks": "कैफियत:",
-      "customVaccine": "कस्टम: {{name}}",
-      "notAdministered": "अझै प्रशासित भएको छैन",
       "recommendedAt": {
         "atBirth": "जन्ममा",
         "days": "{{value}} दिन",
         "weeks": "{{value}} हप्ता",
         "months": "{{value}} महिना",
         "unknown": "अज्ञात"
+      },
+      "givenOnBS": "दिइएको मिति (वि.सं.): {{date}}",
+      "givenOnAD": "दिइएको मिति (ई.सं.): {{date}}",
+      "givenBy": "दिने व्यक्ति",
+      "recorded": "रेकर्ड गरिएको मिति {{date}}",
+      "remarks": "टिप्पणी",
+      "customVaccine": "अनुकूलित खोप: {{name}}",
+      "notAdministered": "दिइएको छैन",
+      "vaccineType": {
+        "routine": "नियमित",
+        "current": "हालको",
+        "booster": "बुस्टर",
+        "unknown": "अज्ञात"
       }
     }
-  },
-  "pagination": {
-    "previous": "अघिल्लो",
-    "next": "अर्को",
-    "page": "पृष्ठ {{current}} मध्ये {{total}}"
   }
 }

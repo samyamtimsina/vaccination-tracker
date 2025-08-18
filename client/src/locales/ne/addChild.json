@@ -1,119 +1,149 @@
 {
   "header": {
-    "title": "बालबालिका थप्नुहोस्",
-    "description": "नयाँ बालबालिकाको जानकारी दर्ता गर्नुहोस्"
+    "title": "नयाँ बच्चा थप्नुहोस्",
+    "description": "नयाँ बच्चाको विवरण दर्ता गर्नुहोस्"
   },
   "dashboard_button": {
-    "label": "ड्यासबोर्ड",
-    "title": "ड्यासबोर्डमा फर्कनुहोस्"
+    "title": "ड्यासबोर्डमा फर्कनुहोस्",
+    "label": "ड्यासबोर्डमा फर्कनुहोस्"
   },
   "personalInfo": {
     "title": "व्यक्तिगत जानकारी",
     "municipality": {
-      "label": "बाहिरको नगरपालिकाबाट आएको हो"
+      "label": "के बच्चा अर्को नगरपालिकाबाट हो?"
     },
     "form": {
       "firstName": {
         "label": "पहिलो नाम",
-        "placeholder": "पहिलो नाम",
-        "required": "पहिलो नाम अनिवार्य छ"
+        "placeholder": "पहिलो नाम प्रविष्ट गर्नुहोस्",
+        "required": "पहिलो नाम आवश्यक छ।"
       },
       "lastName": {
-        "label": "थर",
-        "placeholder": "थर"
+        "label": "अन्तिम नाम",
+        "placeholder": "अन्तिम नाम प्रविष्ट गर्नुहोस्",
+        "required": "अन्तिम नाम आवश्यक छ।"
       },
       "gender": {
-        "label": "लिंग",
-        "placeholder": "लिंग छान्नुहोस्",
-        "required": "लिंग अनिवार्य छ",
+        "label": "लिङ्ग",
+        "placeholder": "लिङ्ग चयन गर्नुहोस्",
         "options": {
           "male": "पुरुष",
           "female": "महिला",
           "other": "अन्य"
-        }
+        },
+        "required": "लिङ्ग आवश्यक छ।"
       },
       "wardNumber": {
         "label": "वडा नम्बर",
-        "placeholder": "वडा नम्बर",
-        "required": "वडा नम्बर अनिवार्य छ"
+        "placeholder": "वडा नम्बर प्रविष्ट गर्नुहोस्",
+        "required": "वडा नम्बर आवश्यक छ।"
       },
       "casteCode": {
-        "label": "जात कोड",
-        "placeholder": "जात कोड",
-        "required": "जात कोड अनिवार्य छ"
+        "label": "जाति कोड",
+        "placeholder": "जाति कोड प्रविष्ट गर्नुहोस्",
+        "required": "जाति कोड आवश्यक छ।"
       },
       "parentName": {
         "label": "अभिभावकको नाम",
-        "placeholder": "अभिभावकको नाम",
-        "required": "अभिभावकको नाम अनिवार्य छ"
+        "placeholder": "अभिभावकको नाम प्रविष्ट गर्नुहोस्",
+        "required": "अभिभावकको नाम आवश्यक छ।"
       },
       "tole": {
-        "label": "टोल",
-        "placeholder": "टोल",
-        "required": "टोल अनिवार्य छ"
+        "label": "टोल/गाउँ",
+        "placeholder": "टोल/गाउँ प्रविष्ट गर्नुहोस्",
+        "required": "टोल/गाउँ आवश्यक छ।"
       },
       "phoneNumber": {
         "label": "फोन नम्बर",
-        "placeholder": "फोन नम्बर"
+        "placeholder": "फोन नम्बर प्रविष्ट गर्नुहोस्",
+        "required": "फोन नम्बर आवश्यक छ।"
       },
       "birthDate": {
         "label": "जन्म मिति",
-        "required": "जन्म मिति अनिवार्य छ",
-        "clear_title": "मिति मेटाउनुहोस्"
-      },
-      "purnaKhop": {
-        "label": "पूर्ण खोप"
+        "clear_title": "मिति खाली गर्नुहोस्",
+        "required": "जन्म मिति आवश्यक छ।"
       }
     },
-    "age": "उमेर: {{months}} महिना ({{days}} दिन)"
-  },
-  "weightTracking": {
-    "title": "तौल ट्र्याकिंग",
-    "date_label": "मिति {{index}}",
-    "weight_label": "तौल (किलोग्राम)",
-    "add_button": "पहिलो तौल रेकर्ड थप्नुहोस्",
-    "remove_button_title": "तौल रेकर्ड हटाउनुहोस्",
-    "add_more_button_title": "अर्को तौल रेकर्ड थप्नुहोस्",
-    "errors": {
-      "weight_positive": "तौल सकारात्मक हुनुपर्छ",
-      "weight_too_large": "तौल धेरै ठूलो छ"
+    "age": "बच्चाको उमेर: {{months}} महिना, {{days}} दिन | लिङ्ग: {{gender}}",
+    "administered_by": {
+      "label": "व्यवस्थापक द्वारा",
+      "placeholder": "स्वास्थ्य कार्यकर्ता चयन गर्नुहोस्",
+      "required": "स्वास्थ्य कार्यकर्ता चयन आवश्यक छ।"
     }
   },
-  "vaccines": {
-    "title": "खोपहरू",
-    "dose_label": "मात्रा {{dose}}",
-    "recommended_at": {
-      "months": "{{value}} महिना",
-      "weeks": "{{value}} हप्ता",
-      "days": "{{value}} दिन"
+  "weightTracking": {
+    "title": "वजन ट्र्याकिङ",
+    "date_label": "मिति {{index}}",
+    "weight_label": "वजन (kg)",
+    "errors": {
+      "date_required": "मिति आवश्यक छ।",
+      "weight_positive": "वजन धनात्मक संख्या हुनुपर्छ।",
+      "weight_too_large": "वजन 50 kg भन्दा बढी हुन सक्दैन।"
     },
-    "not_eligible": "खोपको लागि उमेर पुगेको छैन",
-    "remarks": {
-      "label": "कैफियत",
-      "placeholder": "उदाहरण: बच्चालाई ज्वरो भयो..."
+    "remove_button_title": "वजन रेकर्ड हटाउनुहोस्",
+    "add_more_button_title": "थप वजन रेकर्ड थप्नुहोस्",
+    "add_button": "वजन रेकर्ड थप्नुहोस्"
+  },
+  "vaccine_section": {
+    "title": "खोप तालिका",
+    "age_gender": "बच्चाको उमेर: {{months}} महिना, {{days}} दिन | लिङ्ग: {{gender}}",
+    "total_vaccines": "कुल खोप",
+    "unavailable": {
+      "title": "खोप तालिका उपलब्ध छैन",
+      "description": "उपयुक्त खोप तालिका हेर्न कृपया जन्म मिति र लिङ्ग चयन गर्नुहोस्"
     },
-    "clear_date_title": "मिति मेटाउनुहोस्"
+    "tabs": {
+      "current": "हालको र छुटेको खोप ({{count}})",
+      "catch_up": "क्याच-अप खोप ({{count}})",
+      "not_applicable": "लागू नहुने ({{count}})"
+    },
+    "no_vaccines_in_category": "यस वर्गमा कुनै खोप छैन",
+    "all_up_to_date": {
+      "title": "सबै हालका खोपहरू अद्यावधिक छन्!",
+      "description": "यस उमेर समूहका लागि तत्काल खोपहरू आवश्यक छैनन्।"
+    }
+  },
+  "vaccine_card": {
+    "dose": "मात्रा {{dose}}",
+    "recommended_at": "सिफारिश गरिएको: ",
+    "months": "{{count}} महिना",
+    "weeks": "{{count}} हप्ता",
+    "years": "{{count}} वर्ष",
+    "days": "{{count}} दिन",
+    "status": {
+      "not_yet_eligible": "अझै योग्य छैन",
+      "due_now": "अहिले आवश्यक",
+      "overdue": "छुटेको",
+      "severely_overdue": "गम्भीर रूपमा छुटेको",
+      "accessible": "पहुँचयोग्य"
+    },
+    "booster": "बुस्टर",
+    "date_placeholder": "खोप मिति चयन गर्नुहोस्",
+    "clear_date_title": "मिति खाली गर्नुहोस्",
+    "unavailable_placeholder": "{{age}} मा उपलब्ध छ",
+    "remarks": "टिप्पणीहरू",
+    "remarks_placeholder": "पेशेवर टिप्पणीहरू थप्नुहोस्..."
   },
   "generalRemarks": {
-    "title": "सामान्य कैफियत",
-    "label": "अतिरिक्त जानकारी वा टिप्पणी (वैकल्पिक)",
-    "placeholder": "यहाँ कुनै विशेष कैफियत, अवलोकन, वा अन्य महत्वपूर्ण जानकारी लेख्नुहोस्...",
-    "optional_note": "यो क्षेत्र वैकल्पिक छ"
+    "title": "सामान्य टिप्पणीहरू",
+    "label": "टिप्पणीहरू",
+    "placeholder": "बच्चाको स्वास्थ्य वा खोप इतिहासबारे कुनै पनि सामान्य टिप्पणीहरू प्रविष्ट गर्नुहोस्...",
+    "optional_note": "यो खण्ड वैकल्पिक हो र अतिरिक्त टिप्पणीहरूका लागि प्रयोग गर्न सकिन्छ।"
   },
   "submitSection": {
-    "title": "तयार छ?",
-    "description": "सबै जानकारी जाँच गरेर सेभ गर्नुहोस्",
-    "reset_button": "रिसेट गर्नुहोस्",
-    "reset_confirm": "के तपाईं निश्चित हुनुहुन्छ? सबै डेटा हराउनेछ।",
-    "save_button": "डेटा सेभ गर्नुहोस्",
-    "saving": "सेभ हुँदैछ..."
-  },
-  "toast": {
-    "success": "बालबालिका डेटा सफलतापूर्वक सेभ भयो!",
-    "error": "डेटा सेभ गर्न असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।",
-    "validation_error": "कृपया सबै आवश्यक जानकारी भर्नुहोस्। ({{message}})"
+    "title": "सेभ गर्नुहोस् र सबमिट गर्नुहोस्",
+    "description": "सबै जानकारी प्रमाणित गरिसकेपछि, रेकर्ड सेभ गर्नुहोस्।",
+    "reset_confirm": "के तपाईं साँच्चै फारम रिसेट गर्न चाहनुहुन्छ? प्रविष्ट गरिएको सबै डाटा हराउनेछ।",
+    "reset_button": "फारम रिसेट गर्नुहोस्",
+    "saving": "सेभ हुँदैछ...",
+    "save_button": "सेभ गर्नुहोस् र सबमिट गर्नुहोस्"
   },
   "scrollToTop": {
-    "title": "माथि जानुहोस्"
+    "title": "शीर्षमा स्क्रोल गर्नुहोस्"
+  },
+  "toast": {
+    "success": "बच्चाको रेकर्ड सफलतापूर्वक थपियो!",
+    "error": "बच्चाको रेकर्ड थप्न असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।",
+    "validation_error": "प्रमाणीकरण असफल भयो: {{message}}"
   }
 }
