@@ -1,4 +1,3 @@
-
 import { prisma } from '../utils/prisma.js';
 
 export const getMe = (req, res) => {
@@ -19,7 +18,31 @@ export const getUsers = async (req, res) => {
 
     // Build the query options based on the `role` query parameter
     const whereClause = role ? { role: role.toLowerCase() } : {};
-    
+
+    const users = await prisma.user.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    // Return the list of users
+    return res.status(200).json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    return res.status(500).json({ error: 'Something went wrong.' });
+  }
+};
+export const getWardUsers = async (req, res) => {
+  try {
+    const { role } = req.query;
+    const wardId = req.user.wardId;
+
+    const whereClause = {
+      wardId: wardId,
+      ...(role && { role: role.toLowerCase() }),
+    };
     const users = await prisma.user.findMany({
       where: whereClause,
       select: {
@@ -36,56 +59,50 @@ export const getUsers = async (req, res) => {
   }
 };
 
-
 export const getUserProfile = async (req, res) => {
+  try {
+    // Validate request parameters
+    const userId = parseInt(req.params.userId);
 
-    try {
-        // Validate request parameters
-        const userId = parseInt(req.params.userId);
-
-        if (isNaN(userId)) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Invalid user ID provided.'
-            });
-        }
-
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
-                wardId: true,
-                // Removed the stats for children and vaccination records.
-            }
-        });
-
-        if (!user) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'User not found'
-            });
-        }
-
-        res.status(200).json({
-            status: 'success',
-            data: user
-        });
-
-    } catch (error) {
-        console.error('Error fetching user profile:', error);
-        // CastError for invalid IDs will be caught here.
-        res.status(500).json({
-            status: 'error',
-            message: 'Internal server error'
-        });
+    if (isNaN(userId)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid user ID provided.',
+      });
     }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        wardId: true,
+        // Removed the stats for children and vaccination records.
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found',
+      });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: user,
+    });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    // CastError for invalid IDs will be caught here.
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+    });
+  }
 };
-
-
-
 
 export const updateUserProfile = async (req, res) => {
   try {
@@ -96,7 +113,7 @@ export const updateUserProfile = async (req, res) => {
     if (!name || !email) {
       return res.status(400).json({
         status: 'error',
-        message: 'Name and email are required'
+        message: 'Name and email are required',
       });
     }
 
@@ -104,14 +121,14 @@ export const updateUserProfile = async (req, res) => {
     const existingUser = await prisma.user.findFirst({
       where: {
         email,
-        NOT: { id: userId }
-      }
+        NOT: { id: userId },
+      },
     });
 
     if (existingUser) {
       return res.status(400).json({
         status: 'error',
-        message: 'Email already in use'
+        message: 'Email already in use',
       });
     }
 
@@ -123,20 +140,20 @@ export const updateUserProfile = async (req, res) => {
         name: true,
         email: true,
         role: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     });
 
     res.status(200).json({
       status: 'success',
-      data: updatedUser
+      data: updatedUser,
     });
-
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Internal server error'
+      message: 'Internal server error',
     });
   }
 };
+

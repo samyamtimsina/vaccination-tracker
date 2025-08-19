@@ -12,6 +12,7 @@ import AddMother from './pages/AddMother';
 import ViewChildren from './pages/ViewChildren';
 import ViewMothers from './pages/ViewMothers.jsx';
 import Profile from './pages/Profile.jsx';
+import Graph from './pages/Graph.jsx';
 import Layout from './components/Layout.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import PrintCardWrapper from './components/printdata.jsx';
@@ -57,6 +58,7 @@ function App() {
                   <Route path="/view-children" element={<ViewChildren />} />
                   <Route path="/view-mothers" element={<ViewMothers />} />
                   <Route path="/profile" element={<Profile />} />
+                  <Route path="/graph" element={<Graph/>}/>
                   <Route path="/print" element={<PrintCardWrapper />} />
                 </Route>
 

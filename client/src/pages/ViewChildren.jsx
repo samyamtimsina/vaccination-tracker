@@ -32,7 +32,7 @@ import { adToBs } from '@sbmdkl/nepali-date-converter';
 import VaccinationCardOverlay from '../components/print';
 import { useChildContext } from '../context/ChildContext';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 
 export default function AllChildren() {
 const navigate = useNavigate();
@@ -96,6 +96,12 @@ const navigate = useNavigate();
     return t('childDetails.vaccinationRecords.recommendedAt.unknown');
   };
 
+   const handleButtonClick = () => {
+    console.log('selectedChild:', selectedChild);
+  navigate('/graph', { state: { childrenData: selectedChild } });
+  };
+
+
   const getVaccineTypeLabel = (type) => {
     switch (type) {
       case 'routine':
@@ -108,6 +114,7 @@ const navigate = useNavigate();
         return { label: t('childDetails.vaccinationRecords.vaccineType.unknown'), class: 'bg-gray-100 text-gray-800' };
     }
   };
+
 
   const getOverallVaccinationStats = (child) => {
     const givenVaccinations = child.vaccinations || [];
@@ -467,9 +474,11 @@ const navigate = useNavigate();
                 {selectedChild.weightRecords && selectedChild.weightRecords.length > 0 && (
                   <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                     <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
+
                       <FaWeight className="text-primary" />
                       <span>{t('childDetails.weightTracking.title')}</span>
                     </h3>
+
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {selectedChild.weightRecords
                         .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -491,6 +500,7 @@ const navigate = useNavigate();
                                 <div>{t('childCard.birthDateAD')}: {safeFormatDate(record.date)}</div>
                               </div>
                             </div>
+
                             <div className="flex items-center justify-between text-xs text-base-content/60">
                               <div className="flex items-center space-x-1">
   <FaUserMd />
@@ -504,9 +514,13 @@ const navigate = useNavigate();
                               <div className="flex items-center space-x-1">
                                 <FaClock />
                                 <span>{t('childDetails.weightTracking.recordedOn')} {safeFormatDate(record.createdAt)}</span>
+
+                    <button className='btn btn-primary' onClick={handleButtonClick}>Show graph</button>
                               </div>
                             </div>
+
                           </div>
+
                         ))}
                     </div>
                   </div>
