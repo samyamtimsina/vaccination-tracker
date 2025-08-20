@@ -1,6 +1,7 @@
 import { prisma } from '../utils/prisma.js';
 import { vaccineSchedule } from '../utils/vaccineSchedule.js';
 import { createChildSchema } from '../schemas/childSchema.js';
+import { updateChildSchema } from '../schemas/childSchema.js';
 import {
   toMonths,
   mapVaccineNameToEnum,
@@ -50,8 +51,8 @@ function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
 // --- UPDATED: createChild controller
 // It now expects administeredById for vaccines and weights in the request body
 export const createChild = async (req, res) => {
-  console.log('req.body create child',req.body)
-  console.log('req.body vaccines',req.body.vaccines)
+  console.log('req.body create child', req.body)
+  console.log('req.body vaccines', req.body.vaccines)
   try {
     const validationResult = createChildSchema.safeParse(req.body);
     console.log('Validation result:', validationResult);
@@ -177,9 +178,6 @@ export const updateChildPurnaKhop = async (req, res) => {
   }
 };
 
-// --------------------------------------------------
-// UPDATED: All `read` controllers to include new relations
-// --------------------------------------------------
 
 // Controller to get all children, including their vaccination records
 export const getAllChildren = async (req, res) => {
@@ -253,13 +251,15 @@ export const getWardChildren = async (req, res) => {
 };
 export const getChild = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id= req.params.id;
+    const parsedSewaDartaNumber = parseInt(id, 10);
+    console.log('getChild id:', id);
     if (!id) {
       return res.status(400).json({ error: 'Child ID is required' });
     }
     const child = await prisma.child.findUnique({
       where: {
-        id: id,
+        sewaDartaNumber: parsedSewaDartaNumber,
       },
       include: {
         createdBy: { select: { id: true, name: true } },
@@ -286,6 +286,124 @@ export const getChild = async (req, res) => {
     console.error('Error fetching single child:', error);
     res.status(500).json({
       error: 'Failed to retrieve child data',
+      details: error.message,
+    });
+  }
+};
+// A validation schema is required for updates, similar to create.
+// Since we don't have one, we will use a hypothetical updateChildSchema.
+// You'll need to create this in your schemas/childSchema.js file.
+// It should be a Zod schema that makes all fields optional as they may not
+export const updateChild = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sewaDartaNumber = parseInt(id, 10);
+    const { 
+      vaccines, 
+      weightRecords, 
+      administeredById, 
+      firstName,
+      lastName,
+      ...restUpdateData 
+    } = req.body;
+
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const updatedChild = await prisma.$transaction(async (tx) => {
+      const existingChild = await tx.child.findUnique({
+        where: { sewaDartaNumber },
+      });
+
+      if (!existingChild) {
+        throw new Error('Child not found');
+      }
+
+      // 1. Update basic child info
+      const child = await tx.child.update({
+        where: { sewaDartaNumber },
+        data: {
+          ...restUpdateData,
+          fullName: `${firstName || ''} ${lastName || ''}`.trim(),
+          birthDate: parseBsDateString(restUpdateData.birthDate),
+        },
+      });
+
+      // 2. Delete all existing vaccination records
+      await tx.vaccinationRecord.deleteMany({
+        where: { citizenId: child.id }
+      });
+
+      // 3. Create new vaccination records if provided
+      if (vaccines) {
+        const vaccinationCreateData = prepareVaccinationCreateData(
+          vaccines,
+          req.user,
+          administeredById
+        );
+
+        if (vaccinationCreateData.length > 0) {
+          await tx.vaccinationRecord.createMany({
+            data: vaccinationCreateData.map(v => ({
+              ...v,
+              citizenId: child.id,
+            })),
+          });
+        }
+      }
+
+      // 4. Delete all existing weight records
+      await tx.weightRecord.deleteMany({
+        where: { childId: child.id }
+      });
+
+      // 5. Create new weight records if provided
+      if (weightRecords?.length) {
+        const validWeightRecords = weightRecords
+          .filter(w => w.date && w.weight) // Only process records with both date and weight
+          .map(w => ({
+            childId: child.id,
+            weight: parseFloat(w.weight),
+            date: parseBsDateString(w.date),
+            createdById: req.user.id,
+            administeredById: administeredById,
+          }));
+
+        if (validWeightRecords.length > 0) {
+          await tx.weightRecord.createMany({
+            data: validWeightRecords
+          });
+        }
+      }
+
+      // 6. Return updated child with all relations
+      return await tx.child.findUnique({
+        where: { sewaDartaNumber },
+        include: {
+          createdBy: { select: { id: true, name: true } },
+          verifiedBy: { select: { id: true, name: true } },
+          vaccinations: {
+            include: {
+              createdBy: { select: { id: true, name: true } },
+              administeredBy: { select: { id: true, name: true } },
+            },
+          },
+          weightRecords: {
+            include: {
+              createdBy: { select: { id: true, name: true } },
+              administeredBy: { select: { id: true, name: true } },
+            },
+          },
+        },
+      });
+    });
+
+    res.status(200).json(updatedChild);
+  } catch (error) {
+    console.error('Child update error:', error);
+    res.status(500).json({
+      error: 'Child update failed',
       details: error.message,
     });
   }

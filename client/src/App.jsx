@@ -20,6 +20,7 @@ import Navbar from './components/NavBar.jsx';
 import { Outlet } from 'react-router-dom';
 import "./i18n";
 import UserProfile from './pages/userProfile.jsx';
+import EditChild from './pages/EditChild.jsx';
 
 // A simple layout component that includes the navbar
 const MainLayout = () => {
@@ -54,6 +55,7 @@ function App() {
  <Route path="/users/:userId" element={<UserProfile />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/add-child" element={<AddChild />} />
+                  <Route path="/edit-child" element={<EditChild/>} />
                   <Route path="/add-mother" element={<AddMother />} />
                   <Route path="/view-children" element={<ViewChildren />} />
                   <Route path="/view-mothers" element={<ViewMothers />} />

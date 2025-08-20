@@ -6,6 +6,7 @@ import {
   getAllChildren,
   getChild,
   getWardChildren,
+  updateChild
   // generateMockData, // Import the new function
 } from '../controllers/childController.js';
 
@@ -14,6 +15,15 @@ import { authenticate, authorize } from '../middlewares/auth.js';
 
 const router = express.Router();
 
+router.get(
+  '/ward',
+  authenticate,
+  authorize('admin', 'ward_officer'),
+  getWardChildren,
+);
+
+router.get('/:id', authenticate, authorize('admin', 'ward_officer'), getChild);
+router.put('/:id', authenticate, authorize('admin', 'ward_officer'), updateChild);
 //get all children
 router.get(
   '/',
@@ -23,15 +33,8 @@ router.get(
 );
 
 // Get all children belonging to the authenticated ward officer's ward
-router.get(
-  '/ward',
-  authenticate,
-  authorize('admin', 'ward_officer'),
-  getWardChildren,
-);
 
 //get specific child by ID
-router.get('/:id', authenticate, authorize('admin', 'ward_officer'), getChild);
 
 // Route to create one or more new child records
 router.post('/', authenticate, authorize('admin', 'ward_officer'), createChild);

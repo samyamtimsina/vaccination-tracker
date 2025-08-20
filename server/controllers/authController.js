@@ -24,7 +24,18 @@ export const register = async (req, res) => {
 
   const { name, email, password, wardId } = validationResult.data;
 
+
   try {
+const existingUser = await prisma.user.findUnique({
+      where: {
+        email: email,
+      },
+    });
+
+    // Step 2: If a user is found, return a 409 error
+    if (existingUser) {
+      return res.status(409).json({ error: 'This email is already in use.' });
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await prisma.user.create({
@@ -46,13 +57,6 @@ export const register = async (req, res) => {
       wardId: newUser.wardId,
     });
   } catch (error) {
-    // Handle specific Prisma unique constraint error for email
-    if (
-      error instanceof prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002'
-    ) {
-      return res.status(409).json({ error: 'This email is already in use.' });
-    }
 
     console.error('Registration failed:', error);
     return res.status(500).json({
