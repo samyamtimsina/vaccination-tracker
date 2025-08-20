@@ -251,36 +251,68 @@ export const getWardChildren = async (req, res) => {
 };
 export const getChild = async (req, res) => {
   try {
-    const id= req.params.id;
-    const parsedSewaDartaNumber = parseInt(id, 10);
-    console.log('getChild id:', id);
-    if (!id) {
-      return res.status(400).json({ error: 'Child ID is required' });
+    const searchTerm = req.params.id;
+
+    // Check if searchTerm is a number (sewa darta number)
+    const isNumber = /^\d+$/.test(searchTerm);
+
+    let child;
+    if (isNumber) {
+      // Search by sewa darta number
+      const parsedSewaDartaNumber = parseInt(searchTerm, 10);
+      child = await prisma.child.findUnique({
+        where: {
+          sewaDartaNumber: parsedSewaDartaNumber,
+        },
+        include: {
+          createdBy: { select: { id: true, name: true } },
+          verifiedBy: { select: { id: true, name: true } },
+          vaccinations: {
+            include: {
+              createdBy: { select: { id: true, name: true } },
+              administeredBy: { select: { id: true, name: true } },
+            },
+          },
+          weightRecords: {
+            include: {
+              createdBy: { select: { id: true, name: true } },
+              administeredBy: { select: { id: true, name: true } },
+            },
+          },
+        },
+      });
+    } else {
+      // Search by name
+      child = await prisma.child.findFirst({
+        where: {
+          fullName: {
+            contains: searchTerm,
+            mode: 'insensitive', // Case-insensitive search
+          },
+        },
+        include: {
+          createdBy: { select: { id: true, name: true } },
+          verifiedBy: { select: { id: true, name: true } },
+          vaccinations: {
+            include: {
+              createdBy: { select: { id: true, name: true } },
+              administeredBy: { select: { id: true, name: true } },
+            },
+          },
+          weightRecords: {
+            include: {
+              createdBy: { select: { id: true, name: true } },
+              administeredBy: { select: { id: true, name: true } },
+            },
+          },
+        },
+      });
     }
-    const child = await prisma.child.findUnique({
-      where: {
-        sewaDartaNumber: parsedSewaDartaNumber,
-      },
-      include: {
-        createdBy: { select: { id: true, name: true } },
-        verifiedBy: { select: { id: true, name: true } }, // NEW
-        vaccinations: {
-          include: {
-            createdBy: { select: { id: true, name: true } },
-            administeredBy: { select: { id: true, name: true } }, // NEW
-          },
-        },
-        weightRecords: {
-          include: {
-            createdBy: { select: { id: true, name: true } },
-            administeredBy: { select: { id: true, name: true } }, // NEW
-          },
-        },
-      },
-    });
+
     if (!child) {
       return res.status(404).json({ error: 'Child not found' });
     }
+
     res.status(200).json(child);
   } catch (error) {
     console.error('Error fetching single child:', error);
@@ -298,13 +330,13 @@ export const updateChild = async (req, res) => {
   try {
     const { id } = req.params;
     const sewaDartaNumber = parseInt(id, 10);
-    const { 
-      vaccines, 
-      weightRecords, 
-      administeredById, 
+    const {
+      vaccines,
+      weightRecords,
+      administeredById,
       firstName,
       lastName,
-      ...restUpdateData 
+      ...restUpdateData
     } = req.body;
 
     if (!req.user?.id) {

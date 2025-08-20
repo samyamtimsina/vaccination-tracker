@@ -33,6 +33,7 @@ import { calculateAge } from '../../helpers/calculateAge.jsx';
 import { getFirstErrorMessage } from '../../helpers/getFirstErrorMessage.jsx';
 import { useTranslation } from 'react-i18next';
 import { adToBs, bsToAd } from '@sbmdkl/nepali-date-converter';
+import ChildSearch from '../components/ChildSearch'
 
 // Add this helper function at the top
 const safeFormatDateYYMMDD = (dateString) => {
@@ -168,25 +169,24 @@ const VaccineCard = ({
                 dose.doseInfo.recommendedAtMonths
                   ? t('vaccine_card.months', { count: dose.doseInfo.recommendedAtMonths })
                   : dose.doseInfo.recommendedAtWeeks
-                  ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
-                  : dose.doseInfo.recommendedAtYears
-                  ? t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
-                  : t('vaccine_card.days', { count: dose.doseInfo.recommendedAtDays })
+                    ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
+                    : dose.doseInfo.recommendedAtYears
+                      ? t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
+                      : t('vaccine_card.days', { count: dose.doseInfo.recommendedAtDays })
               }
             </p>
           </div>
           <div className="flex flex-col items-end space-y-1">
-            <span className={`badge ${
-              dose.status === 'SEVERELY_OVERDUE'
-                ? 'badge-error'
-                : dose.status === 'OVERDUE'
+            <span className={`badge ${dose.status === 'SEVERELY_OVERDUE'
+              ? 'badge-error'
+              : dose.status === 'OVERDUE'
                 ? 'badge-warning'
                 : dose.status === 'DUE_NOW'
-                ? 'badge-info'
-                : dose.status === 'ACCESSIBLE'
-                ? 'badge-success'
-                : 'badge-neutral'
-            } text-xs`}>
+                  ? 'badge-info'
+                  : dose.status === 'ACCESSIBLE'
+                    ? 'badge-success'
+                    : 'badge-neutral'
+              } text-xs`}>
               {t(`vaccine_card.status.${dose.status.toLowerCase()}`)}
             </span>
             {dose.doseType === 'booster' && (
@@ -239,8 +239,8 @@ const VaccineCard = ({
                         age: dose.doseInfo.recommendedAtMonths
                           ? t('vaccine_card.months', { count: dose.doseInfo.recommendedAtMonths })
                           : dose.doseInfo.recommendedAtWeeks
-                          ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
-                          : t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
+                            ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
+                            : t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
                       })
                     }
                   />
@@ -262,9 +262,8 @@ const VaccineCard = ({
                 <FaClipboardList className="w-3 h-3 mr-1" />
                 {t('vaccine_card.remarks')}
               </span>
-              <span className={`text-xs transform transition-transform ${
-                showRemark ? 'rotate-180' : ''
-              }`}>
+              <span className={`text-xs transform transition-transform ${showRemark ? 'rotate-180' : ''
+                }`}>
                 ▼
               </span>
             </button>
@@ -373,6 +372,8 @@ export default function EditChild() {
   const { t, i18n } = useTranslation('addChild'); // Reuse translation namespace, adjust if needed
   const { theme } = useTheme();
   const { updateChildInState } = useChildContext(); // Assume context has update method
+  const { childrenData, loading, fetchChildren } = useChildContext();
+  const MOCK_CURRENT_USER_ID = 2;
   const {
     register,
     handleSubmit,
@@ -413,6 +414,22 @@ export default function EditChild() {
   const [sewaDartaNumber, setSewaDartaNumber] = useState('');
   const [fetchedChild, setFetchedChild] = useState(null);
 
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showResults, setShowResults] = useState(false);
+
+  // New states for enhanced search
+  const [showSearch, setShowSearch] = useState(true);
+  const [selectedChild, setSelectedChild] = useState(null);
+  const [filters, setFilters] = useState({
+    searchText: '',
+    wardNumber: '',
+    createdByMe: false,
+    gender: '',
+    isComplete: false
+  });
+
   // Fetch health workers (same)
   useEffect(() => {
     const fetchHealthWorkers = async () => {
@@ -432,6 +449,11 @@ export default function EditChild() {
     name: 'weightRecords',
   });
 
+  // Fetch children data on component mount
+  useEffect(() => {
+    fetchChildren();
+  }, [fetchChildren]);
+
   const toggleRemarks = (vaccineName, doseIndex) => {
     const key = `${vaccineName}-${doseIndex}`;
     setShowRemarks((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -444,59 +466,144 @@ export default function EditChild() {
     }));
   };
 
-  const handleSearch = async () => {
-    if (!sewaDartaNumber) {
-      toast.error(t('search.error_empty'));
+  const handleSearch = () => {
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
       return;
     }
-    try {
-      const res = await axiosClient.get(`/api/child/${sewaDartaNumber}`);
-      const child = res.data;
-      setFetchedChild(child);
 
-      // Update form population with proper date conversion
-      const [firstName, ...last] = child.fullName.split(' ');
-      setValue('firstName', firstName);
-      setValue('lastName', last.join(' '));
-      setValue('wardNumber', child.wardNumber.toString());
-      setValue('casteCode', child.casteCode.toString());
-      setValue('gender', child.gender);
-      setValue('parentName', child.parentName);
-      setValue('tole', child.tole);
-      setValue('phoneNumber', child.phoneNumber);
-      setValue('birthDate', adToBs(safeFormatDateYYMMDD(child.birthDate)));
-      setValue('isFromOtherMunicipality', child.isFromOtherMunicipality);
-      setValue('remarks', child.remarks);
-      setValue('administeredById', child.createdById.toString());
+    const results = childrenData.filter(child =>
+      child.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      child.sewaDartaNumber.toString().includes(searchTerm) ||
+      (child.phoneNumber && child.phoneNumber.includes(searchTerm))
+    );
+    setSearchResults(results);
+  };
 
-      // Update weight records with proper date conversion
-      const weightRecords = child.weightRecords.map(rec => ({
-        date: adToBs(safeFormatDateYYMMDD(rec.date)),
-        weight: rec.weight.toString()
-      }));
-      replace(weightRecords.length > 0 ? weightRecords : [{ date: '', weight: '' }]);
-
-      // Update vaccines with proper date conversion
-      child.vaccinations.forEach(vac => {
-        const vaccineName = vac.vaccineType;
-        const doses = vaccineSchedule[vaccineName];
-        if (doses) {
-          const index = doses.findIndex(d => d.dose === vac.doseNumber);
-          if (index !== -1) {
-            setValue(
-              `vaccines.${vaccineName}.${index}.date`, 
-              adToBs(safeFormatDateYYMMDD(vac.dateGiven))
-            );
-            setValue(`vaccines.${vaccineName}.${index}.remarks`, vac.remarks);
-          }
-        }
-      });
-
-      toast.success(t('search.success'));
-    } catch (err) {
-      console.error('Failed to fetch child:', err);
-      toast.error(t('search.error_not_found'));
+  const handleSearchInputChange = (value) => {
+    setSearchTerm(value);
+    if (value.length >= 2) { // Only search if 2 or more characters
+      const results = childrenData.filter(child =>
+        child.fullName.toLowerCase().includes(value.toLowerCase()) ||
+        child.sewaDartaNumber.toString().includes(value) ||
+        (child.phoneNumber && child.phoneNumber.includes(value))
+      );
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
     }
+  };
+
+  const handleSearchButtonClick = () => {
+    setShowResults(true);
+    handleSearch();
+  };
+
+  // Add this function to handle child selection
+  const handleChildSelect = (child) => {
+    setFetchedChild(child);
+    setSewaDartaNumber(child.sewaDartaNumber);
+
+    // Update form with selected child's data
+    const [firstName, ...last] = child.fullName.split(' ');
+    setValue('firstName', firstName);
+    setValue('lastName', last.join(' '));
+    setValue('wardNumber', child.wardNumber.toString());
+    setValue('casteCode', child.casteCode.toString());
+    setValue('gender', child.gender);
+    setValue('parentName', child.parentName);
+    setValue('tole', child.tole);
+    setValue('phoneNumber', child.phoneNumber || '');
+    setValue('birthDate', adToBs(safeFormatDateYYMMDD(child.birthDate)));
+    setValue('isFromOtherMunicipality', child.isFromOtherMunicipality);
+    setValue('remarks', child.remarks || '');
+    setValue('administeredById', child.createdById.toString());
+
+    // Update weight records
+    const weightRecords = child.weightRecords.map(rec => ({
+      date: adToBs(safeFormatDateYYMMDD(rec.date)),
+      weight: rec.weight.toString()
+    }));
+    replace(weightRecords.length > 0 ? weightRecords : [{ date: '', weight: '' }]);
+
+    // Update vaccines
+    child.vaccinations.forEach(vac => {
+      const vaccineName = vac.vaccineType;
+      const doses = vaccineSchedule[vaccineName];
+      if (doses) {
+        const index = doses.findIndex(d => d.dose === vac.doseNumber);
+        if (index !== -1) {
+          setValue(
+            `vaccines.${vaccineName}.${index}.date`,
+            adToBs(safeFormatDateYYMMDD(vac.dateGiven))
+          );
+          setValue(`vaccines.${vaccineName}.${index}.remarks`, vac.remarks || '');
+        }
+      }
+    });
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
+  };
+
+  const handleSearchClear = () => {
+    setSearchTerm('');
+    setSearchResults([]);
+    setShowResults(false);
+  };
+
+  const handleSearchFocus = () => {
+    if (searchTerm) {
+      setShowResults(true);
+    }
+  };
+
+  const handleSearchBlur = () => {
+    setTimeout(() => {
+      setShowResults(false);
+    }, 100);
+  };
+
+  const handleSearchResultMouseEnter = (index) => {
+    const results = document.querySelectorAll('.search-result-item');
+    if (results[index]) {
+      results[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  };
+
+  const handleSearchResultMouseLeave = () => {
+    const results = document.querySelectorAll('.search-result-item');
+    results.forEach(result => {
+      result.classList.remove('bg-base-200');
+    });
+  };
+
+  const handleSearchResultClick = (child) => {
+    handleChildSelect(child);
+  };
+
+  const handleSearchResultKeyDown = (e, child) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleChildSelect(child);
+    }
+  };
+
+  const handleSearchResultTouchStart = (e) => {
+    e.preventDefault();
+  };
+
+  const handleSearchResultTouchEnd = (e, child) => {
+    e.preventDefault();
+    handleChildSelect(child);
+  };
+
+  const handleSearchResultTouchMove = (e) => {
+    e.preventDefault();
   };
 
   const onSubmit = async (data) => {
@@ -506,48 +613,35 @@ export default function EditChild() {
     }
 
     try {
-      // Filter and format weight records - only include records with both date and weight
-      const filteredWeightRecords = data.weightRecords
-        .filter(record => record.date && record.weight)
-        .map(rec => ({
-          date: rec.date,
-          weight: parseFloat(rec.weight)
-        }));
+      const filteredWeightRecords = data.weightRecords.filter(
+        (record) => record.date && record.weight,
+      );
 
-      // Filter and format vaccines - only include doses with dates
       const filteredVaccines = {};
       Object.entries(data.vaccines).forEach(([vaccineName, doses]) => {
-        const validDoses = doses
-          .filter(dose => dose.date) // Only include doses with dates
-          .map((dose, index) => ({
-            date: dose.date,
-            remarks: dose.remarks || '',
-            doseNumber: index + 1,
-            type: 'routine'
-          }));
-
-        if (validDoses.length > 0) {
-          filteredVaccines[vaccineName] = validDoses;
+        const administeredDoses = [];
+        doses.forEach((dose, index) => {
+          if (dose.date) {
+            const scheduleDose = vaccineSchedule[vaccineName][index];
+            administeredDoses.push({
+              ...dose,
+              doseNumber: scheduleDose.dose,
+              type: scheduleDose.isBooster ? 'booster' : 'current'
+            });
+          }
+        });
+        if (administeredDoses.length > 0) {
+          filteredVaccines[vaccineName] = administeredDoses;
         }
       });
 
       const payload = {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        parentName: data.parentName,
-        tole: data.tole,
-        wardNumber: parseInt(data.wardNumber),
-        casteCode: parseInt(data.casteCode),
-        birthDate: data.birthDate,
-        isFromOtherMunicipality: data.isFromOtherMunicipality,
-        gender: data.gender,
-        phoneNumber: data.phoneNumber || '',
-        remarks: data.remarks || '',
-        administeredById: parseInt(data.administeredById),
+        ...data,
         vaccines: filteredVaccines,
-        weightRecords: filteredWeightRecords
+        weightRecords: filteredWeightRecords,
+        administeredById: parseInt(data.administeredById),
       };
-
+console.log('sewadartanumber', sewaDartaNumber);
       const res = await axiosClient.put(`/api/child/${sewaDartaNumber}`, payload);
       updateChildInState(res.data);
       toast.success(t('toast.update_success'));
@@ -577,6 +671,37 @@ export default function EditChild() {
   }, [age, gender, birthDate]);
 
   const totalVaccines = Object.values(categorizedVaccines).reduce((sum, cat) => sum + cat.count, 0);
+
+  // Define the missing filterChildren function here
+  const filterChildren = () => {
+    if (!childrenData) return [];
+
+    return childrenData.filter(child => {
+      // Filter by searchText
+      const matchesSearchText = !filters.searchText ||
+        child.fullName.toLowerCase().includes(filters.searchText.toLowerCase()) ||
+        child.sewaDartaNumber.toString().includes(filters.searchText) ||
+        (child.phoneNumber && child.phoneNumber.includes(filters.searchText));
+
+      // Filter by wardNumber
+      const matchesWard = !filters.wardNumber ||
+        child.wardNumber.toString() === filters.wardNumber;
+
+      // Filter by gender
+      const matchesGender = !filters.gender ||
+        child.gender === filters.gender;
+
+      // Filter by createdByMe
+      const matchesCreatedByMe = !filters.createdByMe ||
+        child.createdById === MOCK_CURRENT_USER_ID;
+
+      // Filter by isComplete
+      const matchesIsComplete = !filters.isComplete ||
+        (child.vaccinations.length >= Object.keys(vaccineSchedule).length);
+
+      return matchesSearchText && matchesWard && matchesGender && matchesCreatedByMe && matchesIsComplete;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -612,42 +737,183 @@ export default function EditChild() {
         </div>
       </div>
 
-      {/* Search Section */}
+      {/* Enhanced Search Section */}
       <div className="max-w-6xl mx-auto px-6 py-8">
         <div className="bg-base-100 shadow-sm rounded-xl border border-base-300 p-8 mb-8">
-          <div className="flex items-center mb-6">
-            <FaSearch className="text-primary text-xl mr-3" />
-            <h2 className="text-xl font-medium text-base-content">
-              {t('search.title')} {/* Add translation for search */}
-            </h2>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <FaSearch className="text-primary text-xl mr-3" />
+              <h2 className="text-xl font-medium text-base-content">
+                बच्चाको खोजी
+              </h2>
+            </div>
           </div>
-          <div className="flex gap-4">
-            <input
-              type="number"
-              value={sewaDartaNumber}
-              onChange={(e) => setSewaDartaNumber(e.target.value)}
-              className="input input-bordered w-full max-w-xs"
-              placeholder={t('search.placeholder')}
-            />
-            <button
-              type="button"
-              onClick={handleSearch}
-              className="btn btn-primary"
-            >
-              <FaSearch className="mr-2" />
-              {t('search.button')}
-            </button>
-          </div>
-        </div>
 
-        {/* Main Form (only show if fetched) */}
-        {fetchedChild && (
+          {loading ? (
+            <div className="text-center py-8">
+              <span className="loading loading-spinner loading-lg"></span>
+              <p className="mt-2 text-base-content/70">डाटा लोड हुँदैछ...</p>
+            </div>
+          ) : (
+            <>
+              {/* Search Input */}
+              <div className="form-control w-full mb-6">
+                <label className="label">
+                  <span className="label-text font-medium">नाम, सेवा दर्ता नं, वा फोन नम्बर</span>
+                </label>
+                <div className="input-group">
+                  <input
+                    type="text"
+                    value={filters.searchText}
+                    onChange={(e) => setFilters(prev => ({
+                      ...prev,
+                      searchText: e.target.value
+                    }))}
+                    className="input input-bordered w-full"
+                    placeholder="खोज्नुहोस्..."
+                  />
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => handleSearch()}
+                  >
+                    <FaSearch className="mr-2" />
+                    खोज्नुहोस्
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                {/* Ward Filter */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">वडा नं.</span>
+                  </label>
+                  <select
+                    value={filters.wardNumber}
+                    onChange={(e) => setFilters(prev => ({
+                      ...prev,
+                      wardNumber: e.target.value
+                    }))}
+                    className="select select-bordered w-full"
+                  >
+                    <option value="">सबै वडा</option>
+                    {[...Array(15)].map((_, i) => (
+                      <option key={i + 1} value={i + 1}>वडा नं. {i + 1}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Gender Filter */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">लिङ्ग</span>
+                  </label>
+                  <select
+                    value={filters.gender}
+                    onChange={(e) => setFilters(prev => ({
+                      ...prev,
+                      gender: e.target.value
+                    }))}
+                    className="select select-bordered w-full"
+                  >
+                    <option value="">सबै</option>
+                    <option value="MALE">छात्र</option>
+                    <option value="FEMALE">छात्रा</option>
+                    <option value="OTHER">अन्य</option>
+                  </select>
+                </div>
+
+                {/* Created By Me Filter */}
+                <div className="form-control">
+                  <label className="label cursor-pointer justify-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={filters.createdByMe}
+                      onChange={(e) => setFilters(prev => ({
+                        ...prev,
+                        createdByMe: e.target.checked
+                      }))}
+                      className="checkbox checkbox-primary"
+                    />
+                    <span className="label-text">मैले दर्ता गरेको</span>
+                  </label>
+                </div>
+
+                {/* Complete Vaccination Filter */}
+                <div className="form-control">
+                  <label className="label cursor-pointer justify-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={filters.isComplete}
+                      onChange={(e) => setFilters(prev => ({
+                        ...prev,
+                        isComplete: e.target.checked
+                      }))}
+                      className="checkbox checkbox-primary"
+                    />
+                    <span className="label-text">पूर्ण खोप लगाएको</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Results Table */}
+              <div className="overflow-x-auto">
+                <table className="table table-zebra w-full">
+                  <thead>
+                    <tr>
+                      <th>सेवा दर्ता नं.</th>
+                      <th>नाम</th>
+                      <th>वडा नं.</th>
+                      <th>लिङ्ग</th>
+                      <th>जन्म मिति</th>
+                      <th>कार्य</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filterChildren().map(child => (
+                      <tr key={child.id}>
+                        <td>{child.sewaDartaNumber}</td>
+                        <td>{child.fullName}</td>
+                        <td>{child.wardNumber}</td>
+                        <td>
+                          {child.gender === 'MALE' ? 'छात्र' :
+                            child.gender === 'FEMALE' ? 'छात्रा' : 'अन्य'}
+                        </td>
+                        <td>{adToBs(safeFormatDateYYMMDD(child.birthDate))}</td>
+                        <td>
+                          <button
+                            onClick={() => handleChildSelect(child)}
+                            className="btn btn-primary btn-sm"
+                          >
+                            छान्नुहोस्
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {filterChildren().length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-base-content/70">कुनै नतिजा फेला परेन</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Main Form (only show if fetched) */}
+      {fetchedChild && (
+        <div className="max-w-6xl mx-auto px-6 py-8">
           <div className="bg-base-100 shadow-sm rounded-xl border border-base-300 min-w-[20rem]">
             <form
               onSubmit={handleSubmit(onSubmit, onErrors)}
               className="p-8 space-y-12"
             >
-              {/* Personal Information (same, adjusted titles) */}
+              {/* Personal Information */}
               <div>
                 <div className="flex items-center mb-8">
                   <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mr-3">
@@ -933,7 +1199,7 @@ export default function EditChild() {
                 </div>
               </div>
 
-              {/* Weight Tracking (same) */}
+              {/* Weight Tracking */}
               <div className="border-t border-base-300 pt-12">
                 <div className="flex items-center mb-8">
                   <div className="w-8 h-8 bg-warning/10 rounded-lg flex items-center justify-center mr-3">
@@ -1048,7 +1314,7 @@ export default function EditChild() {
                 </div>
               </div>
 
-              {/* Enhanced Vaccines Section (same) */}
+              {/* Enhanced Vaccines Section */}
               <div className="border-t border-base-300 pt-12">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center">
@@ -1089,7 +1355,7 @@ export default function EditChild() {
 
                 {/* Vaccine Tabs */}
                 {birthDate && gender && (
-                  <>
+                    <>
                     <div className="tabs tabs-boxed mb-6">
                       {Object.entries(categorizedVaccines).map(([sectionKey, sectionData]) => {
                         if (sectionData.count > 0 || sectionKey === 'NOT_APPLICABLE') {
@@ -1127,7 +1393,7 @@ export default function EditChild() {
                         />
                       )
                     ))}
-                  </>
+                    </>
                 )}
 
 
@@ -1179,10 +1445,10 @@ export default function EditChild() {
                 <div className="flex flex-col sm:flex-row gap-6 justify-between items-center">
                   <div>
                     <h3 className="text-lg font-medium text-base-content">
-                      {t('submitSection.edit_title')} {/* Adjusted */}
+                      {t('submitSection.title')}
                     </h3>
                     <p className="text-base text-base-content/70">
-                      {t('submitSection.edit_description')} {/* Adjusted */}
+                      {t('submitSection.description')}
                     </p>
                   </div>
 
@@ -1221,7 +1487,7 @@ export default function EditChild() {
 
                     <button
                       type="submit"
-                      disabled={isSubmitting || !fetchedChild}
+                      disabled={isSubmitting}
                       className={`btn btn-primary ${isSubmitting ? 'loading' : ''}`}
                     >
                       {isSubmitting ? (
@@ -1232,7 +1498,7 @@ export default function EditChild() {
                       ) : (
                         <>
                           <svg
-                            className="w-5 h-5 mr-2"
+                           className="w-5 h-5 mr-2"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -1244,7 +1510,7 @@ export default function EditChild() {
                               d="M5 13l4 4L19 7"
                             />
                           </svg>
-                          {t('submitSection.update_button')} {/* Adjusted */}
+                          {t('submitSection.save_button')}
                         </>
                       )}
                     </button>
@@ -1253,8 +1519,8 @@ export default function EditChild() {
               </div>
             </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Scroll to Top Button */}
       <button

@@ -44,6 +44,7 @@ const navigate = useNavigate();
   const itemsPerPage = 20;
   const { childrenData, error, loading, fetchChildren } = useChildContext();
 
+  console.log('children data',childrenData)
   // Function to change language
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
