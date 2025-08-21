@@ -6,7 +6,7 @@ import {
   getAllChildren,
   getChild,
   getWardChildren,
-  updateChild
+  updateChild,
   // generateMockData, // Import the new function
 } from '../controllers/childController.js';
 
@@ -18,17 +18,22 @@ const router = express.Router();
 router.get(
   '/ward',
   authenticate,
-  authorize('admin', 'ward_officer'),
+  authorize('ADMIN', 'ward_officer'),
   getWardChildren,
 );
 
-router.get('/:id', authenticate, authorize('admin', 'ward_officer'), getChild);
-router.put('/:id', authenticate, authorize('admin', 'ward_officer'), updateChild);
+router.get('/:id', authenticate, authorize('ADMIN', 'WARD_OFFICER'), getChild);
+router.put(
+  '/:id',
+  authenticate,
+  authorize('ADMIN', 'WARD_OFFICER'),
+  updateChild,
+);
 //get all children
 router.get(
   '/',
   authenticate,
-  authorize('admin', 'ward_officer'),
+  authorize('ADMIN', 'ward_officer'),
   getAllChildren,
 );
 
@@ -37,7 +42,7 @@ router.get(
 //get specific child by ID
 
 // Route to create one or more new child records
-router.post('/', authenticate, authorize('admin', 'ward_officer'), createChild);
+router.post('/', authenticate, authorize('ADMIN', 'WARD_OFFICER'), createChild);
 
 // New dedicated route for generating mock data
 // router.post(

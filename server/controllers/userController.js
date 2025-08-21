@@ -1,6 +1,8 @@
 import { prisma } from '../utils/prisma.js';
+import { UserStatus } from '../generated/prisma/client.js';
 
 export const getMe = (req, res) => {
+  console.log('userStauts', UserStatus);
   if (req.user) {
     const user = {
       id: req.user.id,
@@ -157,3 +159,33 @@ export const updateUserProfile = async (req, res) => {
   }
 };
 
+export const approveUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const parsedId = parseInt(id);
+    const { status } = req.body; // must be "ACTIVE" or "INACTIVE"
+    if (status === 'ACTIVE') {
+      // Update to the ACTIVE status
+      const updatedUser = await prisma.user.update({
+        where: { id: parsedId },
+        data: {
+          status: UserStatus.ACTIVE,
+        },
+      });
+      return res.status(200).json(updatedUser);
+    } else if (status === 'DISABLED') {
+      const updatedUser = await prisma.user.update({
+        where: { id: parsedId },
+        data: {
+          status: UserStatus.DISABLED,
+        },
+      });
+      return res.status(200).json(updatedUser);
+    } else {
+      return res.status(400).json({ message: 'Invalid status provided.' });
+    }
+  } catch (err) {
+    console.log('error', err);
+    res.status(400).json({ error: err.message });
+  }
+};

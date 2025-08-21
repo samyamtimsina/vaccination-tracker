@@ -1,5 +1,9 @@
 import express from 'express';
-import { createMother, getMothers,getWardMothers } from '../controllers/motherController.js';
+import {
+  createMother,
+  getMothers,
+  getWardMothers,
+} from '../controllers/motherController.js';
 
 import { authenticate, authorize } from '../middlewares/auth.js';
 
@@ -9,16 +13,21 @@ router.post(
   '/',
 
   authenticate,
-  authorize('admin', 'ward_officer'),
+  authorize('ADMIN', 'WARD_OFFICER'),
   createMother,
 );
 router.get(
   '/',
 
   authenticate,
-  authorize('admin', 'ward_officer'),
+  authorize('ADMIN', 'WARD_OFFICER'),
   getMothers,
 );
-router.get('/ward',authenticate, authorize('admin', 'ward_officer'), getWardMothers);
+router.get(
+  '/ward',
+  authenticate,
+  authorize('ADMIN', 'WARD_OFFICER'),
+  getWardMothers,
+);
 
 export default router;

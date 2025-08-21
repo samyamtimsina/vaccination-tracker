@@ -19,12 +19,23 @@ export const authenticate = async (req, res, next) => {
         email: true,
         role: true,
         wardId: true,
+        status: true,
       },
     });
 
     if (!user) {
       return res.status(401).json({ message: 'User not found' });
     }
+
+    //  enforce active
+    if (user.status !== 'ACTIVE') {
+      console.log('authenticate middleware account status:', user.status);
+
+      return res.status(403).json({ message: `Account is ${user.status}` });
+    }
+    // if (allowedRoles && !allowedRoles.includes(req.user.role)) {
+    //     return res.status(403).json({ message: "Forbidden: Insufficient role" });
+    //   }
 
     req.user = user;
     next();
@@ -37,9 +48,22 @@ export const authenticate = async (req, res, next) => {
 //Middleware: check user role
 export const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Acess denied' });
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    // Check if user is ACTIVE
+    if (req.user.status !== 'ACTIVE') {
+      return res.status(403).json({ error: 'Account is not active' });
+    }
+
+    // Check if role matches
+    if (roles.length > 0 && !roles.includes(req.user.role)) {
+      return res
+        .status(403)
+        .json({ error: 'Access denied: insufficient role' });
+    }
+
     next();
   };
 };

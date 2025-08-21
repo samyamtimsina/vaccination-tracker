@@ -13,7 +13,6 @@ if (!JWT_SECRET) {
 export const register = async (req, res) => {
   const validationResult = registerSchema.safeParse(req.body);
 
-
   if (!validationResult.success) {
     // Return detailed Zod validation errors
     return res.status(400).json({
@@ -24,9 +23,8 @@ export const register = async (req, res) => {
 
   const { name, email, password, wardId } = validationResult.data;
 
-
   try {
-const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: {
         email: email,
       },
@@ -43,7 +41,8 @@ const existingUser = await prisma.user.findUnique({
         name,
         email,
         passwordHash: hashedPassword,
-        role: 'ward_officer',
+        role: 'WARD_OFFICER',
+        status: 'PENDING',
         wardId,
       },
     });
@@ -57,7 +56,6 @@ const existingUser = await prisma.user.findUnique({
       wardId: newUser.wardId,
     });
   } catch (error) {
-
     console.error('Registration failed:', error);
     return res.status(500).json({
       error: 'Registration failed unexpectedly.',
@@ -92,7 +90,11 @@ export const login = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
-
+    //  enforce active
+    if (user.status !== 'ACTIVE') {
+      console.log('login controller account status:', user.status);
+      return res.status(403).json({ message: `Account is ${user.status}` });
+    }
     const token = jwt.sign(
       {
         id: user.id,
