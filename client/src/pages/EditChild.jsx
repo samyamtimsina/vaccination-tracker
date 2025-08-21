@@ -307,13 +307,17 @@ const VaccineSection = ({
     return null;
   }
 
+  // Add this to your translation file or handle it in the component
+  const tt = useTranslation('addChild').t;
+
+  // Add fallback for missing translation
   const getSectionTitle = (key) => {
     const titles = {
-      CURRENT: t('vaccine_section.current', { count: sectionData.count }),
-      CATCH_UP: t('vaccine_section.catch_up', { count: sectionData.count }),
-      NOT_APPLICABLE: t('vaccine_section.not_applicable', { count: sectionData.count })
+      CURRENT: tt('vaccine_section.current', { count: 0 }) || 'Current',
+      CATCH_UP: tt('vaccine_section.catch_up', { count: 0 }) || 'Catch Up',
+      NOT_APPLICABLE: tt('vaccine_section.not_applicable', { count: 0 }) || 'Not Applicable'
     };
-    return titles[key];
+    return titles[key] || key;
   };
 
   const getSectionDescription = () => {
@@ -430,6 +434,11 @@ export default function EditChild() {
     isComplete: false
   });
 
+  // Add these states at the top of your component
+  const [showSearchSection, setShowSearchSection] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const resultsPerPage = 10;
+
   // Fetch health workers (same)
   useEffect(() => {
     const fetchHealthWorkers = async () => {
@@ -456,7 +465,7 @@ export default function EditChild() {
 
   const toggleRemarks = (vaccineName, doseIndex) => {
     const key = `${vaccineName}-${doseIndex}`;
-    setShowRemarks((prev) => ({ ...prev, [key]: !prev[key] }));
+    setShowRemarks(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const toggleSection = (section) => {
@@ -501,32 +510,40 @@ export default function EditChild() {
 
   // Add this function to handle child selection
   const handleChildSelect = (child) => {
+    if (!child) return;
+
+    setSelectedChild(child);
+    setShowSearchSection(false);
     setFetchedChild(child);
-    setSewaDartaNumber(child.sewaDartaNumber);
+    setSewaDartaNumber(child.sewaDartaNumber.toString());
 
-    // Update form with selected child's data
-    const [firstName, ...last] = child.fullName.split(' ');
-    setValue('firstName', firstName);
-    setValue('lastName', last.join(' '));
-    setValue('wardNumber', child.wardNumber.toString());
-    setValue('casteCode', child.casteCode.toString());
-    setValue('gender', child.gender);
-    setValue('parentName', child.parentName);
-    setValue('tole', child.tole);
-    setValue('phoneNumber', child.phoneNumber || '');
-    setValue('birthDate', adToBs(safeFormatDateYYMMDD(child.birthDate)));
-    setValue('isFromOtherMunicipality', child.isFromOtherMunicipality);
-    setValue('remarks', child.remarks || '');
-    setValue('administeredById', child.createdById.toString());
+    // Reset form before setting new values
+    reset({
+      firstName: child.fullName.split(' ')[0],
+      lastName: child.fullName.split(' ').slice(1).join(' '),
+      wardNumber: child.wardNumber.toString(),
+      casteCode: child.casteCode.toString(),
+      gender: child.gender,
+      parentName: child.parentName,
+      tole: child.tole,
+      phoneNumber: child.phoneNumber || '',
+      birthDate: adToBs(safeFormatDateYYMMDD(child.birthDate)),
+      isFromOtherMunicipality: child.isFromOtherMunicipality,
+      remarks: child.remarks || '',
+      administeredById: child.createdById.toString(),
+      vaccines: Object.fromEntries(
+        Object.entries(vaccineSchedule).map(([vaccineName, doses]) => [
+          vaccineName,
+          doses.map(() => ({ date: '', remarks: '' }))
+        ])
+      ),
+      weightRecords: child.weightRecords.map(rec => ({
+        date: adToBs(safeFormatDateYYMMDD(rec.date)),
+        weight: rec.weight.toString()
+      })) || [{ date: '', weight: '' }]
+    });
 
-    // Update weight records
-    const weightRecords = child.weightRecords.map(rec => ({
-      date: adToBs(safeFormatDateYYMMDD(rec.date)),
-      weight: rec.weight.toString()
-    }));
-    replace(weightRecords.length > 0 ? weightRecords : [{ date: '', weight: '' }]);
-
-    // Update vaccines
+    // Update vaccines after reset
     child.vaccinations.forEach(vac => {
       const vaccineName = vac.vaccineType;
       const doses = vaccineSchedule[vaccineName];
@@ -537,7 +554,10 @@ export default function EditChild() {
             `vaccines.${vaccineName}.${index}.date`,
             adToBs(safeFormatDateYYMMDD(vac.dateGiven))
           );
-          setValue(`vaccines.${vaccineName}.${index}.remarks`, vac.remarks || '');
+          setValue(
+            `vaccines.${vaccineName}.${index}.remarks`,
+            vac.remarks || ''
+          );
         }
       }
     });
@@ -641,7 +661,7 @@ export default function EditChild() {
         weightRecords: filteredWeightRecords,
         administeredById: parseInt(data.administeredById),
       };
-console.log('sewadartanumber', sewaDartaNumber);
+      console.log('sewadartanumber', sewaDartaNumber);
       const res = await axiosClient.put(`/api/child/${sewaDartaNumber}`, payload);
       updateChildInState(res.data);
       toast.success(t('toast.update_success'));
@@ -672,35 +692,70 @@ console.log('sewadartanumber', sewaDartaNumber);
 
   const totalVaccines = Object.values(categorizedVaccines).reduce((sum, cat) => sum + cat.count, 0);
 
-  // Define the missing filterChildren function here
+  // Update the filterChildren function
   const filterChildren = () => {
     if (!childrenData) return [];
+    
+    let results = [...childrenData];
+    const userInfo = JSON.parse(localStorage.getItem('userInfo')) || {};
 
-    return childrenData.filter(child => {
-      // Filter by searchText
-      const matchesSearchText = !filters.searchText ||
+    // Text search
+    if (filters.searchText) {
+      const searchTerm = filters.searchText.toLowerCase();
+      results = results.filter(child => 
+        child.fullName.toLowerCase().includes(searchTerm) ||
+        child.sewaDartaNumber.toString().includes(searchTerm) ||
+        (child.phoneNumber && child.phoneNumber.includes(searchTerm))
+      );
+    }
+
+    // Ward filter
+    if (filters.wardNumber) {
+      results = results.filter(child => 
+        child.wardNumber === parseInt(filters.wardNumber)
+      );
+    }
+
+    // Gender filter
+    if (filters.gender) {
+      results = results.filter(child => 
+        child.gender === filters.gender
+      );
+    }
+
+    // Created by me filter
+    if (filters.createdByMe) {
+      results = results.filter(child => 
+        child.createdById === userInfo.id
+      );
+    }
+
+    return results;
+  };
+
+  // Add this function to handle pagination
+  const getPaginatedResults = () => {
+    const filteredResults = childrenData.filter(child => {
+      // Text search
+      const matchesSearch = !filters.searchText ||
         child.fullName.toLowerCase().includes(filters.searchText.toLowerCase()) ||
         child.sewaDartaNumber.toString().includes(filters.searchText) ||
         (child.phoneNumber && child.phoneNumber.includes(filters.searchText));
 
-      // Filter by wardNumber
-      const matchesWard = !filters.wardNumber ||
-        child.wardNumber.toString() === filters.wardNumber;
+      // Other filters
+      const matchesWard = !filters.wardNumber || child.wardNumber.toString() === filters.wardNumber;
+      const matchesGender = !filters.gender || child.gender === filters.gender;
+      const matchesCreatedByMe = !filters.createdByMe || child.createdById === MOCK_CURRENT_USER_ID;
 
-      // Filter by gender
-      const matchesGender = !filters.gender ||
-        child.gender === filters.gender;
-
-      // Filter by createdByMe
-      const matchesCreatedByMe = !filters.createdByMe ||
-        child.createdById === MOCK_CURRENT_USER_ID;
-
-      // Filter by isComplete
-      const matchesIsComplete = !filters.isComplete ||
-        (child.vaccinations.length >= Object.keys(vaccineSchedule).length);
-
-      return matchesSearchText && matchesWard && matchesGender && matchesCreatedByMe && matchesIsComplete;
+      return matchesSearch && matchesWard && matchesGender && matchesCreatedByMe;
     });
+
+    // Calculate pagination
+    const totalPages = Math.ceil(filteredResults.length / resultsPerPage);
+    const startIndex = (currentPage - 1) * resultsPerPage;
+    const paginatedResults = filteredResults.slice(startIndex, startIndex + resultsPerPage);
+
+    return { paginatedResults, totalResults: filteredResults.length, totalPages };
   };
 
   return (
@@ -739,170 +794,232 @@ console.log('sewadartanumber', sewaDartaNumber);
 
       {/* Enhanced Search Section */}
       <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="bg-base-100 shadow-sm rounded-xl border border-base-300 p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <FaSearch className="text-primary text-xl mr-3" />
-              <h2 className="text-xl font-medium text-base-content">
-                बच्चाको खोजी
-              </h2>
+        {showSearchSection ? (
+          <div className="bg-base-100 shadow-sm rounded-xl border border-base-300 p-8 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <FaSearch className="text-primary text-xl mr-3" />
+                <h2 className="text-xl font-medium text-base-content">
+                  बच्चाको खोजी
+                </h2>
+              </div>
+            </div>
+
+            {/* Search Input and Filters - Keep your existing code */}
+            <div className="form-control w-full mb-6">
+              <label className="label">
+                <span className="label-text font-medium">नाम, सेवा दर्ता नं, वा फोन नम्बर</span>
+              </label>
+              <div className="input-group">
+                <input
+                  type="text"
+                  value={filters.searchText}
+                  onChange={(e) => setFilters(prev => ({
+                    ...prev,
+                    searchText: e.target.value
+                  }))}
+                  className="input input-bordered w-full"
+                  placeholder="खोज्नुहोस्..."
+                />
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleSearch()}
+                >
+                  <FaSearch className="mr-2" />
+                  खोज्नुहोस्
+                </button>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {/* Ward Filter */}
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">वडा नं.</span>
+                </label>
+                <select
+                  value={filters.wardNumber}
+                  onChange={(e) => setFilters(prev => ({
+                    ...prev,
+                    wardNumber: e.target.value
+                  }))}
+                  className="select select-bordered w-full"
+                >
+                  <option value="">सबै वडा</option>
+                  {[...Array(15)].map((_, i) => (
+                    <option key={i + 1} value={i + 1}>वडा नं. {i + 1}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Gender Filter */}
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">लिङ्ग</span>
+                </label>
+                <select
+                  value={filters.gender}
+                  onChange={(e) => setFilters(prev => ({
+                    ...prev,
+                    gender: e.target.value
+                  }))}
+                  className="select select-bordered w-full"
+                >
+                  <option value="">सबै</option>
+                  <option value="MALE">छात्र</option>
+                  <option value="FEMALE">छात्रा</option>
+                  <option value="OTHER">अन्य</option>
+                </select>
+              </div>
+
+              {/* Created By Me Filter */}
+              <div className="form-control">
+                <label className="label cursor-pointer justify-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={filters.createdByMe}
+                    onChange={(e) => setFilters(prev => ({
+                      ...prev,
+                      createdByMe: e.target.checked
+                    }))}
+                    className="checkbox checkbox-primary"
+                  />
+                  <span className="label-text">मैले दर्ता गरेको</span>
+                </label>
+              </div>
+
+              {/* Complete Vaccination Filter */}
+              <div className="form-control">
+                <label className="label cursor-pointer justify-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={filters.isComplete}
+                    onChange={(e) => setFilters(prev => ({
+                      ...prev,
+                      isComplete: e.target.checked
+                    }))}
+                    className="checkbox checkbox-primary"
+                  />
+                  <span className="label-text">पूर्ण खोप लगाएको</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Results Section */}
+            {!loading && (
+              <>
+                {/* Results Table */}
+                {(() => {
+                  const { paginatedResults, totalResults, totalPages } = getPaginatedResults();
+
+                  return (
+                    <>
+                      {totalResults > 0 ? (
+                        <>
+                          <div className="text-sm text-base-content/70 mb-4">
+                            कुल नतिजाहरू: {totalResults}
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="table table-zebra w-full">
+                              <thead>
+                                <tr>
+                                  <th>सेवा दर्ता नं.</th>
+                                  <th>नाम</th>
+                                  <th>वडा नं.</th>
+                                  <th>लिङ्ग</th>
+                                  <th>जन्म मिति</th>
+                                  <th>कार्य</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {paginatedResults.map(child => (
+                                  <tr key={child.id}>
+                                    <td>{child.sewaDartaNumber}</td>
+                                    <td>{child.fullName}</td>
+                                    <td>{child.wardNumber}</td>
+                                    <td>
+                                      {child.gender === 'MALE' ? 'छात्र' :
+                                        child.gender === 'FEMALE' ? 'छात्रा' : 'अन्य'}
+                                    </td>
+                                    <td>{adToBs(safeFormatDateYYMMDD(child.birthDate))}</td>
+                                    <td>
+                                      <button
+                                        onClick={() => handleChildSelect(child)}
+                                        className="btn btn-primary btn-sm"
+                                      >
+                                        छान्नुहोस्
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Pagination */}
+                          {totalPages > 1 && (
+                            <div className="flex justify-center gap-2 mt-4">
+                              <button
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="btn btn-sm"
+                              >
+                                पछिल्लो
+                              </button>
+                              <span className="flex items-center px-4 text-sm">
+                                पृष्ठ {currentPage} / {totalPages}
+                              </span>
+                              <button
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className="btn btn-sm"
+                              >
+                                अर्को
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-center py-8">
+                          <p className="text-base-content/70">कुनै नतिजा फेला परेन</p>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </>
+            )}
+          </div>
+        ) : (
+          // Show this when a child is selected
+          <div className="bg-base-100 shadow-sm rounded-xl border border-base-300 p-4 mb-8">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <FaUser className="text-primary text-lg" />
+                </div>
+                <div>
+                  <h3 className="font-medium">छानिएको बच्चा: {selectedChild?.fullName}</h3>
+                  <p className="text-sm text-base-content/70">
+                    सेवा दर्ता नं.: {selectedChild?.sewaDartaNumber} |
+                    वडा नं.: {selectedChild?.wardNumber}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowSearchSection(true);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="btn btn-primary btn-sm"
+              >
+                <FaSearch className="mr-2" />
+                अर्को बच्चा खोज्नुहोस्
+              </button>
             </div>
           </div>
-
-          {loading ? (
-            <div className="text-center py-8">
-              <span className="loading loading-spinner loading-lg"></span>
-              <p className="mt-2 text-base-content/70">डाटा लोड हुँदैछ...</p>
-            </div>
-          ) : (
-            <>
-              {/* Search Input */}
-              <div className="form-control w-full mb-6">
-                <label className="label">
-                  <span className="label-text font-medium">नाम, सेवा दर्ता नं, वा फोन नम्बर</span>
-                </label>
-                <div className="input-group">
-                  <input
-                    type="text"
-                    value={filters.searchText}
-                    onChange={(e) => setFilters(prev => ({
-                      ...prev,
-                      searchText: e.target.value
-                    }))}
-                    className="input input-bordered w-full"
-                    placeholder="खोज्नुहोस्..."
-                  />
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => handleSearch()}
-                  >
-                    <FaSearch className="mr-2" />
-                    खोज्नुहोस्
-                  </button>
-                </div>
-              </div>
-
-              {/* Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                {/* Ward Filter */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">वडा नं.</span>
-                  </label>
-                  <select
-                    value={filters.wardNumber}
-                    onChange={(e) => setFilters(prev => ({
-                      ...prev,
-                      wardNumber: e.target.value
-                    }))}
-                    className="select select-bordered w-full"
-                  >
-                    <option value="">सबै वडा</option>
-                    {[...Array(15)].map((_, i) => (
-                      <option key={i + 1} value={i + 1}>वडा नं. {i + 1}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Gender Filter */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">लिङ्ग</span>
-                  </label>
-                  <select
-                    value={filters.gender}
-                    onChange={(e) => setFilters(prev => ({
-                      ...prev,
-                      gender: e.target.value
-                    }))}
-                    className="select select-bordered w-full"
-                  >
-                    <option value="">सबै</option>
-                    <option value="MALE">छात्र</option>
-                    <option value="FEMALE">छात्रा</option>
-                    <option value="OTHER">अन्य</option>
-                  </select>
-                </div>
-
-                {/* Created By Me Filter */}
-                <div className="form-control">
-                  <label className="label cursor-pointer justify-start gap-2">
-                    <input
-                      type="checkbox"
-                      checked={filters.createdByMe}
-                      onChange={(e) => setFilters(prev => ({
-                        ...prev,
-                        createdByMe: e.target.checked
-                      }))}
-                      className="checkbox checkbox-primary"
-                    />
-                    <span className="label-text">मैले दर्ता गरेको</span>
-                  </label>
-                </div>
-
-                {/* Complete Vaccination Filter */}
-                <div className="form-control">
-                  <label className="label cursor-pointer justify-start gap-2">
-                    <input
-                      type="checkbox"
-                      checked={filters.isComplete}
-                      onChange={(e) => setFilters(prev => ({
-                        ...prev,
-                        isComplete: e.target.checked
-                      }))}
-                      className="checkbox checkbox-primary"
-                    />
-                    <span className="label-text">पूर्ण खोप लगाएको</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Results Table */}
-              <div className="overflow-x-auto">
-                <table className="table table-zebra w-full">
-                  <thead>
-                    <tr>
-                      <th>सेवा दर्ता नं.</th>
-                      <th>नाम</th>
-                      <th>वडा नं.</th>
-                      <th>लिङ्ग</th>
-                      <th>जन्म मिति</th>
-                      <th>कार्य</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filterChildren().map(child => (
-                      <tr key={child.id}>
-                        <td>{child.sewaDartaNumber}</td>
-                        <td>{child.fullName}</td>
-                        <td>{child.wardNumber}</td>
-                        <td>
-                          {child.gender === 'MALE' ? 'छात्र' :
-                            child.gender === 'FEMALE' ? 'छात्रा' : 'अन्य'}
-                        </td>
-                        <td>{adToBs(safeFormatDateYYMMDD(child.birthDate))}</td>
-                        <td>
-                          <button
-                            onClick={() => handleChildSelect(child)}
-                            className="btn btn-primary btn-sm"
-                          >
-                            छान्नुहोस्
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                {filterChildren().length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-base-content/70">कुनै नतिजा फेला परेन</p>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Main Form (only show if fetched) */}
@@ -960,9 +1077,8 @@ console.log('sewadartanumber', sewaDartaNumber);
                     </label>
                     <input
                       {...register('firstName')}
-                      className={`input input-bordered w-full ${
-                        errors.firstName ? 'input-error' : ''
-                      }`}
+                      className={`input input-bordered w-full ${errors.firstName ? 'input-error' : ''
+                        }`}
                       placeholder={t('personalInfo.form.firstName.placeholder')}
                     />
                     {errors.firstName && (
@@ -999,9 +1115,8 @@ console.log('sewadartanumber', sewaDartaNumber);
                     </label>
                     <select
                       {...register('gender')}
-                      className={`select select-bordered w-full ${
-                        errors.gender ? 'select-error' : ''
-                      }`}
+                      className={`select select-bordered w-full ${errors.gender ? 'select-error' : ''
+                        }`}
                     >
                       <option value="">{t('personalInfo.form.gender.placeholder')}</option>
                       <option value="MALE">{t('personalInfo.form.gender.options.male')}</option>
@@ -1024,9 +1139,8 @@ console.log('sewadartanumber', sewaDartaNumber);
                     </label>
                     <input
                       {...register('wardNumber')}
-                      className={`input input-bordered w-full ${
-                        errors.wardNumber ? 'input-error' : ''
-                      }`}
+                      className={`input input-bordered w-full ${errors.wardNumber ? 'input-error' : ''
+                        }`}
                       placeholder={t('personalInfo.form.wardNumber.placeholder')}
                     />
                     {errors.wardNumber && (
@@ -1046,9 +1160,8 @@ console.log('sewadartanumber', sewaDartaNumber);
                     <input
                       type="number"
                       {...register('casteCode')}
-                      className={`input input-bordered w-full ${
-                        errors.casteCode ? 'input-error' : ''
-                      }`}
+                      className={`input input-bordered w-full ${errors.casteCode ? 'input-error' : ''
+                        }`}
                       placeholder={t('personalInfo.form.casteCode.placeholder')}
                     />
                     {errors.casteCode && (
@@ -1067,9 +1180,8 @@ console.log('sewadartanumber', sewaDartaNumber);
                     </label>
                     <input
                       {...register('parentName')}
-                      className={`input input-bordered w-full ${
-                        errors.parentName ? 'input-error' : ''
-                      }`}
+                      className={`input input-bordered w-full ${errors.parentName ? 'input-error' : ''
+                        }`}
                       placeholder={t('personalInfo.form.parentName.placeholder')}
                     />
                     {errors.parentName && (
@@ -1088,9 +1200,8 @@ console.log('sewadartanumber', sewaDartaNumber);
                     </label>
                     <input
                       {...register('tole')}
-                      className={`input input-bordered w-full ${
-                        errors.tole ? 'input-error' : ''
-                      }`}
+                      className={`input input-bordered w-full ${errors.tole ? 'input-error' : ''
+                        }`}
                       placeholder={t('personalInfo.form.tole.placeholder')}
                     />
                     {errors.tole && (
@@ -1133,9 +1244,8 @@ console.log('sewadartanumber', sewaDartaNumber);
                           <>
                             <NepaliDatePicker
                               className="w-full"
-                              inputClassName={`input input-bordered w-full pr-10 ${
-                                errors.birthDate ? 'input-error' : ''
-                              }`}
+                              inputClassName={`input input-bordered w-full pr-10 ${errors.birthDate ? 'input-error' : ''
+                                }`}
                               value={field.value || ''}
                               onChange={(value) => field.onChange(value)}
                               language="ne"
@@ -1179,9 +1289,8 @@ console.log('sewadartanumber', sewaDartaNumber);
                   </label>
                   <select
                     {...register('administeredById')}
-                    className={`select select-bordered w-full max-w-xs ${
-                      errors.administeredById ? 'select-error' : ''
-                    }`}
+                    className={`select select-bordered w-full max-w-xs ${errors.administeredById ? 'select-error' : ''
+                      }`}
                     defaultValue=""
                   >
                     <option value="" disabled>{t('personalInfo.administered_by.placeholder')}</option>
@@ -1355,7 +1464,7 @@ console.log('sewadartanumber', sewaDartaNumber);
 
                 {/* Vaccine Tabs */}
                 {birthDate && gender && (
-                    <>
+                  <>
                     <div className="tabs tabs-boxed mb-6">
                       {Object.entries(categorizedVaccines).map(([sectionKey, sectionData]) => {
                         if (sectionData.count > 0 || sectionKey === 'NOT_APPLICABLE') {
@@ -1381,8 +1490,11 @@ console.log('sewadartanumber', sewaDartaNumber);
                           key={sectionKey}
                           sectionKey={sectionKey}
                           sectionData={sectionData}
-                          expandedSections={{ [sectionKey]: true }}
-                          toggleSection={() => {}}
+                          expandedSections={expandedSections}
+                          toggleSection={(section) => setExpandedSections(prev => ({
+                            ...prev,
+                            [section]: !prev[section]
+                          }))}
                           control={control}
                           register={register}
                           setValue={setValue}
@@ -1393,7 +1505,7 @@ console.log('sewadartanumber', sewaDartaNumber);
                         />
                       )
                     ))}
-                    </>
+                  </>
                 )}
 
 
@@ -1498,7 +1610,7 @@ console.log('sewadartanumber', sewaDartaNumber);
                       ) : (
                         <>
                           <svg
-                           className="w-5 h-5 mr-2"
+                            className="w-5 h-5 mr-2"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
