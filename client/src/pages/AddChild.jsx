@@ -409,7 +409,7 @@ export default function AddChild() {
   useEffect(() => {
     const fetchHealthWorkers = async () => {
       try {
-        const res = await axiosClient.get('/api/users?role=ward_officer');
+        const res = await axiosClient.get('/api/users?role=WARD_OFFICER');
         setHealthWorkers(res.data);
       } catch (err) {
         console.error('Failed to fetch health workers:', err);
@@ -1027,17 +1027,19 @@ const onSubmit = async (data) => {
 
 
               {/* Summary for completed vaccines */}
-              {birthDate && gender && categorizedVaccines.CURRENT.count === 0 && (
-                <div className="text-center py-8 mt-8 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="text-6xl mb-4">🎉</div>
-                  <h3 className="text-xl font-semibold text-green-600 mb-2">
-                    {t('vaccine_section.all_up_to_date.title')}
-                  </h3>
-                  <p className="text-base-content/70">
-                    {t('vaccine_section.all_up_to_date.description')}
-                  </p>
-                </div>
-              )}
+              {birthDate &&
+                gender &&
+                categorizedVaccines.CURRENT.count === 0 && (
+                  <div className="text-center py-8 mt-8 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="text-6xl mb-4">🎉</div>
+                    <h3 className="text-xl font-semibold text-green-600 mb-2">
+                      {t('vaccine_section.all_up_to_date.title')}
+                    </h3>
+                    <p className="text-base-content/70">
+                      {t('vaccine_section.all_up_to_date.description')}
+                    </p>
+                  </div>
+                )}
             </div>
 
             {/* General Remarks */}
@@ -1091,7 +1093,7 @@ const onSubmit = async (data) => {
                         setExpandedSections({
                           CURRENT: true,
                           CATCH_UP: false,
-                          NOT_APPLICABLE: false
+                          NOT_APPLICABLE: false,
                         });
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }

@@ -13,6 +13,7 @@ import {
   FaTimes,
   FaChevronLeft,
   FaChevronRight,
+  FaEdit, 
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +30,12 @@ const menuItems = [
     to: '/view-children',
     label: 'menu.view_children.label',
     icon: <FaUsers />,
+    type: 'link',
+  },
+   {
+    to: '/edit-child',
+    label: 'menu.edit_child.label', 
+        icon: <FaEdit />, 
     type: 'link',
   },
   {

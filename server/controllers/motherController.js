@@ -19,11 +19,6 @@ export const createMother = async (req, res) => {
     console.log('Validated data:', validationResult.data); // Log full validated data
 
     const { fullName, lastName, tdDoses = [], ...motherData } = validationResult.data; // Default to empty array
-    console.log('Validated mother data:', motherData);
-    console.log('TD Doses:', tdDoses);
-    console.log('Full Name:', fullName);
-    console.log('Last Name:', lastName);
-
     const user = req.user; // Assuming user is available from auth middleware
     const combinedName = `${fullName} ${lastName || ''}`.trim();
 
@@ -35,8 +30,6 @@ export const createMother = async (req, res) => {
         createdById: user.id,
       }))
       : [];
-
-    console.log('TD Doses to create:', tdDosesToCreate); // Log before Prisma call
 
     const newMother = await prisma.mother.create({
       data: {
@@ -114,8 +107,5 @@ export const getWardMothers = async (req, res) => {
     }
 
     res.status(200).json(mothers);
-
-  } catch (error) {
-
-  }
-}
+  } catch (error) {}
+};

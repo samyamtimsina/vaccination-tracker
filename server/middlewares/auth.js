@@ -29,8 +29,6 @@ export const authenticate = async (req, res, next) => {
 
     //  enforce active
     if (user.status !== 'ACTIVE') {
-      console.log('authenticate middleware account status:', user.status);
-
       return res.status(403).json({ message: `Account is ${user.status}` });
     }
     // if (allowedRoles && !allowedRoles.includes(req.user.role)) {

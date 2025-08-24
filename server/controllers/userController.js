@@ -2,7 +2,6 @@ import { prisma } from '../utils/prisma.js';
 import { UserStatus } from '../generated/prisma/client.js';
 
 export const getMe = (req, res) => {
-  console.log('userStauts', UserStatus);
   if (req.user) {
     const user = {
       id: req.user.id,
@@ -17,9 +16,10 @@ export const getMe = (req, res) => {
 export const getUsers = async (req, res) => {
   try {
     const { role } = req.query;
+    console.log('role', role);
 
     // Build the query options based on the `role` query parameter
-    const whereClause = role ? { role: role.toLowerCase() } : {};
+    const whereClause = role ? { role: role } : {};
 
     const users = await prisma.user.findMany({
       where: whereClause,
@@ -43,7 +43,7 @@ export const getWardUsers = async (req, res) => {
 
     const whereClause = {
       wardId: wardId,
-      ...(role && { role: role.toLowerCase() }),
+      ...(role && { role: role }),
     };
     const users = await prisma.user.findMany({
       where: whereClause,
@@ -162,30 +162,20 @@ export const updateUserProfile = async (req, res) => {
 export const approveUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const parsedId = parseInt(id);
-    const { status } = req.body; // must be "ACTIVE" or "INACTIVE"
-    if (status === 'ACTIVE') {
-      // Update to the ACTIVE status
-      const updatedUser = await prisma.user.update({
-        where: { id: parsedId },
-        data: {
-          status: UserStatus.ACTIVE,
-        },
-      });
-      return res.status(200).json(updatedUser);
-    } else if (status === 'DISABLED') {
-      const updatedUser = await prisma.user.update({
-        where: { id: parsedId },
-        data: {
-          status: UserStatus.DISABLED,
-        },
-      });
-      return res.status(200).json(updatedUser);
-    } else {
+    const { status } = req.body;
+
+    if (!['ACTIVE', 'INACTIVE'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status provided.' });
     }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: parseInt(id) }, // or just `id` if string UUID
+      data: { status }, // Prisma will accept enum string directly
+    });
+
+    res.status(200).json(updatedUser);
   } catch (err) {
-    console.log('error', err);
-    res.status(400).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 };

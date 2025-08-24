@@ -18,7 +18,7 @@ const router = express.Router();
 router.get(
   '/ward',
   authenticate,
-  authorize('ADMIN', 'ward_officer'),
+  authorize('ADMIN', 'WARD_OFFICER'),
   getWardChildren,
 );
 
@@ -33,7 +33,7 @@ router.put(
 router.get(
   '/',
   authenticate,
-  authorize('ADMIN', 'ward_officer'),
+  authorize('ADMIN', 'WARD_OFFICER'),
   getAllChildren,
 );
 

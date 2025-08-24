@@ -23,7 +23,7 @@ import {
   FaHistory,
   FaCheckCircle,
   FaLock,
-  FaSearch
+  FaSearch,
 } from 'react-icons/fa';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createChildSchema } from '../schemas/childSchema.js'; // Reuse schema, or create edit-specific if needed
@@ -661,7 +661,7 @@ export default function EditChild() {
         weightRecords: filteredWeightRecords,
         administeredById: parseInt(data.administeredById),
       };
-      console.log('sewadartanumber', sewaDartaNumber);
+      console.log('Submitting payload:', payload);
       const res = await axiosClient.put(`/api/child/${sewaDartaNumber}`, payload);
       updateChildInState(res.data);
       toast.success(t('toast.update_success'));

@@ -51,8 +51,6 @@ function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
 // --- UPDATED: createChild controller
 // It now expects administeredById for vaccines and weights in the request body
 export const createChild = async (req, res) => {
-  console.log('req.body create child', req.body)
-  console.log('req.body vaccines', req.body.vaccines)
   try {
     const validationResult = createChildSchema.safeParse(req.body);
     console.log('Validation result:', validationResult);
@@ -228,17 +226,17 @@ export const getWardChildren = async (req, res) => {
       },
       include: {
         createdBy: { select: { id: true, } },
-        verifiedBy: { select: { id: true, } }, // NEW
+        verifiedBy: { select: { id: true, } }, 
         vaccinations: {
           include: {
             createdBy: { select: { id: true, } },
-            administeredBy: { select: { id: true, } }, // NEW
+            administeredBy: { select: { id: true, } }, 
           },
         },
         weightRecords: {
           include: {
             createdBy: { select: { id: true, } },
-            administeredBy: { select: { id: true, } }, // NEW
+            administeredBy: { select: { id: true, } }, 
           },
         },
       },
@@ -252,68 +250,57 @@ export const getWardChildren = async (req, res) => {
 export const getChild = async (req, res) => {
   try {
     const searchTerm = req.params.id;
-
-    // Check if searchTerm is a number (sewa darta number)
     const isNumber = /^\d+$/.test(searchTerm);
+    const currentUserWardId = req.user.wardId; // Assuming `req.user` contains the authenticated user's data
 
     let child;
     if (isNumber) {
-      // Search by sewa darta number
-      const parsedSewaDartaNumber = parseInt(searchTerm, 10);
+      // Find child by Sewa Darta number
       child = await prisma.child.findUnique({
         where: {
-          sewaDartaNumber: parsedSewaDartaNumber,
+          sewaDartaNumber: parseInt(searchTerm, 10)
         },
         include: {
-          createdBy: { select: { id: true, name: true } },
-          verifiedBy: { select: { id: true, name: true } },
-          vaccinations: {
-            include: {
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-            },
-          },
-          weightRecords: {
-            include: {
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-            },
-          },
+          vaccinations: true,
+          weightRecords: true,
         },
       });
     } else {
-      // Search by name
-      child = await prisma.child.findFirst({
+      // Find child by ID
+      child = await prisma.child.findUnique({
         where: {
-          fullName: {
-            contains: searchTerm,
-            mode: 'insensitive', // Case-insensitive search
-          },
+          id: searchTerm
         },
         include: {
-          createdBy: { select: { id: true, name: true } },
-          verifiedBy: { select: { id: true, name: true } },
-          vaccinations: {
-            include: {
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-            },
-          },
-          weightRecords: {
-            include: {
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-            },
-          },
+          vaccinations: true,
+          weightRecords: true,
         },
       });
     }
 
     if (!child) {
-      return res.status(404).json({ error: 'Child not found' });
+      return res.status(404).json({
+        error: 'Child not found'
+      });
     }
 
-    res.status(200).json(child);
+    // Check if the user is from the same ward as the child
+    if (child.wardNumber === currentUserWardId) {
+      // Return full data if from the same ward
+      return res.status(200).json(child);
+    } else {
+      // Return a limited subset of data if from a different ward
+      const limitedChildData = {
+        id: child.id,
+        fullName: child.fullName,
+        sewaDartaNumber: child.sewaDartaNumber,
+        birthDate: child.birthDate,
+        gender: child.gender,
+        vaccinations: child.vaccinations,
+        weightRecords: child.weightRecords,
+      };
+      return res.status(200).json(limitedChildData);
+    }
   } catch (error) {
     console.error('Error fetching single child:', error);
     res.status(500).json({
@@ -387,14 +374,14 @@ export const updateChild = async (req, res) => {
 
       // 4. Delete all existing weight records
       await tx.weightRecord.deleteMany({
-        where: { childId: child.id }
+        where: { childId: child.id },
       });
 
       // 5. Create new weight records if provided
       if (weightRecords?.length) {
         const validWeightRecords = weightRecords
-          .filter(w => w.date && w.weight) // Only process records with both date and weight
-          .map(w => ({
+          .filter((w) => w.date && w.weight) // Only process records with both date and weight
+          .map((w) => ({
             childId: child.id,
             weight: parseFloat(w.weight),
             date: parseBsDateString(w.date),
@@ -404,7 +391,7 @@ export const updateChild = async (req, res) => {
 
         if (validWeightRecords.length > 0) {
           await tx.weightRecord.createMany({
-            data: validWeightRecords
+            data: validWeightRecords,
           });
         }
       }
@@ -440,3 +427,4 @@ export const updateChild = async (req, res) => {
     });
   }
 };
+
