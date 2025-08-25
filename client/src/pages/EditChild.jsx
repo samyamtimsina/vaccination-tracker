@@ -16,17 +16,14 @@ import {
   FaWeight,
   FaSyringe,
   FaClipboardList,
-  FaHome,
-  FaPhone,
-  FaBirthdayCake,
+  FaSearch,
   FaExclamationTriangle,
   FaHistory,
-  FaCheckCircle,
   FaLock,
-  FaSearch,
+  FaCheckCircle,
 } from 'react-icons/fa';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { createChildSchema } from '../schemas/childSchema.js';
+import { updateChildSchema } from '../schemas/childSchema.js';
 import { useChildContext } from '../context/ChildContext';
 import { useTheme } from '../context/ThemeContext';
 import { calculateAge } from '../../helpers/calculateAge.jsx';
@@ -440,7 +437,7 @@ export default function EditChild() {
     setValue,
     getValues,
   } = useForm({
-    resolver: zodResolver(createChildSchema),
+    resolver: zodResolver(updateChildSchema),
     defaultValues: {
       isFromOtherMunicipality: false,
       birthDate: '',
@@ -451,7 +448,7 @@ export default function EditChild() {
           doses.map(() => ({ date: '', remarks: '' })),
         ])
       ),
-      weightRecords: [{ date: '', weight: '' }],
+      weightRecords: [{ id: null, date: '', weight: '' }],
     },
   });
 
@@ -496,6 +493,17 @@ export default function EditChild() {
   const resultsPerPage = 10;
 
   useEffect(() => {
+    const fetchHealthWorkers = async () => {
+      try {
+        const res = await axiosClient.get('/api/users?role=WARD_OFFICER');
+        setHealthWorkers(res.data);
+      } catch (err) {
+        console.error('Failed to fetch health workers:', err);
+      }
+    };
+    fetchHealthWorkers();
+  }, []);
+  useEffect(() => {
     const delayDebounce = setTimeout(async () => {
       const hasSearchFilters = filters.name || filters.serviceRegistrationNumber || filters.phoneNumber || filters.gender || filters.wardNumber || filters.isComplete || filters.createdByMe;
       if (!hasSearchFilters) {
@@ -527,31 +535,33 @@ export default function EditChild() {
     return () => clearTimeout(delayDebounce);
   }, [filters]);
 
+  // Use useFieldArray to manage the weightRecords array
+  const { fields, append, remove, replace } = useFieldArray({
+    control,
+    name: 'weightRecords',
+  });
+
   // New useEffect to fetch child data from API when a child is selected
   useEffect(() => {
     const fetchChildData = async () => {
       if (!selectedChild) return;
-
       setIsLoading(true);
+
       try {
-        // Fetch child data from the specific API endpoint
         const res = await axiosClient.get(`/api/child/${selectedChild.sewaDartaNumber}`);
         const childData = res.data;
+        console.log('Fetched child data:', childData);
 
-        // Determine if it's a full or limited profile based on the data received
         const fullProfile = !!childData.parentName;
         setIsFullProfile(fullProfile);
         setFetchedChild(childData);
 
-        // Populate the form using reset()
         const defaultFormValues = {
           firstName: childData.fullName.split(' ')[0],
           lastName: childData.fullName.split(' ').slice(1).join(' '),
           gender: childData.gender,
           birthDate: adToBs(safeFormatDateYYMMDD(childData.birthDate)),
           administeredById: childData.createdById?.toString(),
-
-          // These fields are only populated if it's a full profile
           ...(fullProfile && {
             wardNumber: childData.wardNumber.toString(),
             casteCode: childData.casteCode.toString(),
@@ -561,12 +571,6 @@ export default function EditChild() {
             isFromOtherMunicipality: childData.isFromOtherMunicipality,
             remarks: childData.remarks || '',
           }),
-
-          // Weight records and an empty vaccine structure for filling
-          weightRecords: childData.weightRecords.map((rec) => ({
-            date: adToBs(safeFormatDateYYMMDD(rec.date)),
-            weight: rec.weight.toString(),
-          })) || [{ date: '', weight: '' }],
           vaccines: Object.fromEntries(
             Object.entries(vaccineSchedule).map(([vaccineName, doses]) => [
               vaccineName,
@@ -577,7 +581,25 @@ export default function EditChild() {
 
         reset(defaultFormValues);
 
-        // Populate the vaccine dates separately as they are nested
+        const newWeightRecords = childData.weightRecords.length > 0
+          ? childData.weightRecords.map((rec) => ({
+            dbId: rec.id ? rec.id.toString() : null,
+            date: adToBs(safeFormatDateYYMMDD(rec.date)),
+            weight: rec.weight.toString(),
+          }))
+          : [{ dbId: null, date: '', weight: '' }];
+
+        console.log('Weight records before replace:', newWeightRecords);
+
+        // Clear existing records and replace with new ones
+        replace([]); // Clear first
+        setTimeout(() => {
+          replace(newWeightRecords); // Then replace
+        }, 0);
+
+        console.log('Form state after replace:', getValues('weightRecords'));
+
+        // Populate vaccine dates
         childData.vaccinations.forEach((vac) => {
           const vaccineName = vac.vaccineType;
           const doses = vaccineSchedule[vaccineName];
@@ -596,26 +618,18 @@ export default function EditChild() {
           }
         });
 
-        // Update the Sewa Darta number state for display
         setSewaDartaNumber(childData.sewaDartaNumber.toString());
-
       } catch (err) {
         console.error('Failed to fetch child data:', err);
         toast.error(t('toast.fetch_error') || 'Failed to retrieve child data.');
-        setShowSearchSection(true); // Go back to search on error
+        setShowSearchSection(true);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchChildData();
-  }, [selectedChild, reset, setValue, t]);
-
-  // Use useFieldArray to manage the weightRecords array
-  const { fields, append, remove, replace } = useFieldArray({
-    control,
-    name: 'weightRecords',
-  });
+  }, [selectedChild, reset, setValue, replace, t]);
 
   // Fetch children data on component mount
 
@@ -646,34 +660,60 @@ export default function EditChild() {
     }
 
     try {
-      const filteredWeightRecords = data.weightRecords.filter(
-        (record) => record.date && record.weight
-      );
+      const filteredWeightRecords = data.weightRecords
+        .filter((record) => record.date && record.weight)
+        .map((rec) => {
+          const weightRecord = {
+            date: rec.date,
+            weight: parseFloat(rec.weight),
+          };
 
-      const filteredVaccines = {};
-      Object.entries(data.vaccines).forEach(([vaccineName, doses]) => {
-        const administeredDoses = [];
-        doses.forEach((dose, index) => {
-          if (dose.date) {
-            const scheduleDose = vaccineSchedule[vaccineName][index];
-            administeredDoses.push({
-              ...dose,
-              doseNumber: scheduleDose.dose,
-              type: scheduleDose.isBooster ? 'booster' : 'current',
-            });
+          // Only add id if dbId exists and is not null/undefined/empty
+          if (rec.dbId && rec.dbId !== 'null' && rec.dbId !== '' && rec.dbId !== null) {
+            weightRecord.id = parseInt(rec.dbId);
           }
+
+          return weightRecord;
         });
-        if (administeredDoses.length > 0) {
-          filteredVaccines[vaccineName] = administeredDoses;
-        }
-      });
+
+      // Filter out vaccines that have no date
+      const filteredVaccinations = Object.entries(data.vaccines)
+        .flatMap(([vaccineName, doses]) =>
+          doses
+            .filter((dose) => dose.date)
+            .map((dose, index) => {
+              const scheduleDose = vaccineSchedule[vaccineName][index];
+              return {
+                vaccineType: vaccineName,
+                doseNumber: scheduleDose.dose,
+                dateGiven: dose.date,
+                remarks: dose.remarks || null,
+              };
+            })
+        );
 
       const payload = {
-        ...data,
-        vaccines: filteredVaccines,
         weightRecords: filteredWeightRecords,
+        vaccinations: filteredVaccinations,
         administeredById: parseInt(data.administeredById),
+        remarks: data.remarks || null,
       };
+
+      // Only include demographic data if it's a full profile
+      if (isFullProfile) {
+        payload.firstName = data.firstName;
+        payload.lastName = data.lastName;
+        payload.gender = data.gender;
+        payload.birthDate = data.birthDate;
+        payload.wardNumber = parseInt(data.wardNumber);
+        payload.casteCode = parseInt(data.casteCode);
+        payload.parentName = data.parentName;
+        payload.tole = data.tole;
+        payload.phoneNumber = data.phoneNumber || null;
+        payload.isFromOtherMunicipality = data.isFromOtherMunicipality;
+      }
+
+      console.log('Submitting payload:', payload);
 
       const res = await axiosClient.put(
         `/api/child/${fetchedChild.sewaDartaNumber}`,
@@ -686,10 +726,10 @@ export default function EditChild() {
       toast.error(t('toast.error'));
     }
   };
-
   const onErrors = (errors) => {
+    console.log('Validation errors:', errors);
     const errorMessage = getFirstErrorMessage(errors);
-    toast.error(t('toast.validation_error', { message: errorMessage }));
+    toast.error(t('toast.validation_error', { errors }));
   };
 
   const age = calculateAge(birthDate);
@@ -1380,6 +1420,12 @@ export default function EditChild() {
                           key={field.id}
                           className="p-6 bg-base-200 rounded-lg border border-base-300"
                         >
+                          {/* Hidden input to preserve the DB id */}
+                          <input
+                            type="hidden"
+                            {...register(`weightRecords.${index}.dbId`)}
+                            value={field.dbId || ''}
+                          />
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                             <div>
                               <label className="label">
@@ -1457,7 +1503,7 @@ export default function EditChild() {
                               {index === fields.length - 1 && (
                                 <button
                                   type="button"
-                                  onClick={() => append({ date: '', weight: '' })}
+                                  onClick={() => append({ dbId: null, date: '', weight: '' })}
                                   className="btn btn-outline btn-success btn-sm"
                                   title={t('weightTracking.add_more_button_title')}
                                 >

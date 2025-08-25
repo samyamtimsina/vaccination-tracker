@@ -170,14 +170,14 @@ const VaccineCard = ({
           </div>
           <div className="flex flex-col items-end space-y-1">
             <span className={`badge ${dose.status === 'SEVERELY_OVERDUE'
-                ? 'badge-error'
-                : dose.status === 'OVERDUE'
-                  ? 'badge-warning'
-                  : dose.status === 'DUE_NOW'
-                    ? 'badge-info'
-                    : dose.status === 'ACCESSIBLE'
-                      ? 'badge-success'
-                      : 'badge-neutral'
+              ? 'badge-error'
+              : dose.status === 'OVERDUE'
+                ? 'badge-warning'
+                : dose.status === 'DUE_NOW'
+                  ? 'badge-info'
+                  : dose.status === 'ACCESSIBLE'
+                    ? 'badge-success'
+                    : 'badge-neutral'
               } text-xs`}>
               {t(`vaccine_card.status.${dose.status.toLowerCase()}`)}
             </span>
@@ -468,7 +468,7 @@ export default function AddChild() {
         administeredById: parseInt(data.administeredById),
         wardOfVaccination: 1
       };
-      console.log('payload', payload);
+      console.log('payload add child', payload);
       const res = await axiosClient.post('/api/child', payload);
       addChildToState(res.data);
       toast.success(t('toast.success'));

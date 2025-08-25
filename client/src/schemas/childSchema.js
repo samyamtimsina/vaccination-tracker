@@ -117,3 +117,29 @@ export const createChildSchema = z.object({
     .optional(),
   weightRecords: z.array(weightRecordSchema).optional(),
 });
+export const updateChildSchema = z.object({
+  firstName: z.string().min(1, 'पहिलो नाम आवश्यक छ').optional(),
+  lastName: z.string().optional().nullable(),
+  parentName: z.string().min(1, 'अभिभावकको नाम आवश्यक छ').optional(),
+  tole: z.string().min(1, 'टोल आवश्यक छ').optional(),
+  wardNumber: numericString.optional(),
+  casteCode: numericString.optional(),
+  birthDate: dateSchema.optional(),
+  isFromOtherMunicipality: z.boolean().optional(),
+  administeredById: numericString.optional(),
+  gender: z
+    .string()
+    .transform((val) => val.toUpperCase().trim())
+    .pipe(
+      z.enum(['MALE', 'FEMALE', 'OTHER'], {
+        errorMap: (issue, ctx) => ({
+          message: 'लिङ्ग पुरुष, महिला वा अन्य हुनुपर्छ',
+        }),
+      })
+    )
+    .optional(),
+  phoneNumber: z.string().optional().nullable(),
+  remarks: z.string().optional().nullable(),
+  vaccines: z.record(z.string(), z.array(vaccineDoseSchema)).optional(),
+  weightRecords: z.array(weightRecordSchema).optional(),
+});

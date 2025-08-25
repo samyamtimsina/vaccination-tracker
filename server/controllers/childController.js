@@ -394,19 +394,18 @@ export const searchChildren = async (req, res) => {
   }
 };
 
-// A validation schema is required for updates, similar to create.
-// Since we don't have one, we will use a hypothetical updateChildSchema.
-// You'll need to create this in your schemas/childSchema.js file.
-// It should be a Zod schema that makes all fields optional as they may not
 export const updateChild = async (req, res) => {
   const {
     id
   } = req.params;
   const sewaDartaNumber = parseInt(id, 10);
   const {
-    vaccines,
+    vaccinations,
     weightRecords,
     administeredById,
+    firstName,
+    lastName,
+    remarks,
     ...demographicData
   } = req.body;
   const currentUser = req.user;
@@ -431,70 +430,148 @@ export const updateChild = async (req, res) => {
     // Validate if the user has permission to edit demographics
     const isSameWard = existingChild.wardNumber === currentUser.wardId;
     if (!isSameWard && (Object.keys(demographicData).length > 0)) {
-      // Prevents a cross-ward officer from sending any demographic data changes
+      console.log(
+        'User from different ward trying to edit demographics:',
+        currentUser.wardId,
+        existingChild.wardNumber, 'demographicData', demographicData
+      )
       return res.status(403).json({
         error: 'You are not authorized to edit this child\'s demographic information.'
       });
     }
-
     await prisma.$transaction(async (tx) => {
       if (isSameWard) {
         // Only allow demographic updates for same-ward users
+        const updateData = {
+          fullName: `${firstName || ''} ${lastName || ''}`.trim(),
+        };
+
+        // only include valid fields
+        if (demographicData.birthDate) {
+          updateData.birthDate = parseBsDateString(demographicData.birthDate);
+        }
+        if (typeof demographicData.phoneNumber === 'string' && demographicData.phoneNumber.trim() !== '') {
+          updateData.phoneNumber = demographicData.phoneNumber;
+        }
+        if (typeof demographicData.gender === 'string') {
+          updateData.gender = demographicData.gender;
+        }
+        if (typeof demographicData.wardNumber === 'number') {
+          updateData.wardNumber = demographicData.wardNumber;
+        }
+        if (typeof demographicData.casteCode === 'number') {
+          updateData.casteCode = demographicData.casteCode;
+        }
+        if (typeof demographicData.parentName === 'string') {
+          updateData.parentName = demographicData.parentName;
+        }
+        if (typeof demographicData.tole === 'string') {
+          updateData.tole = demographicData.tole;
+        }
+        if (typeof demographicData.isFromOtherMunicipality === 'boolean') {
+          updateData.isFromOtherMunicipality = demographicData.isFromOtherMunicipality;
+        }
+
         await tx.child.update({
-          where: {
-            sewaDartaNumber
-          },
-          data: {
-            ...demographicData,
-            fullName: `${demographicData.firstName || ''} ${demographicData.lastName || ''}`.trim(),
-            birthDate: parseBsDateString(demographicData.birthDate),
-          },
+          where: { sewaDartaNumber },
+          data: updateData,
         });
       }
 
-      // Update vaccine and weight records for both same-ward and cross-ward users
-      const newVaccines = vaccines.map(v => ({
-        ...v,
-        // Ensure new records are logged with the vaccinating officer's ward
-        wardOfVaccination: currentUser.wardId
-      }));
-      const newWeights = weightRecords.map(w => ({
-        ...w,
-        // Ensure new records are logged with the vaccinating officer's ward
-        wardOfVaccination: currentUser.wardId
-      }));
+      // Prepare vaccination records safely
+      const incomingVaccs = Array.isArray(vaccinations) ? vaccinations : [];
 
-      // A note on the database schema:
-      // The `VaccinationRecord` and `WeightRecord` models should have a
-      // `wardOfVaccination` field to log where the record was created.
-      // This is a crucial change to your database schema for the flow to work correctly.
-      await tx.child.update({
-        where: {
-          sewaDartaNumber
-        },
-        data: {
-          vaccinations: {
-            upsert: newVaccines.map(v => ({
-              where: {
-                id: v.id || v.vaccineCode_childId // Handle new vs existing records
-              },
-              create: v,
-              update: v,
-            }))
-          },
-          weightRecords: {
-            upsert: newWeights.map(w => ({
-              where: {
-                id: w.id || w.recordDate_childId
-              },
-              create: w,
-              update: w,
-            }))
-          },
+      for (const v of incomingVaccs) {
+        const parsedDate = v.dateGiven ? parseBsDateString(v.dateGiven) : null;
+
+        // Base update/create payload (do NOT include date unless valid)
+        const vData = {
+          remarks: v.remarks ?? null,
           administeredById: administeredById,
-          modifiedAt: new Date(),
-        },
-      });
+          wardOfVaccination: currentUser.wardId,
+        };
+        if (parsedDate) vData.dateGiven = parsedDate;
+
+        // Find existing vaccine (same vaccineType + doseNumber)
+        const existingVaccine = existingChild.vaccinations.find(
+          (ev) => ev.vaccineType === v.vaccineType && ev.doseNumber === v.doseNumber
+        );
+
+        if (existingVaccine) {
+          // Only update dateGiven if valid to avoid setting it to null
+          await tx.vaccinationRecord.update({
+            where: { id: existingVaccine.id },
+            data: vData,
+          });
+        } else {
+          // Only create a new record if we have a valid date
+          if (parsedDate) {
+            await tx.vaccinationRecord.create({
+              data: {
+                ...vData,
+                vaccineType: v.vaccineType,
+                doseNumber: v.doseNumber,
+                citizenId: existingChild.id,
+                createdById: currentUser.id,
+              },
+            });
+          }
+        }
+      }
+
+      // Create weight records safely (skip if date invalid)
+      const incomingWeights = Array.isArray(weightRecords) ? weightRecords : [];
+      // Get IDs of weight records that should be updated
+      const incomingIds = incomingWeights
+        .filter(w => w.id && !isNaN(parseInt(w.id)))
+        .map(w => parseInt(w.id));
+
+      // Delete weight records that are no longer in the incoming data
+      if (existingChild.weightRecords.length > 0) {
+        const toDelete = existingChild.weightRecords
+          .filter(existing => !incomingIds.includes(existing.id))
+          .map(wr => wr.id);
+
+        if (toDelete.length > 0) {
+          await tx.weightRecord.deleteMany({
+            where: {
+              id: { in: toDelete },
+              childId: existingChild.id
+            }
+          });
+        }
+      }
+
+      for (const w of incomingWeights) {
+        const parsedWeightDate = w.date ? parseBsDateString(w.date) : null;
+        if (!parsedWeightDate) continue;
+
+        if (w.id) {
+          // Update existing record
+          await tx.weightRecord.update({
+            where: { id: w.id },
+            data: {
+              weight: w.weight,
+              date: parsedWeightDate,
+              administeredById,
+              wardOfVaccination: currentUser.wardId,
+            },
+          });
+        } else {
+          // Create new record
+          await tx.weightRecord.create({
+            data: {
+              weight: w.weight,
+              date: parsedWeightDate,
+              administeredById,
+              wardOfVaccination: currentUser.wardId,
+              childId: existingChild.id,
+              createdById: currentUser.id,
+            },
+          });
+        }
+      }
+
     });
 
     const updatedChild = await prisma.child.findUnique({
