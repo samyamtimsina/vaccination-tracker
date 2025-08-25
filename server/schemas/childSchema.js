@@ -5,8 +5,9 @@ export const createChildSchema = z.object({
   lastName: z.string().optional(),
   parentName: z.string().min(1),
   tole: z.string().min(1),
-  
+
   wardNumber: z.number(),
+  wardOfVaccination: z.number(),
   casteCode: z.number(),
   birthDate: z.string(),
   isFromOtherMunicipality: z.boolean().default(false),

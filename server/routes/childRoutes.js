@@ -6,6 +6,7 @@ import {
   getAllChildren,
   getChild,
   getWardChildren,
+  searchChildren,
   updateChild,
   // generateMockData, // Import the new function
 } from '../controllers/childController.js';
@@ -14,6 +15,8 @@ import {
 import { authenticate, authorize } from '../middlewares/auth.js';
 
 const router = express.Router();
+
+router.get('/search', authenticate, authorize('ADMIN', 'WARD_OFFICER'), searchChildren);
 
 router.get(
   '/ward',

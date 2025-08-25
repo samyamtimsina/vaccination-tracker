@@ -161,25 +161,24 @@ const VaccineCard = ({
                 dose.doseInfo.recommendedAtMonths
                   ? t('vaccine_card.months', { count: dose.doseInfo.recommendedAtMonths })
                   : dose.doseInfo.recommendedAtWeeks
-                  ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
-                  : dose.doseInfo.recommendedAtYears
-                  ? t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
-                  : t('vaccine_card.days', { count: dose.doseInfo.recommendedAtDays })
+                    ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
+                    : dose.doseInfo.recommendedAtYears
+                      ? t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
+                      : t('vaccine_card.days', { count: dose.doseInfo.recommendedAtDays })
               }
             </p>
           </div>
           <div className="flex flex-col items-end space-y-1">
-            <span className={`badge ${
-              dose.status === 'SEVERELY_OVERDUE'
+            <span className={`badge ${dose.status === 'SEVERELY_OVERDUE'
                 ? 'badge-error'
                 : dose.status === 'OVERDUE'
-                ? 'badge-warning'
-                : dose.status === 'DUE_NOW'
-                ? 'badge-info'
-                : dose.status === 'ACCESSIBLE'
-                ? 'badge-success'
-                : 'badge-neutral'
-            } text-xs`}>
+                  ? 'badge-warning'
+                  : dose.status === 'DUE_NOW'
+                    ? 'badge-info'
+                    : dose.status === 'ACCESSIBLE'
+                      ? 'badge-success'
+                      : 'badge-neutral'
+              } text-xs`}>
               {t(`vaccine_card.status.${dose.status.toLowerCase()}`)}
             </span>
             {dose.doseType === 'booster' && (
@@ -232,8 +231,8 @@ const VaccineCard = ({
                         age: dose.doseInfo.recommendedAtMonths
                           ? t('vaccine_card.months', { count: dose.doseInfo.recommendedAtMonths })
                           : dose.doseInfo.recommendedAtWeeks
-                          ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
-                          : t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
+                            ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
+                            : t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
                       })
                     }
                   />
@@ -255,9 +254,8 @@ const VaccineCard = ({
                 <FaClipboardList className="w-3 h-3 mr-1" />
                 {t('vaccine_card.remarks')}
               </span>
-              <span className={`text-xs transform transition-transform ${
-                showRemark ? 'rotate-180' : ''
-              }`}>
+              <span className={`text-xs transform transition-transform ${showRemark ? 'rotate-180' : ''
+                }`}>
                 ▼
               </span>
             </button>
@@ -436,8 +434,8 @@ export default function AddChild() {
     }));
   };
 
-const onSubmit = async (data) => {
-  console.log('Form data before submission:', data);
+  const onSubmit = async (data) => {
+    console.log('Form data before submission:', data);
     try {
       const filteredWeightRecords = data.weightRecords.filter(
         (record) => record.date && record.weight,
@@ -468,6 +466,7 @@ const onSubmit = async (data) => {
         vaccines: filteredVaccines,
         weightRecords: filteredWeightRecords,
         administeredById: parseInt(data.administeredById),
+        wardOfVaccination: 1
       };
       console.log('payload', payload);
       const res = await axiosClient.post('/api/child', payload);
@@ -589,9 +588,8 @@ const onSubmit = async (data) => {
                   </label>
                   <input
                     {...register('firstName')}
-                    className={`input input-bordered w-full ${
-                      errors.firstName ? 'input-error' : ''
-                    }`}
+                    className={`input input-bordered w-full ${errors.firstName ? 'input-error' : ''
+                      }`}
                     placeholder={t('personalInfo.form.firstName.placeholder')}
                   />
                   {errors.firstName && (
@@ -628,9 +626,8 @@ const onSubmit = async (data) => {
                   </label>
                   <select
                     {...register('gender')}
-                    className={`select select-bordered w-full ${
-                      errors.gender ? 'select-error' : ''
-                    }`}
+                    className={`select select-bordered w-full ${errors.gender ? 'select-error' : ''
+                      }`}
                   >
                     <option value="">{t('personalInfo.form.gender.placeholder')}</option>
                     <option value="MALE">{t('personalInfo.form.gender.options.male')}</option>
@@ -653,9 +650,8 @@ const onSubmit = async (data) => {
                   </label>
                   <input
                     {...register('wardNumber')}
-                    className={`input input-bordered w-full ${
-                      errors.wardNumber ? 'input-error' : ''
-                    }`}
+                    className={`input input-bordered w-full ${errors.wardNumber ? 'input-error' : ''
+                      }`}
                     placeholder={t('personalInfo.form.wardNumber.placeholder')}
                   />
                   {errors.wardNumber && (
@@ -675,9 +671,8 @@ const onSubmit = async (data) => {
                   <input
                     type="number"
                     {...register('casteCode')}
-                    className={`input input-bordered w-full ${
-                      errors.casteCode ? 'input-error' : ''
-                    }`}
+                    className={`input input-bordered w-full ${errors.casteCode ? 'input-error' : ''
+                      }`}
                     placeholder={t('personalInfo.form.casteCode.placeholder')}
                   />
                   {errors.casteCode && (
@@ -696,9 +691,8 @@ const onSubmit = async (data) => {
                   </label>
                   <input
                     {...register('parentName')}
-                    className={`input input-bordered w-full ${
-                      errors.parentName ? 'input-error' : ''
-                    }`}
+                    className={`input input-bordered w-full ${errors.parentName ? 'input-error' : ''
+                      }`}
                     placeholder={t('personalInfo.form.parentName.placeholder')}
                   />
                   {errors.parentName && (
@@ -717,9 +711,8 @@ const onSubmit = async (data) => {
                   </label>
                   <input
                     {...register('tole')}
-                    className={`input input-bordered w-full ${
-                      errors.tole ? 'input-error' : ''
-                    }`}
+                    className={`input input-bordered w-full ${errors.tole ? 'input-error' : ''
+                      }`}
                     placeholder={t('personalInfo.form.tole.placeholder')}
                   />
                   {errors.tole && (
@@ -762,9 +755,8 @@ const onSubmit = async (data) => {
                         <>
                           <NepaliDatePicker
                             className="w-full"
-                            inputClassName={`input input-bordered w-full pr-10 ${
-                              errors.birthDate ? 'input-error' : ''
-                            }`}
+                            inputClassName={`input input-bordered w-full pr-10 ${errors.birthDate ? 'input-error' : ''
+                              }`}
                             value={field.value || ''}
                             onChange={(value) => field.onChange(value)}
                             language="ne"
@@ -808,9 +800,8 @@ const onSubmit = async (data) => {
                 </label>
                 <select
                   {...register('administeredById')}
-                  className={`select select-bordered w-full max-w-xs ${
-                    errors.administeredById ? 'select-error' : ''
-                  }`}
+                  className={`select select-bordered w-full max-w-xs ${errors.administeredById ? 'select-error' : ''
+                    }`}
                   defaultValue=""
                 >
                   <option value="" disabled>{t('personalInfo.administered_by.placeholder')}</option>
@@ -984,7 +975,7 @@ const onSubmit = async (data) => {
 
               {/* Vaccine Tabs */}
               {birthDate && gender && (
-                  <>
+                <>
                   <div className="tabs tabs-boxed mb-6">
                     {Object.entries(categorizedVaccines).map(([sectionKey, sectionData]) => {
                       if (sectionData.count > 0 || sectionKey === 'NOT_APPLICABLE') {
@@ -1011,7 +1002,7 @@ const onSubmit = async (data) => {
                         sectionKey={sectionKey}
                         sectionData={sectionData}
                         expandedSections={{ [sectionKey]: true }}
-                        toggleSection={() => {}}
+                        toggleSection={() => { }}
                         control={control}
                         register={register}
                         setValue={setValue}
@@ -1022,7 +1013,7 @@ const onSubmit = async (data) => {
                       />
                     )
                   ))}
-                  </>
+                </>
               )}
 
 

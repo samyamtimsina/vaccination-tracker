@@ -98,6 +98,7 @@ export const createChild = async (req, res) => {
         const vaccinationsWithChildId = vaccinationCreateData.map((v) => ({
           ...v,
           citizenId: child.id,
+          wardOfVaccination: req.user.wardId,
         }));
         await tx.vaccinationRecord.createMany({
           data: vaccinationsWithChildId,
@@ -112,6 +113,8 @@ export const createChild = async (req, res) => {
           date: parseBsDateString(w.date),
           createdById: req.user.id, // The person entering the data
           administeredById: validatedData.administeredById, // Pass the administeredById from the request body
+
+          wardOfVaccination: req.user.wardId,
         }));
         await tx.weightRecord.createMany({ data: weightCreateData });
       }
@@ -226,17 +229,17 @@ export const getWardChildren = async (req, res) => {
       },
       include: {
         createdBy: { select: { id: true, } },
-        verifiedBy: { select: { id: true, } }, 
+        verifiedBy: { select: { id: true, } },
         vaccinations: {
           include: {
             createdBy: { select: { id: true, } },
-            administeredBy: { select: { id: true, } }, 
+            administeredBy: { select: { id: true, } },
           },
         },
         weightRecords: {
           include: {
             createdBy: { select: { id: true, } },
-            administeredBy: { select: { id: true, } }, 
+            administeredBy: { select: { id: true, } },
           },
         },
       },
@@ -309,122 +312,207 @@ export const getChild = async (req, res) => {
     });
   }
 };
-// A validation schema is required for updates, similar to create.
-// Since we don't have one, we will use a hypothetical updateChildSchema.
-// You'll need to create this in your schemas/childSchema.js file.
-// It should be a Zod schema that makes all fields optional as they may not
-export const updateChild = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const sewaDartaNumber = parseInt(id, 10);
-    const {
-      vaccines,
-      weightRecords,
-      administeredById,
-      firstName,
-      lastName,
-      ...restUpdateData
-    } = req.body;
 
-    if (!req.user?.id) {
-      return res.status(401).json({ error: 'Unauthorized' });
+export const searchChildren = async (req, res) => {
+  try {
+    const { name, phoneNumber, sewaDartaNumber, gender, wardId, createdByMe } = req.query;
+    console.log('req.query', req.query);
+
+    // Get the authenticated user's details.
+    const currentUserWardId = req.user.wardId;
+    const currentUserId = req.user.id;
+
+    // Initialize an empty object to build the Prisma query 'where' clause.
+    const whereClause = {};
+
+    // 1. Build search filters for each field dynamically.
+    // If a search term is provided, add it to the whereClause.
+
+    // Search by full name (case-insensitive contains)
+    if (name) {
+      whereClause.fullName = {
+        contains: name,
+        mode: 'insensitive',
+      };
     }
 
-    const updatedChild = await prisma.$transaction(async (tx) => {
-      const existingChild = await tx.child.findUnique({
-        where: { sewaDartaNumber },
-      });
+    // Search by phone number (case-insensitive contains)
+    if (phoneNumber) {
+      whereClause.phoneNumber = {
+        contains: phoneNumber,
+        mode: 'insensitive',
+      };
+    }
 
-      if (!existingChild) {
-        throw new Error('Child not found');
-      }
+    // Search by service registration number (sewaDartaNumber)
+    // Assuming this is a number field, we'll use 'equals' for an exact match.
+    if (sewaDartaNumber) {
+      whereClause.sewaDartaNumber = parseInt(sewaDartaNumber, 10);
+    }
 
-      // 1. Update basic child info
-      const child = await tx.child.update({
-        where: { sewaDartaNumber },
-        data: {
-          ...restUpdateData,
-          fullName: `${firstName || ''} ${lastName || ''}`.trim(),
-          birthDate: parseBsDateString(restUpdateData.birthDate),
-        },
-      });
+    // Filter by gender
+    if (gender) {
+      whereClause.gender = gender.toUpperCase();
+    }
 
-      // 2. Delete all existing vaccination records
-      await tx.vaccinationRecord.deleteMany({
-        where: { citizenId: child.id }
-      });
+    // 2. Adjust ward-based filtering logic
+    // The search will now default to all wards unless a specific wardId is provided.
+    // The ward filter is only applied if a specific wardId is provided by the client
+    // and that wardId is not 'all'.
+    if (wardId && wardId !== 'all') {
+      whereClause.wardNumber = parseInt(wardId, 10);
+    }
+    // If wardId is 'all' or not provided, no ward filter is added, and it searches all wards for any authenticated user.
 
-      // 3. Create new vaccination records if provided
-      if (vaccines) {
-        const vaccinationCreateData = prepareVaccinationCreateData(
-          vaccines,
-          req.user,
-          administeredById
-        );
 
-        if (vaccinationCreateData.length > 0) {
-          await tx.vaccinationRecord.createMany({
-            data: vaccinationCreateData.map(v => ({
-              ...v,
-              citizenId: child.id,
-            })),
-          });
-        }
-      }
+    // 3. Filter by the user who created the record.
+    if (createdByMe === 'true') {
+      whereClause.createdById = currentUserId;
+    }
 
-      // 4. Delete all existing weight records
-      await tx.weightRecord.deleteMany({
-        where: { childId: child.id },
-      });
-
-      // 5. Create new weight records if provided
-      if (weightRecords?.length) {
-        const validWeightRecords = weightRecords
-          .filter((w) => w.date && w.weight) // Only process records with both date and weight
-          .map((w) => ({
-            childId: child.id,
-            weight: parseFloat(w.weight),
-            date: parseBsDateString(w.date),
-            createdById: req.user.id,
-            administeredById: administeredById,
-          }));
-
-        if (validWeightRecords.length > 0) {
-          await tx.weightRecord.createMany({
-            data: validWeightRecords,
-          });
-        }
-      }
-
-      // 6. Return updated child with all relations
-      return await tx.child.findUnique({
-        where: { sewaDartaNumber },
-        include: {
-          createdBy: { select: { id: true, name: true } },
-          verifiedBy: { select: { id: true, name: true } },
-          vaccinations: {
-            include: {
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-            },
-          },
-          weightRecords: {
-            include: {
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-            },
-          },
-        },
-      });
+    // Perform the Prisma query with the dynamically built where clause.
+    const children = await prisma.child.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        fullName: true,
+        sewaDartaNumber: true,
+        birthDate: true,
+        gender: true,
+        wardNumber: true, // It's a good idea to return the wardNumber to the client
+      },
+      take: 20,
     });
 
-    res.status(200).json(updatedChild);
+    res.status(200).json(children);
   } catch (error) {
-    console.error('Child update error:', error);
+    console.error('Error searching children:', error);
     res.status(500).json({
-      error: 'Child update failed',
+      error: 'Failed to perform search',
       details: error.message,
     });
   }
 };
 
+// A validation schema is required for updates, similar to create.
+// Since we don't have one, we will use a hypothetical updateChildSchema.
+// You'll need to create this in your schemas/childSchema.js file.
+// It should be a Zod schema that makes all fields optional as they may not
+export const updateChild = async (req, res) => {
+  const {
+    id
+  } = req.params;
+  const sewaDartaNumber = parseInt(id, 10);
+  const {
+    vaccines,
+    weightRecords,
+    administeredById,
+    ...demographicData
+  } = req.body;
+  const currentUser = req.user;
+
+  try {
+    const existingChild = await prisma.child.findUnique({
+      where: {
+        sewaDartaNumber
+      },
+      include: {
+        vaccinations: true,
+        weightRecords: true,
+      }
+    });
+
+    if (!existingChild) {
+      return res.status(404).json({
+        error: 'Child not found'
+      });
+    }
+
+    // Validate if the user has permission to edit demographics
+    const isSameWard = existingChild.wardNumber === currentUser.wardId;
+    if (!isSameWard && (Object.keys(demographicData).length > 0)) {
+      // Prevents a cross-ward officer from sending any demographic data changes
+      return res.status(403).json({
+        error: 'You are not authorized to edit this child\'s demographic information.'
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (isSameWard) {
+        // Only allow demographic updates for same-ward users
+        await tx.child.update({
+          where: {
+            sewaDartaNumber
+          },
+          data: {
+            ...demographicData,
+            fullName: `${demographicData.firstName || ''} ${demographicData.lastName || ''}`.trim(),
+            birthDate: parseBsDateString(demographicData.birthDate),
+          },
+        });
+      }
+
+      // Update vaccine and weight records for both same-ward and cross-ward users
+      const newVaccines = vaccines.map(v => ({
+        ...v,
+        // Ensure new records are logged with the vaccinating officer's ward
+        wardOfVaccination: currentUser.wardId
+      }));
+      const newWeights = weightRecords.map(w => ({
+        ...w,
+        // Ensure new records are logged with the vaccinating officer's ward
+        wardOfVaccination: currentUser.wardId
+      }));
+
+      // A note on the database schema:
+      // The `VaccinationRecord` and `WeightRecord` models should have a
+      // `wardOfVaccination` field to log where the record was created.
+      // This is a crucial change to your database schema for the flow to work correctly.
+      await tx.child.update({
+        where: {
+          sewaDartaNumber
+        },
+        data: {
+          vaccinations: {
+            upsert: newVaccines.map(v => ({
+              where: {
+                id: v.id || v.vaccineCode_childId // Handle new vs existing records
+              },
+              create: v,
+              update: v,
+            }))
+          },
+          weightRecords: {
+            upsert: newWeights.map(w => ({
+              where: {
+                id: w.id || w.recordDate_childId
+              },
+              create: w,
+              update: w,
+            }))
+          },
+          administeredById: administeredById,
+          modifiedAt: new Date(),
+        },
+      });
+    });
+
+    const updatedChild = await prisma.child.findUnique({
+      where: {
+        sewaDartaNumber
+      },
+      include: {
+        vaccinations: true,
+        weightRecords: true,
+      },
+    });
+
+    res.status(200).json(updatedChild);
+  } catch (error) {
+    console.error('Error updating child:', error);
+    res.status(500).json({
+      error: 'Failed to update child data',
+      details: error.message,
+    });
+  }
+};

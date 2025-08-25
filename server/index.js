@@ -6,6 +6,7 @@ import authRoutes from './routes/authRoutes.js';
 import childRoutes from './routes/childRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import cookieParser from 'cookie-parser';
+import morgan from 'morgan';
 
 import motherRoutes from './routes/motherRoutes.js';
 // import './jobs/smsCronJob.js';
@@ -24,6 +25,7 @@ const corsOptions = {
 
 app.use(cookieParser());
 app.use(cors(corsOptions));
+app.use(morgan('dev'));
 
 const PORT = process.env.PORT || 5000;
 

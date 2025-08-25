@@ -115,6 +115,7 @@ model VaccinationRecord {
   administeredById          Int?
   administeredBy            User?       @relation(name: "AdministeredByVaccination", fields: [administeredById], references: [id])
   createdAt                 DateTime    @default(now())
+   wardOfVaccination     Int
 }
 
 enum VaccineType {
@@ -182,4 +183,5 @@ model WeightRecord {
   administeredBy            User?    @relation(name: "AdministeredByWeight", fields: [administeredById], references: [id])
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
+    wardOfVaccination     Int
 }

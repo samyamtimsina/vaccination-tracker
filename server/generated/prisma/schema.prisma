@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                        Int                 @id @default(autoincrement())
+  name                      String
+  email                     String              @unique
+  passwordHash              String
+  role                      UserRole
+  wardId                    Int?
+  status                    UserStatus          @default(PENDING)
+  Child                     Child[]
+  Mother                    Mother[]
+  createdVaccinationRecords VaccinationRecord[] @relation(name: "CreatedByVaccination")
+  administeredVaccinations  VaccinationRecord[] @relation(name: "AdministeredByVaccination")
+  AuditLogs                 AuditLog[]
+  createdWeightRecords      WeightRecord[]      @relation(name: "CreatedByWeight")
+  administeredWeightRecords WeightRecord[]      @relation(name: "AdministeredByWeight")
+  verifiedChildren          Child[]             @relation(name: "VerifiedBy")
+  createdTDDoses            TDDose[]
+  administeredTDDoses       TDDose[]            @relation("AdministeredByTDDose")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  WARD_OFFICER
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  DISABLED
+}
+
+model Child {
+  id                      String              @id @default(uuid())
+  sewaDartaNumber         Int                 @unique @default(autoincrement())
+  fullName                String
+  wardNumber              Int
+  casteCode               Int
+  gender                  String
+  parentName              String
+  tole                    String
+  phoneNumber             String
+  birthDate               DateTime
+  purnaKhop               Boolean             @default(false)
+  remarks                 String?
+  createdById             Int
+  createdBy               User                @relation(fields: [createdById], references: [id])
+  verifiedById            Int?
+  verifiedBy              User?               @relation(name: "VerifiedBy", fields: [verifiedById], references: [id])
+  vaccinations            VaccinationRecord[]
+  createdAt               DateTime            @default(now())
+  NotificationLog         NotificationLog[]
+  isFromOtherMunicipality Boolean             @default(false)
+  weightRecords           WeightRecord[]
+}
+
+model Mother {
+  id                      String   @id @default(uuid())
+  sewaDartaNumber         Int      @unique @default(autoincrement())
+  name                    String
+  casteCode               Int
+  age                     Int
+  phoneNumber             String
+  tole                    String
+  wardNumber              Int
+  pregnancyCount          Int
+  previousTDTakenCount    Int
+  remarks                 String?
+  createdAt               DateTime @default(now())
+  createdById             Int
+  createdBy               User     @relation(fields: [createdById], references: [id])
+  isFromOtherMunicipality Boolean  @default(false)
+  tdDoses                 TDDose[]
+}
+
+model TDDose {
+  id          String   @id @default(uuid())
+  doseNumber  Int // To identify if it's the 1st, 2nd, or 2nd+ dose
+  dateGiven   DateTime
+  remarks     String?
+  motherId    String
+  mother      Mother   @relation(fields: [motherId], references: [id])
+  createdAt   DateTime @default(now())
+  createdById Int
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  // New fields to track the user who administered the vaccine
+  administeredById Int
+  administeredBy   User @relation("AdministeredByTDDose", fields: [administeredById], references: [id])
+}
+
+model VaccinationRecord {
+  id                  String      @id @default(uuid())
+  citizenId           String
+  vaccineType         VaccineType
+  doseNumber          Int
+  dateGiven           DateTime
+  isComplete          Boolean
+  remarks             String?
+  recommendedAtMonths Int
+  customVaccineName   String?
+  type                String      @default("routine")
+  child               Child       @relation(fields: [citizenId], references: [id])
+  createdById         Int
+  createdBy           User        @relation(name: "CreatedByVaccination", fields: [createdById], references: [id])
+  administeredById    Int?
+  administeredBy      User?       @relation(name: "AdministeredByVaccination", fields: [administeredById], references: [id])
+  createdAt           DateTime    @default(now())
+}
+
+enum VaccineType {
+  BCG
+  DPT_HEPB_HIB
+  ROTA
+  OPV
+  FIPV
+  PCV
+  MR
+  JE
+  TCV
+  HPV
+  OTHERS
+}
+
+model NotificationLog {
+  id          Int         @id @default(autoincrement())
+  citizenId   String
+  vaccineType VaccineType
+  doseNumber  Int
+  sentAt      DateTime    @default(now())
+  type        String
+  child       Child       @relation(fields: [citizenId], references: [id])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  action    String
+  meta      Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model CorrectionRequest {
+  id            Int       @id @default(autoincrement())
+  vaccinationId String
+  requestedById Int
+  reason        String
+  status        String    @default("pending")
+  createdAt     DateTime  @default(now())
+  processedById Int?
+  processedAt   DateTime?
+}
+
+model Certificate {
+  id         Int      @id @default(autoincrement())
+  childId    String
+  issuedById Int
+  issuedAt   DateTime @default(now())
+  token      String   @unique
+  pdfPath    String?
+}
+
+model WeightRecord {
+  id               String   @id @default(uuid())
+  date             DateTime
+  weight           Float
+  child            Child    @relation(fields: [childId], references: [id])
+  childId          String
+  createdById      Int
+  createdBy        User     @relation(name: "CreatedByWeight", fields: [createdById], references: [id])
+  administeredById Int?
+  administeredBy   User?    @relation(name: "AdministeredByWeight", fields: [administeredById], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
