@@ -26,6 +26,7 @@ model User {
   verifiedChildren          Child[]             @relation(name: "VerifiedBy")
   createdTDDoses            TDDose[]
   administeredTDDoses       TDDose[]            @relation("AdministeredByTDDose")
+  RefreshTokens             RefreshToken[]
 }
 
 enum UserRole {
@@ -38,6 +39,16 @@ enum UserStatus {
   PENDING
   ACTIVE
   DISABLED
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  device    String? // optional: track device/browser
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model Child {
@@ -116,6 +127,7 @@ model VaccinationRecord {
   administeredById    Int?
   administeredBy      User?       @relation(name: "AdministeredByVaccination", fields: [administeredById], references: [id])
   createdAt           DateTime    @default(now())
+  wardOfVaccination   Int
 }
 
 enum VaccineType {
@@ -172,15 +184,16 @@ model Certificate {
 }
 
 model WeightRecord {
-  id               String   @id @default(uuid())
-  date             DateTime
-  weight           Float
-  child            Child    @relation(fields: [childId], references: [id])
-  childId          String
-  createdById      Int
-  createdBy        User     @relation(name: "CreatedByWeight", fields: [createdById], references: [id])
-  administeredById Int?
-  administeredBy   User?    @relation(name: "AdministeredByWeight", fields: [administeredById], references: [id])
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                String   @id @default(uuid())
+  date              DateTime
+  weight            Float
+  child             Child    @relation(fields: [childId], references: [id])
+  childId           String
+  createdById       Int
+  createdBy         User     @relation(name: "CreatedByWeight", fields: [createdById], references: [id])
+  administeredById  Int?
+  administeredBy    User?    @relation(name: "AdministeredByWeight", fields: [administeredById], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  wardOfVaccination Int
 }

@@ -7,24 +7,41 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const checkAuthentication = async () => {
-    try {
-      const response = await axiosClient.get('/api/users/me', {
-        withCredentials: true,
-      });
-      setUser(response.data.user); // The server should return the user's data
-    } catch (error) {
-      console.error('Authentication check failed:', error);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Run the check when the component first mounts.
+  //automatic refresh token
   useEffect(() => {
-    checkAuthentication();
+    const checkAuth = async () => {
+      try {
+        const response = await axiosClient.get('/api/users/me', { withCredentials: true });
+        setUser(response.data.user);
+      } catch (error) {
+        // If access token expired, try refreshing
+        try {
+          await axiosClient.post('/api/auth/refresh', {}, { withCredentials: true });
+          // Retry fetching user after refresh
+          const retryResponse = await axiosClient.get('/api/users/me', { withCredentials: true });
+          setUser(retryResponse.data.user);
+        } catch {
+          setUser(null); // Refresh failed → force logout
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+
+    // Optional: auto-refresh every 10 minutes
+    const interval = setInterval(async () => {
+      try {
+        await axiosClient.post('/api/auth/refresh', {}, { withCredentials: true });
+      } catch {
+        setUser(null); // Refresh failed → logout
+      }
+    }, 10 * 60 * 1000);
+
+    return () => clearInterval(interval);
   }, []);
+
 
   async function login(email, password) {
     try {

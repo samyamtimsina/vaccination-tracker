@@ -26,6 +26,7 @@ model User {
   verifiedChildren          Child[]             @relation(name: "VerifiedBy")
   createdTDDoses      TDDose[]
   administeredTDDoses TDDose[] @relation("AdministeredByTDDose")
+  RefreshTokens             RefreshToken[]
 }
 enum UserRole {
   SUPER_ADMIN
@@ -38,6 +39,17 @@ enum UserStatus {
   ACTIVE
   DISABLED
 }
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  device    String?  // optional: track device/browser
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
 
 
 model Child {

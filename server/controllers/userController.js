@@ -1,5 +1,4 @@
 import { prisma } from '../utils/prisma.js';
-import { UserStatus } from '../generated/prisma/client.js';
 
 export const getMe = (req, res) => {
   if (req.user) {
@@ -8,7 +7,7 @@ export const getMe = (req, res) => {
       email: req.user.email,
       name: req.user.name,
     };
-    res.json({ user });
+    res.status(200).json({ user });
   } else {
     res.status(404).json({ message: 'User not found' });
   }
@@ -39,6 +38,7 @@ export const getUsers = async (req, res) => {
 export const getWardUsers = async (req, res) => {
   try {
     const { role } = req.query;
+    console.log('role', role)
     const wardId = req.user.wardId;
 
     const whereClause = {
@@ -178,4 +178,20 @@ export const approveUser = async (req, res) => {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
+};
+
+export const disableUser = async (req, res) => {
+  if (req.user.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  const userId = parseInt(req.params.id);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { status: 'DISABLED' },
+  });
+
+  await prisma.refreshToken.deleteMany({ where: { userId } });
+
+  res.json({ message: 'User disabled successfully' });
 };

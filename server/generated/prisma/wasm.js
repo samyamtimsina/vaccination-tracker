@@ -130,6 +130,15 @@ exports.Prisma.UserScalarFieldEnum = {
   status: 'status'
 };
 
+exports.Prisma.RefreshTokenScalarFieldEnum = {
+  id: 'id',
+  token: 'token',
+  userId: 'userId',
+  device: 'device',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.ChildScalarFieldEnum = {
   id: 'id',
   sewaDartaNumber: 'sewaDartaNumber',
@@ -296,6 +305,7 @@ exports.VaccineType = exports.$Enums.VaccineType = {
 
 exports.Prisma.ModelName = {
   User: 'User',
+  RefreshToken: 'RefreshToken',
   Child: 'Child',
   Mother: 'Mother',
   TDDose: 'TDDose',

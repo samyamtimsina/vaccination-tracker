@@ -5,6 +5,7 @@ import {
   getMe,
   updateUserProfile,
   getUsers,
+  disableUser,
   getWardUsers,
   approveUser,
 } from '../controllers/userController.js';
@@ -29,4 +30,5 @@ router.patch(
   authorize('SUPER_ADMIN', 'ADMIN'),
   approveUser,
 );
+router.post('/disable-user/:id', authenticate, disableUser);
 export default router;
