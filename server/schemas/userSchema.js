@@ -7,6 +7,7 @@ export const registerSchema = z.object({
 
   // 'email' must be a string, a valid email format, and not be empty
   email: z.email(),
+  phoneNumber: z.string().min(10, { message: 'Phone number must be at least 10 characters long' }),
 
   // 'password' must be a string and have a minimum length for security
   password: z

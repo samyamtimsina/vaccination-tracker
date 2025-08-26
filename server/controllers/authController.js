@@ -22,7 +22,7 @@ export const register = async (req, res) => {
     });
   }
 
-  const { name, email, password, wardId } = validationResult.data;
+  const { name, email, password, wardId, phoneNumber } = validationResult.data;
 
   try {
     const existingUser = await prisma.user.findUnique({
@@ -45,6 +45,7 @@ export const register = async (req, res) => {
         role: 'WARD_OFFICER',
         status: 'PENDING',
         wardId,
+        phoneNumber
       },
     });
 
@@ -55,6 +56,7 @@ export const register = async (req, res) => {
       email: newUser.email,
       role: newUser.role,
       wardId: newUser.wardId,
+      phoneNumber: newUser.phoneNumber
     });
   } catch (error) {
     console.error('Registration failed:', error);
@@ -78,6 +80,9 @@ export const login = async (req, res) => {
   }
 
   const { email, password } = validationResult.data;
+  function generateOtp() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
@@ -93,8 +98,45 @@ export const login = async (req, res) => {
     }
 
     // Enforce active status
-    if (user.status !== 'ACTIVE') {
-      return res.status(403).json({ message: `Account is ${user.status}` });
+    if (user.status === 'PENDING') {
+      // Logic for PENDING users: Initiate OTP verification
+
+      // Generate a new OTP and set its expiry
+      const otpCode = generateOtp();
+      const expiryDate = new Date();
+      expiryDate.setMinutes(expiryDate.getMinutes() + 5); // OTP expires in 5 minutes
+
+      // Hash the OTP before storing it for security
+      const hashedOtp = await bcrypt.hash(otpCode, 10); // Use a salt round of 10
+
+      // Store the OTP in the database.
+      // We will clear any existing OTPs for this user to ensure only the latest one is valid.
+      await prisma.otp.deleteMany({
+        where: { userId: user.id },
+      });
+      await prisma.otp.create({
+        data: {
+          otpCode: hashedOtp,
+          expiresAt: expiryDate,
+          userId: user.id,
+        },
+      });
+
+      // Log the OTP to the console for development/testing purposes.
+      // This part will be replaced by an actual SMS or email provider later.
+      console.log(`[OTP] Sending OTP ${otpCode} to user with ID ${user.id} at email: ${user.email}`);
+
+      // Return a success response indicating OTP is required.
+      // Do NOT send the OTP itself back to the client.
+      return res.status(200).json({
+        message: 'Account pending. OTP verification required.',
+        userId: user.id, // Send the user ID back so the client knows which user to verify
+      });
+
+    } else if (user.status === 'DISABLED') {
+      // Logic for DISABLED users: Deny access
+      return res.status(403).json({ message: 'Your account is currently disabled. Please contact support.' });
+
     }
 
     // --- Generate short-lived access token (15 mins) ---
@@ -164,6 +206,12 @@ export const login = async (req, res) => {
 export const logout = async (req, res) => {
   try {
     const { refreshToken } = req.cookies;
+    console.log(
+      'Logging out user:',
+      req.user ? `ID ${req.user.id}, Email: ${req.user.email}` : 'No user data'
+
+    )
+    console.log('Refresh token from cookies:', refreshToken);
 
     if (refreshToken) {
       await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
@@ -229,3 +277,115 @@ export const refreshToken = async (req, res) => {
     res.status(500).json({ error: 'Failed to refresh token' });
   }
 };
+
+export const verifyOtp = async (req, res) => {
+  const { userId, otpCode } = req.body;
+
+  // 1. Validate incoming data
+  if (!userId || !otpCode) {
+    return res.status(400).json({ message: 'User ID and OTP are required.' });
+  }
+
+  try {
+    // 2. Find the OTP record for the given user
+    const otpRecord = await prisma.otp.findFirst({
+      where: {
+        userId: parseInt(userId), // Ensure userId is an integer
+      },
+      include: {
+        user: true, // Include the user data to update their status later
+      },
+      orderBy: {
+        createdAt: 'desc', // Get the latest OTP if multiple exist (though the login endpoint deletes old ones)
+      },
+    });
+
+    // Handle cases where no OTP record is found
+    if (!otpRecord) {
+      return res.status(404).json({ message: 'No pending OTP found for this account. Please log in again to generate a new one.' });
+    }
+
+    // 3. Check if the OTP has expired
+    if (new Date() > otpRecord.expiresAt) {
+      // Delete the expired OTP to prevent future use and cleanup the database
+      await prisma.otp.delete({
+        where: { id: otpRecord.id },
+      });
+      return res.status(400).json({ message: 'OTP has expired. Please log in again to receive a new one.' });
+    }
+
+    // 4. Compare the submitted OTP with the stored hashed OTP
+    const isOtpValid = await bcrypt.compare(String(otpCode), otpRecord.otpCode);
+    if (!isOtpValid) {
+      // You might choose to add a lockout mechanism here after a number of failed attempts
+      return res.status(401).json({ message: 'Invalid OTP. Please try again.' });
+    }
+
+    // 5. If OTP is valid, activate the user's account and delete the OTP record
+    const user = await prisma.user.update({
+      where: { id: otpRecord.user.id },
+      data: { status: 'ACTIVE' },
+    });
+
+    // Delete the OTP record since it has been successfully used
+    await prisma.otp.delete({
+      where: { id: otpRecord.id },
+    });
+
+    // 6. Issue a new access token and refresh token
+    const accessToken = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        wardId: user.wardId,
+      },
+      JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    const refreshToken = crypto.randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30); // 30-day refresh token
+
+    await prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt: expiresAt,
+        device: 'unknown', // You might get this from the request headers
+      },
+    });
+
+    // 7. Return the tokens to the client
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+      path: '/',
+    });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      path: '/',
+    });
+
+    return res.status(200).json({
+      message: 'Account successfully activated and logged in.',
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      wardId: user.wardId,
+      phoneNumber: user.phoneNumber
+    });
+
+  } catch (error) {
+    console.error('OTP verification error:', error);
+    return res.status(500).json({ message: 'An internal server error occurred.' });
+  }
+
+}

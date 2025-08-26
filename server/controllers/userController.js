@@ -15,7 +15,6 @@ export const getMe = (req, res) => {
 export const getUsers = async (req, res) => {
   try {
     const { role } = req.query;
-    console.log('role', role);
 
     // Build the query options based on the `role` query parameter
     const whereClause = role ? { role: role } : {};

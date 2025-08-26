@@ -15,6 +15,7 @@ model User {
   passwordHash              String
   role                      UserRole 
   wardId                    Int?
+  phoneNumber               String 
   status       UserStatus @default(PENDING)
   Child                     Child[]
   Mother                    Mother[]
@@ -27,6 +28,7 @@ model User {
   createdTDDoses      TDDose[]
   administeredTDDoses TDDose[] @relation("AdministeredByTDDose")
   RefreshTokens             RefreshToken[]
+  otps                     Otp[]
 }
 enum UserRole {
   SUPER_ADMIN
@@ -48,6 +50,14 @@ model RefreshToken {
   device    String?  // optional: track device/browser
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+model Otp {
+  id          Int      @id @default(autoincrement())
+  otpCode     String   // The hashed OTP code
+  expiresAt   DateTime // The time when the OTP becomes invalid
+  createdAt   DateTime @default(now())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 
