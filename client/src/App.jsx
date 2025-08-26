@@ -21,6 +21,7 @@ import { Outlet } from 'react-router-dom';
 import "./i18n";
 import UserProfile from './pages/userProfile.jsx';
 import EditChild from './pages/EditChild.jsx';
+import VerifyOTP from './components/VerifyOTP.jsx';
 
 // A simple layout component that includes the navbar
 const MainLayout = () => {
@@ -38,35 +39,36 @@ function App() {
       <ThemeProvider>
         <ChildProvider>
           <MotherProvider>
-          {' '}
-          <BrowserRouter>
-            <Routes>
-              {/* Login route has no navbar */}
-              <Route path="/login" element={<Login />} />
+            {' '}
+            <BrowserRouter>
+              <Routes>
+                {/* Login route has no navbar */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/verify-otp" element={<VerifyOTP />} />
 
-              {/* These routes will use the MainLayout, which includes the Navbar */}
-              <Route element={<MainLayout />}>
-                <Route path="/" element={<Home />} />
+                {/* These routes will use the MainLayout, which includes the Navbar */}
+                <Route element={<MainLayout />}>
+                  <Route path="/" element={<Home />} />
 
-              </Route>
-                
+                </Route>
+
                 {/* Nested protected routes within the main layout */}
                 <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
- <Route path="/users/:userId" element={<UserProfile />} />
+                  <Route path="/users/:userId" element={<UserProfile />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/add-child" element={<AddChild />} />
-                  <Route path="/edit-child" element={<EditChild/>} />
+                  <Route path="/edit-child" element={<EditChild />} />
                   <Route path="/add-mother" element={<AddMother />} />
                   <Route path="/view-children" element={<ViewChildren />} />
                   <Route path="/view-mothers" element={<ViewMothers />} />
                   <Route path="/profile" element={<Profile />} />
-                  <Route path="/graph" element={<Graph/>}/>
+                  <Route path="/graph" element={<Graph />} />
                   <Route path="/print" element={<PrintCardWrapper />} />
                 </Route>
 
-            </Routes>
-          </BrowserRouter>
-</MotherProvider>
+              </Routes>
+            </BrowserRouter>
+          </MotherProvider>
         </ChildProvider>
       </ThemeProvider>
     </AuthProvider>

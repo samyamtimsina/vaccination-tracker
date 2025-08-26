@@ -28,9 +28,24 @@ export default function Login() {
 
   const onSubmit = async (data) => {
     try {
-      await login(data.email, data.password);
-      toast.success(t('toast.success'));
-      navigate('/dashboard');
+      const response = await login(data.email, data.password);
+      console.log('Login response:', response);
+
+      switch (response?.status) {
+        case 'PENDING':
+
+          console.log('verify opt should be called');
+          navigate('/verify-otp', { state: { userId: response.userId } });
+          break;
+
+        case 'ACTIVE':
+          toast.success(t('toast.success'));
+          navigate('/dashboard');
+          break;
+
+        default:
+          toast.error(t('toast.error'));
+      }
     } catch (err) {
       console.error(err);
       toast.error(err?.response?.data?.message || t('toast.error'));
@@ -45,8 +60,8 @@ export default function Login() {
 
   return (
     <>
-      <ToastContainer 
-        position="top-right" 
+      <ToastContainer
+        position="top-right"
         autoClose={3000}
         className="!top-16 sm:!top-4"
         toastClassName="!text-sm"
@@ -117,19 +132,19 @@ export default function Login() {
 
           {/* Theme Toggle */}
           <label className="group relative overflow-hidden bg-base-100/80 hover:bg-base-100 backdrop-blur-xl border border-base-300/50 hover:border-primary/30 rounded-2xl w-12 h-12 sm:w-auto sm:h-auto sm:px-4 sm:py-2.5 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 flex items-center justify-center cursor-pointer">
-            <input 
-              type="checkbox" 
-              onChange={toggleTheme} 
+            <input
+              type="checkbox"
+              onChange={toggleTheme}
               checked={theme === 'light'}
               className="sr-only"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             <div className="relative flex items-center gap-2">
               {/* Sun Icon (Light Mode) */}
-              <svg 
+              <svg
                 className={`w-4 h-4 transition-all duration-300 ${theme === 'light' ? 'text-primary opacity-100 rotate-0' : 'text-base-content/70 opacity-0 rotate-180 absolute'} group-hover:text-primary`}
-                fill="none" 
-                stroke="currentColor" 
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <circle cx="12" cy="12" r="5"></circle>
@@ -137,10 +152,10 @@ export default function Login() {
               </svg>
 
               {/* Moon Icon (Dark Mode) */}
-              <svg 
+              <svg
                 className={`w-4 h-4 transition-all duration-300 ${theme === 'dark' ? 'text-primary opacity-100 rotate-0' : 'text-base-content/70 opacity-0 -rotate-180 absolute'} group-hover:text-primary`}
-                fill="none" 
-                stroke="currentColor" 
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>

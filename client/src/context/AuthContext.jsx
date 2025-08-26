@@ -52,6 +52,7 @@ export function AuthProvider({ children }) {
         { withCredentials: true },
       );
       setUser(response.data.user);
+      return response.data;
     } catch (error) {
       console.error('Login failed:', error);
       throw error; // Propagate the error for the component to handle
@@ -73,7 +74,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, loading, isAuthenticated: !!user }}
+      value={{ user, setUser, login, logout, loading, isAuthenticated: !!user }}
     >
       {children}
     </AuthContext.Provider>

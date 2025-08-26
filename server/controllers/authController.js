@@ -131,6 +131,7 @@ export const login = async (req, res) => {
       return res.status(200).json({
         message: 'Account pending. OTP verification required.',
         userId: user.id, // Send the user ID back so the client knows which user to verify
+        status: user.status,
       });
 
     } else if (user.status === 'DISABLED') {
@@ -376,11 +377,15 @@ export const verifyOtp = async (req, res) => {
 
     return res.status(200).json({
       message: 'Account successfully activated and logged in.',
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      wardId: user.wardId,
-      phoneNumber: user.phoneNumber
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        status: user.status,
+        wardId: user.wardId,
+        phoneNumber: user.phoneNumber
+      }
     });
 
   } catch (error) {
