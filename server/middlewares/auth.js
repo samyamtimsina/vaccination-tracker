@@ -20,6 +20,7 @@ export const authenticate = async (req, res, next) => {
         role: true,
         wardId: true,
         status: true,
+        phoneNumber: true,
       },
     });
 

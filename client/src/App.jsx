@@ -22,6 +22,10 @@ import "./i18n";
 import UserProfile from './pages/userProfile.jsx';
 import EditChild from './pages/EditChild.jsx';
 import VerifyOTP from './components/VerifyOTP.jsx';
+import RoleBasedRedirect from './components/RoleBasedRedirect.jsx';
+import SuperAdminDashboard from './components/Dashboards/SuperAdminDashboard.jsx';
+import SuperAdminLayout from './components/SuperAdminLayout.jsx';
+
 
 // A simple layout component that includes the navbar
 const MainLayout = () => {
@@ -52,10 +56,18 @@ function App() {
 
                 </Route>
 
+                <Route element={<ProtectedRoute><SuperAdminLayout /></ProtectedRoute>}>
+                  <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
+                  {/* <Route path="/super-admin/users" element={<UsersPage />} />
+                  <Route path="/super-admin/children" element={<ChildrenPage />} />
+                  <Route path="/super-admin/mothers" element={<MothersPage />} />
+                  <Route path="/super-admin/analytics" element={<AnalyticsPage />} /> */}
+                </Route>
+
                 {/* Nested protected routes within the main layout */}
                 <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                   <Route path="/users/:userId" element={<UserProfile />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/dashboard" element={<RoleBasedRedirect />} />
                   <Route path="/add-child" element={<AddChild />} />
                   <Route path="/edit-child" element={<EditChild />} />
                   <Route path="/add-mother" element={<AddMother />} />

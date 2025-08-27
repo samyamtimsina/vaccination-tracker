@@ -6,6 +6,10 @@ export const getMe = (req, res) => {
       id: req.user.id,
       email: req.user.email,
       name: req.user.name,
+      role: req.user.role,
+      phoneNumber: req.user.phoneNumber,
+      status: req.user.status
+
     };
     res.status(200).json({ user });
   } else {
@@ -24,6 +28,7 @@ export const getUsers = async (req, res) => {
       select: {
         id: true,
         name: true,
+        role: true,
       },
     });
 
