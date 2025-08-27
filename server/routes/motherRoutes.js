@@ -13,20 +13,20 @@ router.post(
   '/',
 
   authenticate,
-  authorize('ADMIN', 'WARD_OFFICER'),
+  authorize('SUPER_ADMIN', 'WARD_OFFICER'),
   createMother,
 );
 router.get(
   '/',
 
   authenticate,
-  authorize('ADMIN', 'WARD_OFFICER'),
+  authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'),
   getMothers,
 );
 router.get(
   '/ward',
   authenticate,
-  authorize('ADMIN', 'WARD_OFFICER'),
+  authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'),
   getWardMothers,
 );
 

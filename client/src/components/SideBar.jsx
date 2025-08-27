@@ -13,7 +13,7 @@ import {
   FaTimes,
   FaChevronLeft,
   FaChevronRight,
-  FaEdit, 
+  FaEdit,
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -32,10 +32,10 @@ const menuItems = [
     icon: <FaUsers />,
     type: 'link',
   },
-   {
+  {
     to: '/edit-child',
-    label: 'menu.edit_child.label', 
-        icon: <FaEdit />, 
+    label: 'menu.edit_child.label',
+    icon: <FaEdit />,
     type: 'link',
   },
   {
@@ -116,9 +116,8 @@ export default function SidebarNav() {
         />
       )}
       <aside
-        className={`fixed top-0 left-0 h-full bg-base-100 border-r border-base-300 z-50 transform transition-transform duration-300 ease-in-out ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        } min-w-[20rem]`}
+        className={`fixed top-0 left-0 h-full bg-base-100 border-r border-base-300 z-50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          } min-w-[20rem]`}
         style={{ width: SNAP_POINTS.EXPANDED }}
       >
         <div className="flex flex-col h-full">
@@ -148,11 +147,10 @@ export default function SidebarNav() {
                 <Link
                   key={label}
                   to={to}
-                  className={`${baseClasses} ${
-                    isActive
-                      ? 'bg-primary text-primary-content'
-                      : 'hover:bg-base-200 text-base-content/80'
-                  }`}
+                  className={`${baseClasses} ${isActive
+                    ? 'bg-primary text-primary-content'
+                    : 'hover:bg-base-200 text-base-content/80'
+                    }`}
                 >
                   <div className="w-8 h-8 flex items-center justify-center">
                     {icon}
@@ -205,18 +203,16 @@ export default function SidebarNav() {
       <nav className="flex-1 p-2 space-y-1">
         {menuItems.map(({ to, label, icon, type }) => {
           const isActive = location.pathname === to;
-          const baseClasses = `flex items-center ${
-            showText ? 'gap-3 p-3' : 'justify-center p-3'
-          } rounded-lg transition-colors`;
+          const baseClasses = `flex items-center ${showText ? 'gap-3 p-3' : 'justify-center p-3'
+            } rounded-lg transition-colors`;
           return type === 'link' ? (
             <Link
               key={label}
               to={to}
-              className={`${baseClasses} ${
-                isActive
-                  ? 'bg-primary text-primary-content'
-                  : 'hover:bg-base-200 text-base-content/80'
-              }`}
+              className={`${baseClasses} ${isActive
+                ? 'bg-primary text-primary-content'
+                : 'hover:bg-base-200 text-base-content/80'
+                }`}
             >
               <div className="w-8 h-8 flex items-center justify-center">
                 {icon}

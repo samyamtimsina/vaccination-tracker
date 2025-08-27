@@ -410,11 +410,10 @@ export default function Dashboard() {
                         {icon}
                       </div>
                       <div
-                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
-                          changeType === 'positive'
+                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${changeType === 'positive'
                             ? 'bg-emerald-100 text-emerald-700'
                             : 'bg-red-100 text-red-700'
-                        }`}
+                          }`}
                       >
                         {changeType === 'positive' ? (
                           <FaArrowTrendUp className="text-xs" />
@@ -618,11 +617,10 @@ export default function Dashboard() {
               >
                 <div className="flex items-center justify-center h-full">
                   <div
-                    className={`w-12 h-1 rounded-full ${
-                      isResizing
-                        ? 'bg-primary'
-                        : 'bg-base-300 group-hover:bg-primary'
-                    } transition-all duration-200`}
+                    className={`w-12 h-1 rounded-full ${isResizing
+                      ? 'bg-primary'
+                      : 'bg-base-300 group-hover:bg-primary'
+                      } transition-all duration-200`}
                   />
                 </div>
               </div>

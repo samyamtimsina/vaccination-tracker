@@ -2,6 +2,7 @@ import { prisma } from '../utils/prisma.js';
 import { vaccineSchedule } from '../utils/vaccineSchedule.js';
 import { createChildSchema } from '../schemas/childSchema.js';
 import { updateChildSchema } from '../schemas/childSchema.js';
+import { checkPermission, filterChildData } from '../../client/src/utils/permissionService.js';
 import {
   toMonths,
   mapVaccineNameToEnum,
@@ -254,26 +255,20 @@ export const getChild = async (req, res) => {
   try {
     const searchTerm = req.params.id;
     const isNumber = /^\d+$/.test(searchTerm);
-    const currentUserWardId = req.user.wardId; // Assuming `req.user` contains the authenticated user's data
+    const currentUser = req.user;
 
     let child;
     if (isNumber) {
-      // Find child by Sewa Darta number
       child = await prisma.child.findUnique({
-        where: {
-          sewaDartaNumber: parseInt(searchTerm, 10)
-        },
+        where: { sewaDartaNumber: parseInt(searchTerm, 10) },
         include: {
           vaccinations: true,
           weightRecords: true,
         },
       });
     } else {
-      // Find child by ID
       child = await prisma.child.findUnique({
-        where: {
-          id: searchTerm
-        },
+        where: { id: searchTerm },
         include: {
           vaccinations: true,
           weightRecords: true,
@@ -282,28 +277,18 @@ export const getChild = async (req, res) => {
     }
 
     if (!child) {
-      return res.status(404).json({
-        error: 'Child not found'
-      });
+      return res.status(404).json({ error: 'Child not found' });
     }
 
-    // Check if the user is from the same ward as the child
-    if (child.wardNumber === currentUserWardId) {
-      // Return full data if from the same ward
-      return res.status(200).json(child);
-    } else {
-      // Return a limited subset of data if from a different ward
-      const limitedChildData = {
-        id: child.id,
-        fullName: child.fullName,
-        sewaDartaNumber: child.sewaDartaNumber,
-        birthDate: child.birthDate,
-        gender: child.gender,
-        vaccinations: child.vaccinations,
-        weightRecords: child.weightRecords,
-      };
-      return res.status(200).json(limitedChildData);
+    // Check read permission and filter the data accordingly.
+    const hasReadPermission = checkPermission(currentUser, 'read', child);
+    if (!hasReadPermission) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to view this child.' });
     }
+
+    const filteredChild = filterChildData(currentUser, child);
+    return res.status(200).json(filteredChild);
+
   } catch (error) {
     console.error('Error fetching single child:', error);
     res.status(500).json({
@@ -316,61 +301,28 @@ export const getChild = async (req, res) => {
 export const searchChildren = async (req, res) => {
   try {
     const { name, phoneNumber, sewaDartaNumber, gender, wardId, createdByMe } = req.query;
-    console.log('req.query', req.query);
-
-    // Get the authenticated user's details.
-    const currentUserWardId = req.user.wardId;
-    const currentUserId = req.user.id;
+    const currentUser = req.user;
 
     // Initialize an empty object to build the Prisma query 'where' clause.
     const whereClause = {};
 
-    // 1. Build search filters for each field dynamically.
-    // If a search term is provided, add it to the whereClause.
-
-    // Search by full name (case-insensitive contains)
-    if (name) {
-      whereClause.fullName = {
-        contains: name,
-        mode: 'insensitive',
-      };
-    }
-
-    // Search by phone number (case-insensitive contains)
-    if (phoneNumber) {
-      whereClause.phoneNumber = {
-        contains: phoneNumber,
-        mode: 'insensitive',
-      };
-    }
-
-    // Search by service registration number (sewaDartaNumber)
-    // Assuming this is a number field, we'll use 'equals' for an exact match.
-    if (sewaDartaNumber) {
-      whereClause.sewaDartaNumber = parseInt(sewaDartaNumber, 10);
-    }
-
-    // Filter by gender
-    if (gender) {
-      whereClause.gender = gender.toUpperCase();
-    }
-
-    // 2. Adjust ward-based filtering logic
-    // The search will now default to all wards unless a specific wardId is provided.
-    // The ward filter is only applied if a specific wardId is provided by the client
-    // and that wardId is not 'all'.
-    if (wardId && wardId !== 'all') {
+    // 1. Enforce ward filtering based on user role and query.
+    // If user is WARD_OFFICER and no specific wardId is requested, default to their own ward.
+    // If they request a specific wardId, the permission check will handle access.
+    if (currentUser.role === 'WARD_OFFICER' && !wardId) {
+      whereClause.wardNumber = currentUser.wardId;
+    } else if (wardId && wardId !== 'all') {
       whereClause.wardNumber = parseInt(wardId, 10);
     }
-    // If wardId is 'all' or not provided, no ward filter is added, and it searches all wards for any authenticated user.
 
+    // 2. Build search filters for each field dynamically.
+    if (name) { whereClause.fullName = { contains: name, mode: 'insensitive' }; }
+    if (phoneNumber) { whereClause.phoneNumber = { contains: phoneNumber, mode: 'insensitive' }; }
+    if (sewaDartaNumber) { whereClause.sewaDartaNumber = parseInt(sewaDartaNumber, 10); }
+    if (gender) { whereClause.gender = gender.toUpperCase(); }
+    if (createdByMe === 'true') { whereClause.createdById = currentUser.id; }
 
-    // 3. Filter by the user who created the record.
-    if (createdByMe === 'true') {
-      whereClause.createdById = currentUserId;
-    }
-
-    // Perform the Prisma query with the dynamically built where clause.
+    // Perform the Prisma query.
     const children = await prisma.child.findMany({
       where: whereClause,
       select: {
@@ -379,7 +331,7 @@ export const searchChildren = async (req, res) => {
         sewaDartaNumber: true,
         birthDate: true,
         gender: true,
-        wardNumber: true, // It's a good idea to return the wardNumber to the client
+        wardNumber: true,
       },
       take: 20,
     });
@@ -393,84 +345,49 @@ export const searchChildren = async (req, res) => {
     });
   }
 };
-
 export const updateChild = async (req, res) => {
-  const {
-    id
-  } = req.params;
+  const { id } = req.params;
   const sewaDartaNumber = parseInt(id, 10);
-  const {
-    vaccinations,
-    weightRecords,
-    administeredById,
-    firstName,
-    lastName,
-    remarks,
-    ...demographicData
-  } = req.body;
+  const { vaccinations, weightRecords, administeredById, firstName, lastName, ...demographicData } = req.body;
   const currentUser = req.user;
 
   try {
     const existingChild = await prisma.child.findUnique({
-      where: {
-        sewaDartaNumber
-      },
-      include: {
-        vaccinations: true,
-        weightRecords: true,
-      }
+      where: { sewaDartaNumber },
+      include: { vaccinations: true, weightRecords: true }
     });
 
     if (!existingChild) {
-      return res.status(404).json({
-        error: 'Child not found'
-      });
+      return res.status(404).json({ error: 'Child not found' });
     }
 
-    // Validate if the user has permission to edit demographics
-    const isSameWard = existingChild.wardNumber === currentUser.wardId;
-    if (!isSameWard && (Object.keys(demographicData).length > 0)) {
-      console.log(
-        'User from different ward trying to edit demographics:',
-        currentUser.wardId,
-        existingChild.wardNumber, 'demographicData', demographicData
-      )
-      return res.status(403).json({
-        error: 'You are not authorized to edit this child\'s demographic information.'
-      });
+    // STEP 1: Centralized permission check
+    // Pass the demographic data to the permission service to check for partial updates
+    const hasPermission = checkPermission(currentUser, 'update', existingChild, demographicData);
+
+    if (!hasPermission) {
+      return res.status(403).json({ error: 'You are not authorized to edit this child\'s data.' });
     }
+
+    // STEP 2: The rest of the logic can proceed, now that we know the user has permission.
+    // The previous hardcoded check is replaced.
+
     await prisma.$transaction(async (tx) => {
-      if (isSameWard) {
-        // Only allow demographic updates for same-ward users
+      // Only update demographic data if the user has full permission (i.e., from the same ward or SUPER_ADMIN).
+      const isSameWard = existingChild.wardNumber === currentUser.wardId;
+      if (isSameWard || currentUser.role === 'SUPER_ADMIN') {
         const updateData = {
           fullName: `${firstName || ''} ${lastName || ''}`.trim(),
         };
 
-        // only include valid fields
-        if (demographicData.birthDate) {
-          updateData.birthDate = parseBsDateString(demographicData.birthDate);
-        }
-        if (typeof demographicData.phoneNumber === 'string' && demographicData.phoneNumber.trim() !== '') {
-          updateData.phoneNumber = demographicData.phoneNumber;
-        }
-        if (typeof demographicData.gender === 'string') {
-          updateData.gender = demographicData.gender;
-        }
-        if (typeof demographicData.wardNumber === 'number') {
-          updateData.wardNumber = demographicData.wardNumber;
-        }
-        if (typeof demographicData.casteCode === 'number') {
-          updateData.casteCode = demographicData.casteCode;
-        }
-        if (typeof demographicData.parentName === 'string') {
-          updateData.parentName = demographicData.parentName;
-        }
-        if (typeof demographicData.tole === 'string') {
-          updateData.tole = demographicData.tole;
-        }
-        if (typeof demographicData.isFromOtherMunicipality === 'boolean') {
-          updateData.isFromOtherMunicipality = demographicData.isFromOtherMunicipality;
-        }
+        if (demographicData.birthDate) { updateData.birthDate = parseBsDateString(demographicData.birthDate); }
+        if (typeof demographicData.phoneNumber === 'string' && demographicData.phoneNumber.trim() !== '') { updateData.phoneNumber = demographicData.phoneNumber; }
+        if (typeof demographicData.gender === 'string') { updateData.gender = demographicData.gender; }
+        if (typeof demographicData.wardNumber === 'number') { updateData.wardNumber = demographicData.wardNumber; }
+        if (typeof demographicData.casteCode === 'number') { updateData.casteCode = demographicData.casteCode; }
+        if (typeof demographicData.parentName === 'string') { updateData.parentName = demographicData.parentName; }
+        if (typeof demographicData.tole === 'string') { updateData.tole = demographicData.tole; }
+        if (typeof demographicData.isFromOtherMunicipality === 'boolean') { updateData.isFromOtherMunicipality = demographicData.isFromOtherMunicipality; }
 
         await tx.child.update({
           where: { sewaDartaNumber },
@@ -478,13 +395,12 @@ export const updateChild = async (req, res) => {
         });
       }
 
-      // Prepare vaccination records safely
+      // Prepare vaccination records
       const incomingVaccs = Array.isArray(vaccinations) ? vaccinations : [];
 
       for (const v of incomingVaccs) {
+        // Only update if the user has permission (handled by the initial check)
         const parsedDate = v.dateGiven ? parseBsDateString(v.dateGiven) : null;
-
-        // Base update/create payload (do NOT include date unless valid)
         const vData = {
           remarks: v.remarks ?? null,
           administeredById: administeredById,
@@ -492,19 +408,11 @@ export const updateChild = async (req, res) => {
         };
         if (parsedDate) vData.dateGiven = parsedDate;
 
-        // Find existing vaccine (same vaccineType + doseNumber)
-        const existingVaccine = existingChild.vaccinations.find(
-          (ev) => ev.vaccineType === v.vaccineType && ev.doseNumber === v.doseNumber
-        );
+        const existingVaccine = existingChild.vaccinations.find((ev) => ev.vaccineType === v.vaccineType && ev.doseNumber === v.doseNumber);
 
         if (existingVaccine) {
-          // Only update dateGiven if valid to avoid setting it to null
-          await tx.vaccinationRecord.update({
-            where: { id: existingVaccine.id },
-            data: vData,
-          });
+          await tx.vaccinationRecord.update({ where: { id: existingVaccine.id }, data: vData });
         } else {
-          // Only create a new record if we have a valid date
           if (parsedDate) {
             await tx.vaccinationRecord.create({
               data: {
@@ -519,19 +427,12 @@ export const updateChild = async (req, res) => {
         }
       }
 
-      // Create weight records safely (skip if date invalid)
+      // Create/update/delete weight records
       const incomingWeights = Array.isArray(weightRecords) ? weightRecords : [];
-      // Get IDs of weight records that should be updated
-      const incomingIds = incomingWeights
-        .filter(w => w.id && !isNaN(parseInt(w.id)))
-        .map(w => parseInt(w.id));
+      const incomingIds = incomingWeights.filter(w => w.id && !isNaN(parseInt(w.id))).map(w => parseInt(w.id));
 
-      // Delete weight records that are no longer in the incoming data
       if (existingChild.weightRecords.length > 0) {
-        const toDelete = existingChild.weightRecords
-          .filter(existing => !incomingIds.includes(existing.id))
-          .map(wr => wr.id);
-
+        const toDelete = existingChild.weightRecords.filter(existing => !incomingIds.includes(existing.id)).map(wr => wr.id);
         if (toDelete.length > 0) {
           await tx.weightRecord.deleteMany({
             where: {
@@ -547,7 +448,6 @@ export const updateChild = async (req, res) => {
         if (!parsedWeightDate) continue;
 
         if (w.id) {
-          // Update existing record
           await tx.weightRecord.update({
             where: { id: w.id },
             data: {
@@ -558,7 +458,6 @@ export const updateChild = async (req, res) => {
             },
           });
         } else {
-          // Create new record
           await tx.weightRecord.create({
             data: {
               weight: w.weight,
@@ -571,17 +470,11 @@ export const updateChild = async (req, res) => {
           });
         }
       }
-
     });
 
     const updatedChild = await prisma.child.findUnique({
-      where: {
-        sewaDartaNumber
-      },
-      include: {
-        vaccinations: true,
-        weightRecords: true,
-      },
+      where: { sewaDartaNumber },
+      include: { vaccinations: true, weightRecords: true }
     });
 
     res.status(200).json(updatedChild);

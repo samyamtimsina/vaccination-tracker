@@ -16,27 +16,27 @@ import { authenticate, authorize } from '../middlewares/auth.js';
 
 const router = express.Router();
 
-router.get('/search', authenticate, authorize('ADMIN', 'WARD_OFFICER'), searchChildren);
+router.get('/search', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'), searchChildren);
 
 router.get(
   '/ward',
   authenticate,
-  authorize('ADMIN', 'WARD_OFFICER'),
+  authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'),
   getWardChildren,
 );
 
-router.get('/:id', authenticate, authorize('ADMIN', 'WARD_OFFICER'), getChild);
+router.get('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'WARD_OFFICER'), getChild);
 router.put(
   '/:id',
   authenticate,
-  authorize('ADMIN', 'WARD_OFFICER'),
+  authorize('SUPER_ADMIN', 'WARD_OFFICER'),
   updateChild,
 );
 //get all children
 router.get(
   '/',
   authenticate,
-  authorize('ADMIN', 'WARD_OFFICER'),
+  authorize('ADMIN', 'ADMIN', 'WARD_OFFICER'),
   getAllChildren,
 );
 
@@ -45,7 +45,7 @@ router.get(
 //get specific child by ID
 
 // Route to create one or more new child records
-router.post('/', authenticate, authorize('ADMIN', 'WARD_OFFICER'), createChild);
+router.post('/', authenticate, authorize('SUPER_ADMIN', 'WARD_OFFICER'), createChild);
 
 // New dedicated route for generating mock data
 // router.post(

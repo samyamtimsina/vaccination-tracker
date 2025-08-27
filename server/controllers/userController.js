@@ -43,6 +43,7 @@ export const getWardUsers = async (req, res) => {
     const whereClause = {
       wardId: wardId,
       ...(role && { role: role }),
+      status: 'ACTIVE',
     };
     const users = await prisma.user.findMany({
       where: whereClause,
