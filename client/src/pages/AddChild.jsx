@@ -472,7 +472,7 @@ export default function AddChild() {
       const res = await axiosClient.post('/api/child', payload);
       addChildToState(res.data);
       toast.success(t('toast.success'));
-      reset();
+      // reset();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       console.error('Submission failed:', err);

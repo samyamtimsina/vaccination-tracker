@@ -17,7 +17,7 @@ router.post(
   createMother,
 );
 router.get(
-  '/',
+  '/all',
 
   authenticate,
   authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'),

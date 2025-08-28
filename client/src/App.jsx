@@ -25,6 +25,8 @@ import VerifyOTP from './components/VerifyOTP.jsx';
 import RoleBasedRedirect from './components/RoleBasedRedirect.jsx';
 import SuperAdminDashboard from './components/Dashboards/SuperAdminDashboard.jsx';
 import SuperAdminLayout from './components/SuperAdminLayout.jsx';
+import UsersManagementPage from './components/UsersManagement.jsx';
+import AnalyticsPage from './components/SuperAdminAnalytics.jsx';
 
 
 // A simple layout component that includes the navbar
@@ -58,10 +60,10 @@ function App() {
 
                 <Route element={<ProtectedRoute><SuperAdminLayout /></ProtectedRoute>}>
                   <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
-                  {/* <Route path="/super-admin/users" element={<UsersPage />} />
-                  <Route path="/super-admin/children" element={<ChildrenPage />} />
-                  <Route path="/super-admin/mothers" element={<MothersPage />} />
-                  <Route path="/super-admin/analytics" element={<AnalyticsPage />} /> */}
+                  <Route path="/super-admin/users" element={<UsersManagementPage />} />
+                  {/* <Route path="/super-admin/children" element={<ChildrenPage />} /> */}
+                  {/* <Route path="/super-admin/mothers" element={<MothersPage />} /> */}
+                  <Route path="/super-admin/analytics" element={<AnalyticsPage />} />
                 </Route>
 
                 {/* Nested protected routes within the main layout */}

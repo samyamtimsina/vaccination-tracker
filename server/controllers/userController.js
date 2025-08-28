@@ -16,6 +16,36 @@ export const getMe = (req, res) => {
     res.status(404).json({ message: 'User not found' });
   }
 };
+export const getAllUsers = async (req, res) => {
+  try {
+
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        phoneNumber: true,
+        wardId: true,
+        status: true,
+        email: true,
+        Child: true,
+        Mother: true,
+        createdVaccinationRecords: true,
+        administeredVaccinations: true,
+        AuditLogs: true,
+        createdWeightRecords: true,
+        administeredWeightRecords: true,
+        verifiedChildren: true,
+        createdTDDoses: true,
+        administeredTDDoses: true
+      }
+    });
+    res.status(200).json({ users })
+  } catch (error) {
+    res.status(500).json({ message: 'Something went wrong' })
+    console.log('error', error)
+  }
+}
 export const getUsers = async (req, res) => {
   try {
     const { role } = req.query;
@@ -111,42 +141,55 @@ export const getUserProfile = async (req, res) => {
   }
 };
 
+
 export const updateUserProfile = async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
-    const { name, email } = req.body; // Only updatable fields in your schema
+    const { name, email, role, status, phoneNumber } = req.body;
 
-    // Basic validation
-    if (!name || !email) {
+    // A more flexible validation approach
+    if (!name && !email && !role && !status && !phoneNumber) {
       return res.status(400).json({
         status: 'error',
-        message: 'Name and email are required',
+        message: 'No fields provided for update.',
       });
     }
 
-    // Email uniqueness check
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        email,
-        NOT: { id: userId },
-      },
-    });
+    // Prepare the data object for the update, only including fields that were provided
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (role) updateData.role = role;
+    if (status) updateData.status = status;
+    if (phoneNumber) updateData.phoneNumber = phoneNumber;
 
-    if (existingUser) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Email already in use',
+    // Email uniqueness check (still a good idea)
+    if (email) {
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          email,
+          NOT: { id: userId },
+        },
       });
+      if (existingUser) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Email already in use.',
+        });
+      }
     }
 
+    // Perform the update with the dynamic data object
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { name, email }, // Only these fields can be updated
+      data: updateData, // Now using the flexible updateData object
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
+        status: true, // Add other fields you want to return
+        phoneNumber: true,
         createdAt: true,
       },
     });
@@ -157,6 +200,8 @@ export const updateUserProfile = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating user:', error);
+
+    // You can check for specific Prisma errors for more granular responses
     res.status(500).json({
       status: 'error',
       message: 'Internal server error',
@@ -187,7 +232,9 @@ export const approveUser = async (req, res) => {
 
 export const disableUser = async (req, res) => {
   if (req.user.role !== 'SUPER_ADMIN') {
+    console.log('Unauthorized attempt to disable user by', req.user.role);
     return res.status(403).json({ error: 'Unauthorized' });
+
   }
 
   const userId = parseInt(req.params.id);

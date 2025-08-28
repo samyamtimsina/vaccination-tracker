@@ -16,6 +16,12 @@ import { authenticate, authorize } from '../middlewares/auth.js';
 
 const router = express.Router();
 
+router.get(
+  '/all',
+  authenticate,
+  authorize('SUPER_ADMIN', 'ADMIN', 'WARD_OFFICER'),
+  getAllChildren,
+);
 router.get('/search', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'), searchChildren);
 
 router.get(
@@ -33,12 +39,6 @@ router.put(
   updateChild,
 );
 //get all children
-router.get(
-  '/',
-  authenticate,
-  authorize('ADMIN', 'ADMIN', 'WARD_OFFICER'),
-  getAllChildren,
-);
 
 // Get all children belonging to the authenticated ward officer's ward
 

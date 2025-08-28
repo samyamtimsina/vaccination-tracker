@@ -8,27 +8,26 @@ import {
   disableUser,
   getWardUsers,
   approveUser,
+  getAllUsers,
 } from '../controllers/userController.js';
 import { authenticate, authorize } from '../middlewares/auth.js';
 
 const router = express.Router();
 
 router.get('/me', authenticate, getMe);
+router.get('/all', authenticate, authorize('SUPER_ADMIN'), getAllUsers);
+router.patch('/:userId', updateUserProfile);
 router.get(
   '/:userId',
   authenticate,
 
-  authorize('ADMIN', ' WARD_OFFICER'),
+  authorize('ADMIN', 'SUPER_ADMIN', ' WARD_OFFICER'),
   getUserProfile,
 );
 
-router.get('/', authenticate, authorize('ADMIN', 'WARD_OFFICER'), getWardUsers);
+router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'), getWardUsers);
 
-router.patch(
-  '/approve/:id',
-  authenticate,
-  authorize('SUPER_ADMIN', 'ADMIN'),
-  approveUser,
-);
-router.post('/disable-user/:id', authenticate, disableUser);
+router.post('/disable-user/:id', authenticate,
+  authorize('SUPER_ADMIN'),
+  disableUser);
 export default router;
