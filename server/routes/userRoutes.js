@@ -5,10 +5,9 @@ import {
   getMe,
   updateUserProfile,
   getUsers,
-  disableUser,
   getWardUsers,
-  approveUser,
   getAllUsers,
+  updateUserStatus,
 } from '../controllers/userController.js';
 import { authenticate, authorize } from '../middlewares/auth.js';
 
@@ -27,7 +26,7 @@ router.get(
 
 router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'), getWardUsers);
 
-router.post('/disable-user/:id', authenticate,
+router.post('/update-user-status/:id', authenticate,
   authorize('SUPER_ADMIN'),
-  disableUser);
+  updateUserStatus);
 export default router;

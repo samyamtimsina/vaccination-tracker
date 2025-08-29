@@ -208,42 +208,42 @@ export const updateUserProfile = async (req, res) => {
     });
   }
 };
-
-export const approveUser = async (req, res) => {
+export const updateUserStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+    const { role } = req.user;
 
-    if (!['ACTIVE', 'INACTIVE'].includes(status)) {
+    // Only SUPER_ADMIN can perform this action.
+    if (role !== 'SUPER_ADMIN') {
+      console.log('Unauthorized attempt to change user status by', role);
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // Only allow manual status changes to 'PENDING' or 'DISABLED'.
+    const allowedStatuses = ['PENDING', 'DISABLED'];
+    if (!allowedStatuses.includes(status)) {
+      console.log(!allowedStatuses.includes(status), 'status')
+      console.log('Invalid status provided:', status);
       return res.status(400).json({ message: 'Invalid status provided.' });
     }
 
+    const userId = parseInt(id);
+
+    // Update the user's status.
     const updatedUser = await prisma.user.update({
-      where: { id: parseInt(id) }, // or just `id` if string UUID
-      data: { status }, // Prisma will accept enum string directly
+      where: { id: userId },
+      data: { status },
     });
+
+    // If the user is being disabled, also delete their refresh tokens.
+    if (status === 'DISABLED') {
+      await prisma.refreshToken.deleteMany({ where: { userId } });
+    }
 
     res.status(200).json(updatedUser);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
-};
-
-export const disableUser = async (req, res) => {
-  if (req.user.role !== 'SUPER_ADMIN') {
-    console.log('Unauthorized attempt to disable user by', req.user.role);
-    return res.status(403).json({ error: 'Unauthorized' });
-
-  }
-
-  const userId = parseInt(req.params.id);
-  await prisma.user.update({
-    where: { id: userId },
-    data: { status: 'DISABLED' },
-  });
-
-  await prisma.refreshToken.deleteMany({ where: { userId } });
-
-  res.json({ message: 'User disabled successfully' });
 };

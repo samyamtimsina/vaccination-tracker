@@ -27,6 +27,7 @@ import SuperAdminDashboard from './components/Dashboards/SuperAdminDashboard.jsx
 import SuperAdminLayout from './components/SuperAdminLayout.jsx';
 import UsersManagementPage from './components/UsersManagement.jsx';
 import AnalyticsPage from './components/SuperAdminAnalytics.jsx';
+import AdminDashboard from './components/Dashboards/AdminDashboard.jsx';
 
 
 // A simple layout component that includes the navbar
@@ -66,8 +67,12 @@ function App() {
                   <Route path="/super-admin/analytics" element={<AnalyticsPage />} />
                 </Route>
 
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
                 {/* Nested protected routes within the main layout */}
                 <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+
+                  <Route path="/ward-officer/dashboard" element={<Dashboard />} />
                   <Route path="/users/:userId" element={<UserProfile />} />
                   <Route path="/dashboard" element={<RoleBasedRedirect />} />
                   <Route path="/add-child" element={<AddChild />} />
