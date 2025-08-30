@@ -37,27 +37,48 @@ import { getFirstErrorMessage } from '../../helpers/getFirstErrorMessage.jsx';
 import { useTranslation } from 'react-i18next';
 
 // Enhanced vaccine categorization logic
+// Fixed vaccine categorization logic
 const getVaccineStatus = (dose, childAge) => {
-  const ageInDays = childAge.days;
+  // Calculate child's total age in days
+  const ageInDays = (childAge.years || 0) * 365.25 +
+    (childAge.months || 0) * 30.44 +
+    (childAge.days || 0);
 
-  // Calculate recommended age in days
+  // Calculate recommended age in days from the dose info
   let recommendedAgeDays = 0;
-  if (dose.recommendedAtDays !== undefined) recommendedAgeDays = dose.recommendedAtDays;
-  if (dose.recommendedAtWeeks !== undefined) recommendedAgeDays = dose.recommendedAtWeeks * 7;
-  if (dose.recommendedAtMonths !== undefined) recommendedAgeDays = dose.recommendedAtMonths * 30;
-  if (dose.recommendedAtYears !== undefined) recommendedAgeDays = dose.recommendedAtYears * 365;
+  if (dose.recommendedAtDays !== null && dose.recommendedAtDays !== undefined) {
+    recommendedAgeDays = dose.recommendedAtDays;
+  } else if (dose.recommendedAtWeeks !== null && dose.recommendedAtWeeks !== undefined) {
+    recommendedAgeDays = dose.recommendedAtWeeks * 7;
+  } else if (dose.recommendedAtMonths !== null && dose.recommendedAtMonths !== undefined) {
+    recommendedAgeDays = dose.recommendedAtMonths * 30.44;
+  } else if (dose.recommendedAtYears !== null && dose.recommendedAtYears !== undefined) {
+    recommendedAgeDays = dose.recommendedAtYears * 365.25;
+  }
 
   const daysDifference = ageInDays - recommendedAgeDays;
 
-  // Status categories with grace periods
-  if (daysDifference < -30) return {
+  // Debug logging - remove after fixing
+  // console.log(`Vaccine status check:`, {
+  //   vaccineType: dose.vaccineType,
+  //   doseNumber: dose.doseNumber,
+  //   childAgeDays: ageInDays,
+  //   recommendedAgeDays,
+  //   daysDifference,
+  //   recommendedAtWeeks: dose.recommendedAtWeeks
+  // });
+
+  // Status categories with appropriate grace periods
+  // If child is more than 7 days younger than recommended age, not yet eligible
+  if (daysDifference < -7) return {
     status: 'NOT_YET_ELIGIBLE',
     priority: 4,
     color: 'text-gray-500',
     bgColor: 'bg-gray-50',
     borderColor: 'border-gray-200'
   };
-  if (daysDifference >= -30 && daysDifference <= 30) return {
+  // If within 7 days before to 30 days after recommended age, it's due now
+  if (daysDifference >= -7 && daysDifference <= 30) return {
     status: 'DUE_NOW',
     priority: 2,
     color: 'text-yellow-700',
@@ -96,6 +117,7 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
   };
 
   Object.entries(vaccineSchedule.doses).forEach(([vaccineName, doses]) => {
+    // Gender-specific filtering
     if (vaccineName === 'HPV' && gender !== 'FEMALE') {
       categories.NOT_APPLICABLE.vaccines.push({
         vaccineName,
@@ -109,7 +131,7 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
       const statusInfo = getVaccineStatus(dose, childAge);
       return {
         doseIndex: index,
-        dose: dose.dose,
+        dose: dose.doseNumber, // Use doseNumber instead of dose
         doseInfo: dose,
         ...statusInfo,
         doseType: dose.isBooster ? 'booster' : 'current'
@@ -135,6 +157,7 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
 
 
 // Vaccine Card Component
+// Updated VaccineCard Component with proper dose display
 const VaccineCard = ({
   vaccineName,
   dose,
@@ -151,6 +174,20 @@ const VaccineCard = ({
   const remarksKey = `${vaccineName}-${dose.doseIndex}`;
   const showRemark = showRemarks[remarksKey] || false;
 
+  // Helper function to format recommended age text
+  const getRecommendedAgeText = (doseInfo) => {
+    if (doseInfo.recommendedAtDays !== null && doseInfo.recommendedAtDays !== undefined) {
+      return t('vaccine_card.days', { count: doseInfo.recommendedAtDays });
+    } else if (doseInfo.recommendedAtWeeks !== null && doseInfo.recommendedAtWeeks !== undefined) {
+      return t('vaccine_card.weeks', { count: doseInfo.recommendedAtWeeks });
+    } else if (doseInfo.recommendedAtMonths !== null && doseInfo.recommendedAtMonths !== undefined) {
+      return t('vaccine_card.months', { count: doseInfo.recommendedAtMonths });
+    } else if (doseInfo.recommendedAtYears !== null && doseInfo.recommendedAtYears !== undefined) {
+      return t('vaccine_card.years', { count: doseInfo.recommendedAtYears });
+    }
+    return t('vaccine_card.birth');
+  };
+
   return (
     <div className={`p-4 border rounded-lg transition-all ${dose.bgColor} ${dose.borderColor} border-l-4`}>
       <div className="space-y-3">
@@ -161,15 +198,7 @@ const VaccineCard = ({
               {vaccineName} - {t('vaccine_card.dose', { dose: dose.dose })}
             </h4>
             <p className="text-xs text-gray-600 mt-1">
-              {t('vaccine_card.recommended_at')}{
-                dose.doseInfo.recommendedAtMonths
-                  ? t('vaccine_card.months', { count: dose.doseInfo.recommendedAtMonths })
-                  : dose.doseInfo.recommendedAtWeeks
-                    ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
-                    : dose.doseInfo.recommendedAtYears
-                      ? t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
-                      : t('vaccine_card.days', { count: dose.doseInfo.recommendedAtDays })
-              }
+              {t('vaccine_card.recommended_at')} {getRecommendedAgeText(dose.doseInfo)}
             </p>
           </div>
           <div className="flex flex-col items-end space-y-1">
@@ -230,15 +259,9 @@ const VaccineCard = ({
                     value=""
                     disabled
                     readOnly
-                    placeholder={
-                      t('vaccine_card.unavailable_placeholder', {
-                        age: dose.doseInfo.recommendedAtMonths
-                          ? t('vaccine_card.months', { count: dose.doseInfo.recommendedAtMonths })
-                          : dose.doseInfo.recommendedAtWeeks
-                            ? t('vaccine_card.weeks', { count: dose.doseInfo.recommendedAtWeeks })
-                            : t('vaccine_card.years', { count: dose.doseInfo.recommendedAtYears })
-                      })
-                    }
+                    placeholder={t('vaccine_card.unavailable_placeholder', {
+                      age: getRecommendedAgeText(dose.doseInfo)
+                    })}
                   />
                 )}
               </div>
@@ -258,8 +281,7 @@ const VaccineCard = ({
                 <FaClipboardList className="w-3 h-3 mr-1" />
                 {t('vaccine_card.remarks')}
               </span>
-              <span className={`text-xs transform transition-transform ${showRemark ? 'rotate-180' : ''
-                }`}>
+              <span className={`text-xs transform transition-transform ${showRemark ? 'rotate-180' : ''}`}>
                 ▼
               </span>
             </button>
@@ -366,8 +388,8 @@ const VaccineSection = ({
 
 export default function AddChild() {
   const { vaccineSchedule, loading } = useContext(VaccineScheduleContext);
-  console.log('vaccineSchedule in AddChild:', vaccineSchedule);
-  console.log('loading in AddChild:', loading);
+  // console.log('vaccineSchedule in AddChild:', vaccineSchedule);
+  // console.log('loading in AddChild:', loading);
   if (loading || !vaccineSchedule) return <div>Loading schedule...</div>;
   const { t, i18n } = useTranslation('addChild');
   const { theme } = useTheme();
@@ -441,7 +463,6 @@ export default function AddChild() {
       [section]: !prev[section]
     }));
   };
-
   const onSubmit = async (data) => {
     console.log('Form data before submission:', data);
     try {
@@ -454,10 +475,17 @@ export default function AddChild() {
         const administeredDoses = [];
         doses.forEach((dose, index) => {
           if (dose.date) {
-            const scheduleDose = vaccineSchedule[vaccineName][index];
+            // Add error checking but maintain exact same payload format
+            const scheduleVaccine = vaccineSchedule.doses[vaccineName];
+            if (!scheduleVaccine || !scheduleVaccine[index]) {
+              console.error(`Schedule data missing for ${vaccineName} dose ${index}`);
+              return; // Skip this dose but continue processing
+            }
+
+            const scheduleDose = scheduleVaccine[index];
             administeredDoses.push({
               ...dose,
-              doseNumber: scheduleDose.dose,
+              doseNumber: scheduleDose.doseNumber,
               type: scheduleDose.isBooster ? 'booster' : 'current'
             });
           }
@@ -487,6 +515,8 @@ export default function AddChild() {
       toast.error(t('toast.error'));
     }
   };
+
+
   const onErrors = (errors) => {
     const errorMessage = getFirstErrorMessage(errors);
     toast.error(t('toast.validation_error', { message: errorMessage }));
