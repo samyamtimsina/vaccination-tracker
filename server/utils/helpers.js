@@ -82,3 +82,9 @@ export const generateRandomBsDate = () => {
   // Return the BS date string in 'YYYY-MM-DD' format
   return bsDateString;
 };
+
+export const addMonthsToDate = (date, months) => {
+  const newDate = new Date(date);
+  newDate.setMonth(newDate.getMonth() + months);
+  return newDate;
+};

@@ -9,37 +9,38 @@ import {
   parseBsDateString,
 } from '../utils/helpers.js';
 
-// --- UPDATED: prepareVaccinationCreateData function
-// Now it takes the administeredById from the payload
-function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
+async function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
   if (!vaccines) return [];
+
+  // Get latest vaccine schedule version
+  const scheduleVersion = await prisma.vaccineScheduleVersion.findFirst({
+    orderBy: { id: 'desc' },
+    include: { doses: true },
+  });
+  if (!scheduleVersion) throw new Error('No vaccine schedule found in the database');
 
   return Object.entries(vaccines).flatMap(([vaccineName, doses]) => {
     const vaccineTypeEnum = mapVaccineNameToEnum(vaccineName);
-    const schedule = vaccineSchedule[vaccineTypeEnum] || [];
+
+    // Only primary doses
+    const schedule = scheduleVersion.doses
+      .filter((d) => d.vaccineType === vaccineTypeEnum)
+      .sort((a, b) => a.doseNumber - b.doseNumber);
 
     return doses
-      .map((doseObj, index) => { // Added index parameter here
+      .map((doseObj, index) => {
         if (!doseObj?.date) return null;
+        const dateGiven = parseBsDateString(doseObj.date);
+        if (!dateGiven) return null;
 
-        const adDateGiven = parseBsDateString(doseObj.date);
-        if (!adDateGiven) {
-          console.error(`Invalid vaccination date for ${vaccineName}`);
-          return null;
-        }
-
-        const doseNumber = index + 1; // Use the dose index to determine the dose number
-        const doseSchedule = schedule.find((d) => d.dose === doseNumber);
-        const recommendedAtMonths = doseSchedule
-          ? Math.round(toMonths(doseSchedule) * 100) / 100
-          : 0;
+        const doseNumber = index + 1; // map to primary dose
+        if (!schedule.find((d) => d.doseNumber === doseNumber)) return null;
 
         return {
           vaccineType: vaccineTypeEnum,
           doseNumber,
-          dateGiven: adDateGiven,
+          dateGiven,
           isComplete: true,
-          recommendedAtMonths,
           remarks: doseObj.remarks || null,
           type: doseObj.type || 'routine',
           createdById: user.id,
@@ -49,108 +50,132 @@ function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
       .filter(Boolean);
   });
 }
-// --- UPDATED: createChild controller
-// It now expects administeredById for vaccines and weights in the request body
+
+// --- Calculate ChildDueVaccine entries based on schedule + catch-up rules
+export async function prepareChildDueVaccines(birthDateBs, scheduleVersionId = null) {
+  const birthDate = parseBsDateString(birthDateBs);
+  if (!birthDate) throw new Error('Invalid BS birthDate');
+
+  // Get the latest schedule if scheduleVersionId is not provided
+  const scheduleVersion = await prisma.vaccineScheduleVersion.findFirst({
+    where: scheduleVersionId ? { id: scheduleVersionId } : undefined,
+    orderBy: { id: 'desc' },
+    include: { doses: true },
+  });
+
+  if (!scheduleVersion) throw new Error('No vaccine schedule found');
+
+  const childDueVaccines = [];
+
+  for (const dose of scheduleVersion.doses) {
+    let dueDate = new Date(birthDate.getTime()); // start from birth
+
+    if (dose.recommendedAtDays != null) dueDate.setDate(dueDate.getDate() + dose.recommendedAtDays);
+    if (dose.recommendedAtWeeks != null) dueDate.setDate(dueDate.getDate() + dose.recommendedAtWeeks * 7);
+    if (dose.recommendedAtMonths != null) dueDate.setMonth(dueDate.getMonth() + dose.recommendedAtMonths);
+    if (dose.recommendedAtYears != null) dueDate.setFullYear(dueDate.getFullYear() + dose.recommendedAtYears);
+
+    childDueVaccines.push({
+      vaccineType: dose.vaccineType,
+      doseNumber: dose.doseNumber,
+      dueDate,
+      isCompleted: false,
+      scheduleVersion: scheduleVersion.id,
+    });
+  }
+
+  return childDueVaccines;
+}
+// --- Full createChild controller
 export const createChild = async (req, res) => {
   try {
     const validationResult = createChildSchema.safeParse(req.body);
-    console.log('Validation result:', validationResult);
-
     if (!validationResult.success) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: validationResult.error.errors,
-      });
+      return res.status(400).json({ error: 'Validation failed', details: validationResult.error.errors });
     }
     const validatedData = validationResult.data;
 
-    const adBirthDate = parseBsDateString(validatedData.birthDate);
-    if (!adBirthDate) {
-      return res.status(400).json({ error: 'Invalid BS birthDate string' });
-    }
+    const birthDate = parseBsDateString(validatedData.birthDate);
+    if (!birthDate) return res.status(400).json({ error: 'Invalid BS birthDate string' });
 
-    // PurnaKhop should NOT be set on creation. We'll set it to false by default.
     const createdChild = await prisma.$transaction(async (tx) => {
-      // Create child record
-      const childData = {
-        isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
-        fullName: validatedData.firstName + ' ' + validatedData.lastName || '',
-        wardNumber: parseInt(validatedData.wardNumber, 10),
-        parentName: validatedData.parentName || '',
-        tole: validatedData.tole || '',
-        phoneNumber: validatedData.phoneNumber || '',
-        gender: validatedData.gender,
-        casteCode: parseInt(validatedData.casteCode, 10),
-        birthDate: adBirthDate,
-        createdById: req.user.id,
-        purnaKhop: false, // Always false on creation
-        remarks: validatedData.remarks || '',
-        verifiedById: null, // Always null on creation
-      };
-      const child = await tx.child.create({ data: childData });
+      // Create child
+      const child = await tx.child.create({
+        data: {
+          isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
+          fullName: `${validatedData.firstName} ${validatedData.lastName}` || '',
+          wardNumber: parseInt(validatedData.wardNumber, 10),
+          parentName: validatedData.parentName || '',
+          tole: validatedData.tole || '',
+          phoneNumber: validatedData.phoneNumber || '',
+          gender: validatedData.gender,
+          casteCode: parseInt(validatedData.casteCode, 10),
+          birthDate,
+          createdById: req.user.id,
+          purnaKhop: false,
+          remarks: validatedData.remarks || '',
+          verifiedById: null,
+        },
+      });
 
-      // Create vaccination records with both createdBy and administeredBy
-      const vaccinationCreateData = prepareVaccinationCreateData(
+      // Vaccination records
+      const vaccinationCreateData = await prepareVaccinationCreateData(
         validatedData.vaccines,
         req.user,
-        validatedData.administeredById // Pass the administeredById from the request body
+        validatedData.administeredById
       );
-      if (vaccinationCreateData.length > 0) {
+
+      if (vaccinationCreateData.length) {
         const vaccinationsWithChildId = vaccinationCreateData.map((v) => ({
           ...v,
           citizenId: child.id,
           wardOfVaccination: req.user.wardId,
         }));
-        await tx.vaccinationRecord.createMany({
-          data: vaccinationsWithChildId,
-        });
+        await tx.vaccinationRecord.createMany({ data: vaccinationsWithChildId });
       }
 
-      // Create weight records with both createdBy and administeredBy
+      // Weight records
       if (validatedData.weightRecords?.length) {
-        const weightCreateData = validatedData.weightRecords.map((w) => ({
+        const weightData = validatedData.weightRecords.map((w) => ({
           childId: child.id,
           weight: w.weight,
           date: parseBsDateString(w.date),
-          createdById: req.user.id, // The person entering the data
-          administeredById: validatedData.administeredById, // Pass the administeredById from the request body
-
+          createdById: req.user.id,
+          administeredById: validatedData.administeredById,
           wardOfVaccination: req.user.wardId,
         }));
-        await tx.weightRecord.createMany({ data: weightCreateData });
+        await tx.weightRecord.createMany({ data: weightData });
       }
 
-      // Perform a final query to get the newly created child with all related data
-      const newChildWithUser = await tx.child.findUnique({
+      // Create ChildDueVaccine entries
+      // Create ChildDueVaccine entries
+      const dueVaccines = await prepareChildDueVaccines(validatedData.birthDate);
+      if (dueVaccines.length) {
+        const dueVaccinesWithChildId = dueVaccines.map((v) => ({
+          ...v,
+          childId: child.id, // <-- add this
+        }));
+        await tx.childDueVaccine.createMany({ data: dueVaccinesWithChildId });
+      }
+
+
+      // Return full child with relations
+      return await tx.child.findUnique({
         where: { id: child.id },
         include: {
           createdBy: { select: { id: true, name: true } },
           verifiedBy: { select: { id: true, name: true } },
-          vaccinations: {
-            include: {
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-            },
-          },
-          weightRecords: {
-            include: {
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-            },
-          },
+          vaccinations: { include: { createdBy: true, administeredBy: true } },
+          weightRecords: { include: { createdBy: true, administeredBy: true } },
+          dueVaccines: true,
         },
       });
-
-      return newChildWithUser;
     });
 
     res.status(201).json(createdChild);
   } catch (error) {
     console.error('Child creation error:', error);
-    res.status(500).json({
-      error: 'Child creation failed',
-      details: error.message,
-    });
+    res.status(500).json({ error: 'Child creation failed', details: error.message });
   }
 };
 
@@ -182,169 +207,189 @@ export const updateChildPurnaKhop = async (req, res) => {
 
 
 // Controller to get all children, including their vaccination records
+// Get all children (with schedule & nested data)
 export const getAllChildren = async (req, res) => {
   try {
     const children = await prisma.child.findMany({
       include: {
         createdBy: { select: { id: true, name: true } },
-        verifiedBy: { select: { id: true, name: true } }, // NEW
+        verifiedBy: { select: { id: true, name: true } },
         vaccinations: {
           include: {
             createdBy: { select: { id: true, name: true } },
-            administeredBy: { select: { id: true, name: true } }, // NEW
+            administeredBy: { select: { id: true, name: true } },
           },
         },
         weightRecords: {
           include: {
             createdBy: { select: { id: true, name: true } },
-            administeredBy: { select: { id: true, name: true } }, // NEW
+            administeredBy: { select: { id: true, name: true } },
           },
         },
+        dueVaccines: true, // include the schedule
       },
     });
 
-    if (!children) {
+    if (!children.length) {
       return res.status(404).json({ error: 'No children found' });
     }
 
     res.status(200).json(children);
   } catch (error) {
     console.error('Error fetching all children:', error);
-    res.status(500).json({
-      error: 'Failed to retrieve children data',
-      details: error.message,
-    });
+    res.status(500).json({ error: 'Failed to retrieve children data', details: error.message });
   }
 };
+
+// Get children for a specific ward
 export const getWardChildren = async (req, res) => {
   try {
-    if (!req.user || !req.user.wardId) {
-      return res
-        .status(401)
-        .json({ error: 'Unauthorized. User or wardId not found.' });
+    const currentUser = req.user;
+    if (!currentUser?.wardId) {
+      return res.status(401).json({ error: 'Unauthorized. User or wardId not found.' });
     }
-    const { wardId } = req.user;
+
     const children = await prisma.child.findMany({
-      where: {
-        wardNumber: wardId,
-      },
+      where: { wardNumber: currentUser.wardId },
       include: {
-        createdBy: { select: { id: true, } },
-        verifiedBy: { select: { id: true, } },
+        createdBy: { select: { id: true, name: true } },
+        verifiedBy: { select: { id: true, name: true } },
         vaccinations: {
           include: {
-            createdBy: { select: { id: true, } },
-            administeredBy: { select: { id: true, } },
+            createdBy: { select: { id: true, name: true } },
+            administeredBy: { select: { id: true, name: true } },
           },
         },
         weightRecords: {
           include: {
-            createdBy: { select: { id: true, } },
-            administeredBy: { select: { id: true, } },
+            createdBy: { select: { id: true, name: true } },
+            administeredBy: { select: { id: true, name: true } },
           },
         },
+        dueVaccines: true, // include the schedule
       },
     });
-    return res.status(200).json(children);
+
+    res.status(200).json(children);
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Something went wrong.' });
+    console.error('Error fetching ward children:', error);
+    res.status(500).json({ error: 'Failed to fetch ward children', details: error.message });
   }
 };
+
+// Get single child (by ID or Sewa Darta Number)
 export const getChild = async (req, res) => {
   try {
-    const searchTerm = req.params.id;
-    const isNumber = /^\d+$/.test(searchTerm);
+    const { id } = req.params;
     const currentUser = req.user;
+    const isNumber = /^\d+$/.test(id);
 
-    let child;
-    if (isNumber) {
-      child = await prisma.child.findUnique({
-        where: { sewaDartaNumber: parseInt(searchTerm, 10) },
-        include: {
-          vaccinations: true,
-          weightRecords: true,
+    const child = await prisma.child.findUnique({
+      where: isNumber ? { sewaDartaNumber: parseInt(id, 10) } : { id },
+      include: {
+        vaccinations: {
+          include: {
+            createdBy: { select: { id: true, name: true } },
+            administeredBy: { select: { id: true, name: true } },
+          },
         },
-      });
-    } else {
-      child = await prisma.child.findUnique({
-        where: { id: searchTerm },
-        include: {
-          vaccinations: true,
-          weightRecords: true,
+        weightRecords: {
+          include: {
+            createdBy: { select: { id: true, name: true } },
+            administeredBy: { select: { id: true, name: true } },
+          },
         },
-      });
-    }
+        dueVaccines: true, // include schedule
+        createdBy: { select: { id: true, name: true } },
+        verifiedBy: { select: { id: true, name: true } },
+      },
+    });
 
-    if (!child) {
-      return res.status(404).json({ error: 'Child not found' });
-    }
+    if (!child) return res.status(404).json({ error: 'Child not found' });
 
-    // Check read permission and filter the data accordingly.
-    const hasReadPermission = checkPermission(currentUser, 'read', child);
-    if (!hasReadPermission) {
+    // Filter data based on read permissions
+    if (!checkPermission(currentUser, 'read', child)) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to view this child.' });
     }
 
     const filteredChild = filterChildData(currentUser, child);
-    return res.status(200).json(filteredChild);
-
+    res.status(200).json(filteredChild);
   } catch (error) {
     console.error('Error fetching single child:', error);
-    res.status(500).json({
-      error: 'Failed to retrieve child data',
-      details: error.message,
-    });
+    res.status(500).json({ error: 'Failed to retrieve child data', details: error.message });
   }
 };
 
+// Search children (with query filters)
 export const searchChildren = async (req, res) => {
   try {
     const { name, phoneNumber, sewaDartaNumber, gender, wardId, createdByMe } = req.query;
     const currentUser = req.user;
 
-    // Initialize an empty object to build the Prisma query 'where' clause.
     const whereClause = {};
 
-    // 1. Enforce ward filtering based on user role and query.
-    // If user is WARD_OFFICER and no specific wardId is requested, default to their own ward.
-    // If they request a specific wardId, the permission check will handle access.
     if (currentUser.role === 'WARD_OFFICER' && !wardId) {
       whereClause.wardNumber = currentUser.wardId;
     } else if (wardId && wardId !== 'all') {
       whereClause.wardNumber = parseInt(wardId, 10);
     }
 
-    // 2. Build search filters for each field dynamically.
-    if (name) { whereClause.fullName = { contains: name, mode: 'insensitive' }; }
-    if (phoneNumber) { whereClause.phoneNumber = { contains: phoneNumber, mode: 'insensitive' }; }
-    if (sewaDartaNumber) { whereClause.sewaDartaNumber = parseInt(sewaDartaNumber, 10); }
-    if (gender) { whereClause.gender = gender.toUpperCase(); }
-    if (createdByMe === 'true') { whereClause.createdById = currentUser.id; }
+    if (name) whereClause.fullName = { contains: name, mode: 'insensitive' };
+    if (phoneNumber) whereClause.phoneNumber = { contains: phoneNumber, mode: 'insensitive' };
+    if (sewaDartaNumber) whereClause.sewaDartaNumber = parseInt(sewaDartaNumber, 10);
+    if (gender) whereClause.gender = gender.toUpperCase();
+    if (createdByMe === 'true') whereClause.createdById = currentUser.id;
 
-    // Perform the Prisma query.
     const children = await prisma.child.findMany({
       where: whereClause,
-      select: {
-        id: true,
-        fullName: true,
-        sewaDartaNumber: true,
-        birthDate: true,
-        gender: true,
-        wardNumber: true,
-      },
+      include: { dueVaccines: true }, // include schedule for search results
       take: 20,
     });
 
     res.status(200).json(children);
   } catch (error) {
     console.error('Error searching children:', error);
-    res.status(500).json({
-      error: 'Failed to perform search',
-      details: error.message,
-    });
+    res.status(500).json({ error: 'Failed to perform search', details: error.message });
   }
 };
+
+
+//update child controller declarations and helpers
+async function getLatestSchedule() {
+  const scheduleVersion = await prisma.vaccineScheduleVersion.findFirst({
+    orderBy: { id: 'desc' },
+    include: { doses: true },
+  });
+  if (!scheduleVersion) throw new Error('No vaccine schedule found');
+  return scheduleVersion;
+}
+
+// Map incoming vaccinations to DB schedule primary doses
+async function prepareVaccinationUpdateData(childId, vaccinations, administeredById) {
+  if (!vaccinations || !vaccinations.length) return [];
+
+  const scheduleVersion = await getLatestSchedule();
+  return vaccinations.flatMap((v) => {
+    const vaccineType = mapVaccineNameToEnum(v.vaccineType);
+    const schedule = scheduleVersion.doses
+      .filter((d) => d.vaccineType === vaccineType)
+      .sort((a, b) => a.doseNumber - b.doseNumber);
+
+    const doseNumber = v.doseNumber;
+    const scheduledDose = schedule.find((d) => d.doseNumber === doseNumber);
+    if (!scheduledDose) return null; // skip doses not in primary schedule
+
+    return {
+      ...v,
+      citizenId: childId,
+      administeredById,
+      createdById: v.id ? undefined : v.createdById, // only for new records
+      dateGiven: v.dateGiven ? parseBsDateString(v.dateGiven) : null,
+    };
+  }).filter(Boolean);
+}
+
+// --- Updated controller
 export const updateChild = async (req, res) => {
   const { id } = req.params;
   const sewaDartaNumber = parseInt(id, 10);
@@ -354,135 +399,92 @@ export const updateChild = async (req, res) => {
   try {
     const existingChild = await prisma.child.findUnique({
       where: { sewaDartaNumber },
-      include: { vaccinations: true, weightRecords: true }
+      include: { vaccinations: true, weightRecords: true },
     });
 
-    if (!existingChild) {
-      return res.status(404).json({ error: 'Child not found' });
-    }
+    if (!existingChild) return res.status(404).json({ error: 'Child not found' });
 
-    // STEP 1: Centralized permission check
-    // Pass the demographic data to the permission service to check for partial updates
     const hasPermission = checkPermission(currentUser, 'update', existingChild, demographicData);
-
-    if (!hasPermission) {
-      return res.status(403).json({ error: 'You are not authorized to edit this child\'s data.' });
-    }
-
-    // STEP 2: The rest of the logic can proceed, now that we know the user has permission.
-    // The previous hardcoded check is replaced.
+    if (!hasPermission) return res.status(403).json({ error: 'Not authorized to edit this child\'s data.' });
 
     await prisma.$transaction(async (tx) => {
-      // Only update demographic data if the user has full permission (i.e., from the same ward or SUPER_ADMIN).
+      // Update demographic data if user has full permission
       const isSameWard = existingChild.wardNumber === currentUser.wardId;
       if (isSameWard || currentUser.role === 'SUPER_ADMIN') {
         const updateData = {
           fullName: `${firstName || ''} ${lastName || ''}`.trim(),
+          ...demographicData.birthDate ? { birthDate: parseBsDateString(demographicData.birthDate) } : {},
+          ...demographicData.phoneNumber ? { phoneNumber: demographicData.phoneNumber } : {},
+          ...demographicData.gender ? { gender: demographicData.gender } : {},
+          ...demographicData.wardNumber ? { wardNumber: demographicData.wardNumber } : {},
+          ...demographicData.casteCode ? { casteCode: demographicData.casteCode } : {},
+          ...demographicData.parentName ? { parentName: demographicData.parentName } : {},
+          ...demographicData.tole ? { tole: demographicData.tole } : {},
+          ...typeof demographicData.isFromOtherMunicipality === 'boolean' ? { isFromOtherMunicipality: demographicData.isFromOtherMunicipality } : {},
         };
-
-        if (demographicData.birthDate) { updateData.birthDate = parseBsDateString(demographicData.birthDate); }
-        if (typeof demographicData.phoneNumber === 'string' && demographicData.phoneNumber.trim() !== '') { updateData.phoneNumber = demographicData.phoneNumber; }
-        if (typeof demographicData.gender === 'string') { updateData.gender = demographicData.gender; }
-        if (typeof demographicData.wardNumber === 'number') { updateData.wardNumber = demographicData.wardNumber; }
-        if (typeof demographicData.casteCode === 'number') { updateData.casteCode = demographicData.casteCode; }
-        if (typeof demographicData.parentName === 'string') { updateData.parentName = demographicData.parentName; }
-        if (typeof demographicData.tole === 'string') { updateData.tole = demographicData.tole; }
-        if (typeof demographicData.isFromOtherMunicipality === 'boolean') { updateData.isFromOtherMunicipality = demographicData.isFromOtherMunicipality; }
-
-        await tx.child.update({
-          where: { sewaDartaNumber },
-          data: updateData,
-        });
+        await tx.child.update({ where: { sewaDartaNumber }, data: updateData });
       }
 
-      // Prepare vaccination records
-      const incomingVaccs = Array.isArray(vaccinations) ? vaccinations : [];
+      // Update vaccinations
+      const updatedVaccinations = await prepareVaccinationUpdateData(existingChild.id, vaccinations, administeredById);
 
-      for (const v of incomingVaccs) {
-        // Only update if the user has permission (handled by the initial check)
-        const parsedDate = v.dateGiven ? parseBsDateString(v.dateGiven) : null;
-        const vData = {
-          remarks: v.remarks ?? null,
-          administeredById: administeredById,
-          wardOfVaccination: currentUser.wardId,
-        };
-        if (parsedDate) vData.dateGiven = parsedDate;
+      for (const v of updatedVaccinations) {
+        const vaccineTypeEnum = mapVaccineNameToEnum(v.vaccineType);
 
-        const existingVaccine = existingChild.vaccinations.find((ev) => ev.vaccineType === v.vaccineType && ev.doseNumber === v.doseNumber);
-
+        const existingVaccine = existingChild.vaccinations.find(
+          (ev) => ev.vaccineType === vaccineTypeEnum && ev.doseNumber === v.doseNumber
+        );
         if (existingVaccine) {
-          await tx.vaccinationRecord.update({ where: { id: existingVaccine.id }, data: vData });
-        } else {
-          if (parsedDate) {
-            await tx.vaccinationRecord.create({
-              data: {
-                ...vData,
-                vaccineType: v.vaccineType,
-                doseNumber: v.doseNumber,
-                citizenId: existingChild.id,
-                createdById: currentUser.id,
-              },
-            });
-          }
-        }
-      }
-
-      // Create/update/delete weight records
-      const incomingWeights = Array.isArray(weightRecords) ? weightRecords : [];
-      const incomingIds = incomingWeights.filter(w => w.id && !isNaN(parseInt(w.id))).map(w => parseInt(w.id));
-
-      if (existingChild.weightRecords.length > 0) {
-        const toDelete = existingChild.weightRecords.filter(existing => !incomingIds.includes(existing.id)).map(wr => wr.id);
-        if (toDelete.length > 0) {
-          await tx.weightRecord.deleteMany({
-            where: {
-              id: { in: toDelete },
-              childId: existingChild.id
-            }
+          await tx.vaccinationRecord.update({ where: { id: existingVaccine.id }, data: v });
+        } else if (v.dateGiven) {
+          await tx.vaccinationRecord.create({
+            data: {
+              ...v,
+              vaccineType: vaccineTypeEnum,
+              citizenId: existingChild.id,
+              createdById: currentUser.id, // required
+              isComplete: true,           // required
+              wardOfVaccination: currentUser.wardId, // required if your model needs it
+            },
           });
         }
+      }
+
+      // Update weight records
+      const incomingWeights = Array.isArray(weightRecords) ? weightRecords : [];
+      const incomingIds = incomingWeights.filter(w => w.id).map(w => w.id);
+      if (existingChild.weightRecords.length > 0) {
+        const toDelete = existingChild.weightRecords.filter(w => !incomingIds.includes(w.id)).map(w => w.id);
+        if (toDelete.length) await tx.weightRecord.deleteMany({ where: { id: { in: toDelete }, childId: existingChild.id } });
       }
 
       for (const w of incomingWeights) {
-        const parsedWeightDate = w.date ? parseBsDateString(w.date) : null;
-        if (!parsedWeightDate) continue;
-
+        if (!w.date) continue;
+        const parsedDate = parseBsDateString(w.date);
         if (w.id) {
-          await tx.weightRecord.update({
-            where: { id: w.id },
-            data: {
-              weight: w.weight,
-              date: parsedWeightDate,
-              administeredById,
-              wardOfVaccination: currentUser.wardId,
-            },
-          });
+          await tx.weightRecord.update({ where: { id: w.id }, data: { weight: w.weight, date: parsedDate, administeredById, wardOfVaccination: currentUser.wardId } });
         } else {
-          await tx.weightRecord.create({
-            data: {
-              weight: w.weight,
-              date: parsedWeightDate,
-              administeredById,
-              wardOfVaccination: currentUser.wardId,
-              childId: existingChild.id,
-              createdById: currentUser.id,
-            },
-          });
+          await tx.weightRecord.create({ data: { childId: existingChild.id, weight: w.weight, date: parsedDate, administeredById, wardOfVaccination: currentUser.wardId, createdById: currentUser.id } });
         }
+      }
+
+      // Optionally: recalc childDueVaccines if birthDate changed
+      if (demographicData.birthDate) {
+        const childDueVaccines = await prepareChildDueVaccines(demographicData.birthDate);
+        const dueWithChildId = childDueVaccines.map(v => ({ ...v, childId: existingChild.id }));
+        await tx.childDueVaccine.deleteMany({ where: { childId: existingChild.id } });
+        await tx.childDueVaccine.createMany({ data: dueWithChildId });
       }
     });
 
     const updatedChild = await prisma.child.findUnique({
       where: { sewaDartaNumber },
-      include: { vaccinations: true, weightRecords: true }
+      include: { vaccinations: true, weightRecords: true, dueVaccines: true },
     });
 
     res.status(200).json(updatedChild);
   } catch (error) {
     console.error('Error updating child:', error);
-    res.status(500).json({
-      error: 'Failed to update child data',
-      details: error.message,
-    });
+    res.status(500).json({ error: 'Failed to update child data', details: error.message });
   }
 };

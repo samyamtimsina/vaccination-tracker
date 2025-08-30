@@ -29,6 +29,7 @@ model User {
   administeredTDDoses TDDose[] @relation("AdministeredByTDDose")
   RefreshTokens             RefreshToken[]
   otps                     Otp[]
+  vaccineScheduleVersions    VaccineScheduleVersion[]
   createdAt DateTime @default(now())
 }
 enum UserRole {
@@ -81,6 +82,7 @@ model Child {
   verifiedById              Int?
   verifiedBy                User?               @relation(name: "VerifiedBy", fields: [verifiedById], references: [id])
   vaccinations              VaccinationRecord[]
+  dueVaccines      ChildDueVaccine[] 
   createdAt                 DateTime            @default(now())
   NotificationLog           NotificationLog[]
   isFromOtherMunicipality   Boolean             @default(false)
@@ -103,6 +105,7 @@ model Mother {
   createdById               Int
   createdBy                 User      @relation(fields: [createdById], references: [id])
   isFromOtherMunicipality   Boolean   @default(false)
+  NotificationLog           NotificationLog[]
  tdDoses                 TDDose[]
 }
 model TDDose {
@@ -129,7 +132,6 @@ model VaccinationRecord {
   dateGiven                 DateTime
   isComplete                Boolean
   remarks                   String?
-  recommendedAtMonths       Int
   customVaccineName         String?
   type                      String      @default("routine")
   child                     Child       @relation(fields: [citizenId], references: [id])
@@ -154,15 +156,62 @@ enum VaccineType {
   HPV
   OTHERS
 }
+model Dose {
+  id                  Int      @id @default(autoincrement())
+  vaccineType         VaccineType
+  doseNumber          Int
+  recommendedAtDays   Float?
+  recommendedAtWeeks  Float?
+  recommendedAtMonths Float?
+  recommendedAtYears  Float?
+  isBooster           Boolean? @default(false)
+  scheduleVersionId   Int @default(1)
+  scheduleVersion     VaccineScheduleVersion @relation(fields: [scheduleVersionId], references: [id])
+  @@unique([vaccineType, doseNumber, scheduleVersionId])
+}
+
+model VaccineScheduleVersion {
+    id              Int      @id @default(autoincrement())
+  lastModifiedAt  DateTime @updatedAt
+  lastModifiedBy  Int?
+  user            User?    @relation(fields: [lastModifiedBy], references: [id])
+  doses           Dose[]
+  catchUpRules    CatchUpRule[]
+}
+
+model ChildDueVaccine {
+  id              String        @id @default(uuid())
+  childId         String
+  child           Child         @relation(fields: [childId], references: [id])
+  vaccineType     VaccineType
+  doseNumber      Int
+  dueDate         DateTime
+  isCompleted     Boolean       @default(false)   // mark true once administered
+  createdAt       DateTime      @default(now())
+  scheduleVersion Int @default(1)           // tie to VaccineScheduleVersion for recalculation
+}
+
+model CatchUpRule {
+  id                Int      @id @default(autoincrement())
+  vaccineType       VaccineType
+  maxAgeDays        Float?
+  maxAgeWeeks       Float?
+  maxAgeMonths      Float?
+  maxAgeYears       Float?
+  minIntervalWeeks  Float?
+  totalDoses        Int?
+  scheduleVersionId Int @default(1)
+  scheduleVersion   VaccineScheduleVersion @relation(fields: [scheduleVersionId], references: [id])
+}
 
 model NotificationLog {
-  id                        Int         @id @default(autoincrement())
-  citizenId                 String
-  vaccineType               VaccineType
-  doseNumber                Int
-  sentAt                    DateTime    @default(now())
-  type                      String
-  child                     Child       @relation(fields: [citizenId], references: [id])
+  id          Int      @id @default(autoincrement())
+  childId     String?
+  motherId    String?
+  message     String
+  sentAt      DateTime @default(now())
+  child       Child?   @relation(fields: [childId], references: [id])
+  mother      Mother?  @relation(fields: [motherId], references: [id])
 }
 
 model AuditLog {
