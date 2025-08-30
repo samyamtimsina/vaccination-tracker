@@ -13,7 +13,6 @@ export const VaccineScheduleProvider = ({ children }) => {
             try {
                 const res = await axiosClient.get('/api/vaccine-schedule');
                 const data = res.data;
-                console.log('Fetched vaccine schedule:', data);
 
                 // Transform doses
                 const dosesByVaccine = data.doses.reduce((acc, dose) => {

@@ -35,6 +35,7 @@ import SuperAdminLayout from './components/SuperAdminLayout.jsx';
 import UsersManagementPage from './components/UsersManagement.jsx';
 import AnalyticsPage from './components/SuperAdminAnalytics.jsx';
 import AdminDashboard from './components/Dashboards/AdminDashboard.jsx';
+import Schedule from './components/Schedule.jsx'
 
 
 // A simple layout component that includes the navbar
@@ -86,6 +87,7 @@ function App() {
                     <Route path="/add-child" element={<AddChild />} />
                     <Route path="/edit-child" element={<EditChild />} />
                     <Route path="/add-mother" element={<AddMother />} />
+                    <Route path="/schedule" element={<Schedule />} />
                     <Route path="/view-children" element={<ViewChildren />} />
                     <Route path="/view-mothers" element={<ViewMothers />} />
                     <Route path="/profile" element={<Profile />} />
