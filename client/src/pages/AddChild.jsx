@@ -1,7 +1,8 @@
 import { useForm, Controller, useWatch, useFieldArray } from 'react-hook-form';
+import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMemo, useEffect, useState } from 'react';
-import { vaccineSchedule } from '../utils/vaccineSchedule';
+// import { vaccineSchedule } from '../utils/vaccineSchedule';
 import axiosClient from '../api/axiosClient.js';
 import { NepaliDatePicker } from 'nepali-datepicker-reactjs';
 import 'nepali-datepicker-reactjs/dist/index.css';
@@ -26,7 +27,10 @@ import {
 } from 'react-icons/fa';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createChildSchema } from '../schemas/childSchema.js';
+
 import { useChildContext } from '../context/ChildContext';
+import { VaccineScheduleContext } from '../context/VaccineScheduleContext';
+
 import { useTheme } from '../context/ThemeContext';
 import { calculateAge } from '../../helpers/calculateAge.jsx';
 import { getFirstErrorMessage } from '../../helpers/getFirstErrorMessage.jsx';
@@ -91,7 +95,7 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
     NOT_APPLICABLE: { vaccines: [], count: 0, icon: FaLock, color: 'text-gray-400', title: 'Not Applicable' }
   };
 
-  Object.entries(vaccineSchedule).forEach(([vaccineName, doses]) => {
+  Object.entries(vaccineSchedule.doses).forEach(([vaccineName, doses]) => {
     if (vaccineName === 'HPV' && gender !== 'FEMALE') {
       categories.NOT_APPLICABLE.vaccines.push({
         vaccineName,
@@ -361,6 +365,10 @@ const VaccineSection = ({
 };
 
 export default function AddChild() {
+  const { vaccineSchedule, loading } = useContext(VaccineScheduleContext);
+  console.log('vaccineSchedule in AddChild:', vaccineSchedule);
+  console.log('loading in AddChild:', loading);
+  if (loading || !vaccineSchedule) return <div>Loading schedule...</div>;
   const { t, i18n } = useTranslation('addChild');
   const { theme } = useTheme();
   const { addChildToState } = useChildContext();
@@ -379,7 +387,7 @@ export default function AddChild() {
       birthDate: '',
       administeredById: '',
       vaccines: Object.fromEntries(
-        Object.entries(vaccineSchedule).map(([vaccineName, doses]) => [
+        Object.entries(vaccineSchedule.doses).map(([vaccineName, doses]) => [
           vaccineName,
           doses.map(() => ({ date: '', remarks: '' })),
         ]),
@@ -472,7 +480,7 @@ export default function AddChild() {
       const res = await axiosClient.post('/api/child', payload);
       addChildToState(res.data);
       toast.success(t('toast.success'));
-      // reset();
+      reset();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       console.error('Submission failed:', err);

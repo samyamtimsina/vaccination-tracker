@@ -1,10 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { authenticate, authorize } from './middlewares/auth.js';
 import authRoutes from './routes/authRoutes.js';
 import childRoutes from './routes/childRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import scheduleRoutes from './routes/scheduleRoutes.js';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 
@@ -43,6 +43,9 @@ app.use('/api/child', childRoutes);
 
 //mother routes
 app.use('/api/mothers', motherRoutes);
+
+//schedule routes
+app.use('/api/vaccine-schedule', scheduleRoutes);
 
 app.get('/', (req, res) => {
   res.send('Vaccination API running');

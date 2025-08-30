@@ -20,19 +20,21 @@ async function prepareVaccinationCreateData(vaccines, user, administeredByUserId
   return Object.entries(vaccines).flatMap(([vaccineName, doses]) => {
     const vaccineTypeEnum = mapVaccineNameToEnum(vaccineName);
 
-    // Only primary doses
-    const schedule = scheduleVersion.doses
-      .filter((d) => d.vaccineType === vaccineTypeEnum)
-      .sort((a, b) => a.doseNumber - b.doseNumber);
+    // Get valid doses from schedule
+    const validDoseNumbers = scheduleVersion.doses
+      .filter(d => d.vaccineType === vaccineTypeEnum)
+      .map(d => d.doseNumber);
 
     return doses
-      .map((doseObj, index) => {
+      .map((doseObj) => {
         if (!doseObj?.date) return null;
+        if (!['current', 'booster'].includes(doseObj.type)) return null;
+
+        const doseNumber = doseObj.doseNumber;
+        if (!validDoseNumbers.includes(doseNumber)) return null; // Reject invalid doseNumber
+
         const dateGiven = parseBsDateString(doseObj.date);
         if (!dateGiven) return null;
-
-        const doseNumber = index + 1; // map to primary dose
-        if (!schedule.find((d) => d.doseNumber === doseNumber)) return null;
 
         return {
           vaccineType: vaccineTypeEnum,
@@ -40,7 +42,7 @@ async function prepareVaccinationCreateData(vaccines, user, administeredByUserId
           dateGiven,
           isComplete: true,
           remarks: doseObj.remarks || null,
-          type: doseObj.type || 'routine',
+          type: doseObj.type,
           createdById: user.id,
           administeredById: administeredByUserId,
         };
@@ -54,50 +56,42 @@ export async function prepareChildDueVaccines(birthDateBs, scheduleVersionId = n
   const birthDate = parseBsDateString(birthDateBs);
   if (!birthDate) throw new Error('Invalid BS birthDate');
 
-  // Get the latest schedule if scheduleVersionId is not provided
   const scheduleVersion = await prisma.vaccineScheduleVersion.findFirst({
     where: scheduleVersionId ? { id: scheduleVersionId } : undefined,
     orderBy: { id: 'desc' },
     include: { doses: true },
   });
-
   if (!scheduleVersion) throw new Error('No vaccine schedule found');
 
-  const childDueVaccines = [];
-
-  for (const dose of scheduleVersion.doses) {
-    let dueDate = new Date(birthDate.getTime()); // start from birth
-
+  return scheduleVersion.doses.map((dose) => {
+    let dueDate = new Date(birthDate.getTime());
     if (dose.recommendedAtDays != null) dueDate.setDate(dueDate.getDate() + dose.recommendedAtDays);
     if (dose.recommendedAtWeeks != null) dueDate.setDate(dueDate.getDate() + dose.recommendedAtWeeks * 7);
     if (dose.recommendedAtMonths != null) dueDate.setMonth(dueDate.getMonth() + dose.recommendedAtMonths);
     if (dose.recommendedAtYears != null) dueDate.setFullYear(dueDate.getFullYear() + dose.recommendedAtYears);
 
-    childDueVaccines.push({
+    return {
       vaccineType: dose.vaccineType,
       doseNumber: dose.doseNumber,
       dueDate,
       isCompleted: false,
       scheduleVersion: scheduleVersion.id,
-    });
-  }
-
-  return childDueVaccines;
+    };
+  });
 }
+
 // --- Full createChild controller
 export const createChild = async (req, res) => {
   try {
     const validationResult = createChildSchema.safeParse(req.body);
-    if (!validationResult.success) {
+    if (!validationResult.success)
       return res.status(400).json({ error: 'Validation failed', details: validationResult.error.errors });
-    }
-    const validatedData = validationResult.data;
 
+    const validatedData = validationResult.data;
     const birthDate = parseBsDateString(validatedData.birthDate);
     if (!birthDate) return res.status(400).json({ error: 'Invalid BS birthDate string' });
 
     const createdChild = await prisma.$transaction(async (tx) => {
-      // Create child
       const child = await tx.child.create({
         data: {
           isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
@@ -145,19 +139,13 @@ export const createChild = async (req, res) => {
         await tx.weightRecord.createMany({ data: weightData });
       }
 
-      // Create ChildDueVaccine entries
-      // Create ChildDueVaccine entries
+      // ChildDueVaccine entries
       const dueVaccines = await prepareChildDueVaccines(validatedData.birthDate);
       if (dueVaccines.length) {
-        const dueVaccinesWithChildId = dueVaccines.map((v) => ({
-          ...v,
-          childId: child.id, // <-- add this
-        }));
+        const dueVaccinesWithChildId = dueVaccines.map((v) => ({ ...v, childId: child.id }));
         await tx.childDueVaccine.createMany({ data: dueVaccinesWithChildId });
       }
 
-
-      // Return full child with relations
       return await tx.child.findUnique({
         where: { id: child.id },
         include: {
@@ -176,6 +164,7 @@ export const createChild = async (req, res) => {
     res.status(500).json({ error: 'Child creation failed', details: error.message });
   }
 };
+
 
 
 export const updateChildPurnaKhop = async (req, res) => {
