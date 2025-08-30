@@ -1,7 +1,5 @@
 import { prisma } from '../utils/prisma.js';
-import { vaccineSchedule } from '../utils/vaccineSchedule.js';
 import { createChildSchema } from '../schemas/childSchema.js';
-import { updateChildSchema } from '../schemas/childSchema.js';
 import { checkPermission, filterChildData } from '../../client/src/utils/permissionService.js';
 import {
   toMonths,
