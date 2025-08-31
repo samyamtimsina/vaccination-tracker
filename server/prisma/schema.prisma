@@ -127,7 +127,8 @@ model TDDose {
 model VaccinationRecord {
   id                        String      @id @default(uuid())
   citizenId                 String
-  vaccineType               VaccineType
+  vaccineTypeId       Int
+  vaccineType         VaccineType @relation(fields: [vaccineTypeId], references: [id])
   doseNumber                Int
   dateGiven                 DateTime
   isComplete                Boolean
@@ -142,23 +143,24 @@ model VaccinationRecord {
   createdAt                 DateTime    @default(now())
    wardOfVaccination     Int
 }
+model VaccineType {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)   // so you can disable vaccines without deleting
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-enum VaccineType {
-  BCG
-  DPT_HEPB_HIB
-  ROTA
-  OPV
-  FIPV
-  PCV
-  MR
-  JE
-  TCV
-  HPV
-  OTHERS
+  doses       Dose[]
+  catchUpRules CatchUpRule[]
+  dueVaccines ChildDueVaccine[]
+  records     VaccinationRecord[]
 }
+
+
 model Dose {
   id                  Int      @id @default(autoincrement())
-  vaccineType         VaccineType
+  vaccineTypeId       Int
+  vaccineType         VaccineType @relation(fields: [vaccineTypeId], references: [id])
   doseNumber          Int
   recommendedAtDays   Float?
   recommendedAtWeeks  Float?
@@ -167,7 +169,7 @@ model Dose {
   isBooster           Boolean? @default(false)
   scheduleVersionId   Int @default(1)
   scheduleVersion     VaccineScheduleVersion @relation(fields: [scheduleVersionId], references: [id])
-  @@unique([vaccineType, doseNumber, scheduleVersionId])
+  @@unique([vaccineTypeId, doseNumber, scheduleVersionId])
 }
 
 model VaccineScheduleVersion {
@@ -183,7 +185,8 @@ model ChildDueVaccine {
   id              String        @id @default(uuid())
   childId         String
   child           Child         @relation(fields: [childId], references: [id])
-  vaccineType     VaccineType
+  vaccineTypeId       Int
+  vaccineType         VaccineType @relation(fields: [vaccineTypeId], references: [id])
   doseNumber      Int
   dueDate         DateTime
   isCompleted     Boolean       @default(false)   // mark true once administered
@@ -193,7 +196,8 @@ model ChildDueVaccine {
 
 model CatchUpRule {
   id                Int      @id @default(autoincrement())
-  vaccineType       VaccineType
+  vaccineTypeId       Int
+  vaccineType         VaccineType @relation(fields: [vaccineTypeId], references: [id])
   maxAgeDays        Float?
   maxAgeWeeks       Float?
   maxAgeMonths      Float?

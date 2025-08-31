@@ -2,8 +2,6 @@ import { PrismaClient } from './generated/prisma/client.js';
 
 const prisma = new PrismaClient();
 
-// NOTE: This is the complete mock data for the migration script,
-// based on the provided vaccine schedule.
 const vaccineSchedule = {
     BCG: [{ dose: 1, recommendedAtDays: 0 }],
     DPT_HepB_hib: [
@@ -45,13 +43,10 @@ const vaccineSchedule = {
     TCV: [{ dose: 1, recommendedAtMonths: 15 }],
     HPV: [
         { dose: 1, recommendedAtYears: 10 },
-        { dose: 2, recommendedAtYears: 10.5 }, // 10.5 years = 126 months
+        { dose: 2, recommendedAtYears: 10.5 },
     ],
 };
 
-// ---------------------
-// Catch-up rules
-// ---------------------
 const catchUpRules = {
     BCG: { maxAgeMonths: 60, totalDoses: 1 },
     ROTA: { maxAgeWeeks: 32, totalDoses: 2 },
@@ -69,19 +64,29 @@ async function seed() {
     try {
         console.log('Starting vaccine schedule migration...');
 
-        // 1. Create a new VaccineScheduleVersion
-        const version = await prisma.vaccineScheduleVersion.create({
-            data: {},
-        });
-        console.log(`Created VaccineScheduleVersion with ID: ${version.id}`);
-
+        // 1. Create new VaccineScheduleVersion
+        const version = await prisma.vaccineScheduleVersion.create({ data: {} });
         const scheduleVersionId = version.id;
 
-        // 2. Populate Dose table
-        const doseData = Object.entries(vaccineSchedule).flatMap(([vaccine, doses]) => {
-            const vaccineType = vaccine.toUpperCase().replace(/-/g, '_');
-            return doses.map((dose) => ({
-                vaccineType,
+        // 2. Insert VaccineTypes
+        const vaccineTypes = await Promise.all(
+            Object.keys(vaccineSchedule).map((name) =>
+                prisma.vaccineType.upsert({
+                    where: { name },
+                    update: {},
+                    create: { name },
+                })
+            )
+        );
+
+        const vaccineTypeMap = Object.fromEntries(
+            vaccineTypes.map((vt) => [vt.name, vt.id])
+        );
+
+        // 3. Insert Doses
+        const doseData = Object.entries(vaccineSchedule).flatMap(([vaccine, doses]) =>
+            doses.map((dose) => ({
+                vaccineTypeId: vaccineTypeMap[vaccine],
                 doseNumber: dose.dose,
                 recommendedAtDays: dose.recommendedAtDays ?? null,
                 recommendedAtWeeks: dose.recommendedAtWeeks ?? null,
@@ -89,34 +94,25 @@ async function seed() {
                 recommendedAtYears: dose.recommendedAtYears ?? null,
                 isBooster: dose.isBooster ?? false,
                 scheduleVersionId,
-            }));
-        });
+            }))
+        );
 
-        await prisma.dose.createMany({
-            data: doseData,
-            skipDuplicates: true,
-        });
+        await prisma.dose.createMany({ data: doseData });
         console.log(`Inserted ${doseData.length} Dose records.`);
 
-        // 3. Populate CatchUpRule table
-        const catchUpData = Object.entries(catchUpRules).map(([vaccine, rules]) => {
-            const vaccineType = vaccine.toUpperCase().replace(/-/g, '_');
-            return {
-                vaccineType,
-                maxAgeDays: rules.maxAgeDays ?? null,
-                maxAgeWeeks: rules.maxAgeWeeks ?? null,
-                maxAgeMonths: rules.maxAgeMonths ?? null,
-                maxAgeYears: rules.maxAgeYears ?? null,
-                minIntervalWeeks: rules.minIntervalWeeks ?? null,
-                totalDoses: rules.totalDoses ?? null,
-                scheduleVersionId,
-            };
-        });
+        // 4. Insert CatchUpRules
+        const catchUpData = Object.entries(catchUpRules).map(([vaccine, rules]) => ({
+            vaccineTypeId: vaccineTypeMap[vaccine],
+            maxAgeDays: rules.maxAgeDays ?? null,
+            maxAgeWeeks: rules.maxAgeWeeks ?? null,
+            maxAgeMonths: rules.maxAgeMonths ?? null,
+            maxAgeYears: rules.maxAgeYears ?? null,
+            minIntervalWeeks: rules.minIntervalWeeks ?? null,
+            totalDoses: rules.totalDoses ?? null,
+            scheduleVersionId,
+        }));
 
-        await prisma.catchUpRule.createMany({
-            data: catchUpData,
-            skipDuplicates: true,
-        });
+        await prisma.catchUpRule.createMany({ data: catchUpData });
         console.log(`Inserted ${catchUpData.length} CatchUpRule records.`);
 
         console.log('Vaccine schedule migration completed successfully!');

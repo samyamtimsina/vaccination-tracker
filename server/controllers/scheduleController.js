@@ -1,14 +1,17 @@
 // controllers/vaccineScheduleController.js
 
 import { prisma } from '../utils/prisma.js';
-
 export const getLatestVaccineSchedule = async (req, res) => {
     try {
         const scheduleVersion = await prisma.vaccineScheduleVersion.findFirst({
             orderBy: { id: 'desc' },
             include: {
-                doses: true,
-                catchUpRules: true,
+                doses: {
+                    include: { vaccineType: true }, // include related vaccineType
+                },
+                catchUpRules: {
+                    include: { vaccineType: true }, // include related vaccineType
+                },
             },
         });
 
@@ -16,12 +19,28 @@ export const getLatestVaccineSchedule = async (req, res) => {
             return res.status(404).json({ error: 'No vaccine schedule found' });
         }
 
-        res.status(200).json(scheduleVersion);
+        // Transform to include vaccineName like the old layout
+        const dosesWithNames = scheduleVersion.doses.map(d => ({
+            ...d,
+            vaccineName: d.vaccineType.name, // add human-readable name
+        }));
+
+        const catchUpWithNames = scheduleVersion.catchUpRules.map(r => ({
+            ...r,
+            vaccineName: r.vaccineType.name,
+        }));
+
+        res.status(200).json({
+            ...scheduleVersion,
+            doses: dosesWithNames,
+            catchUpRules: catchUpWithNames,
+        });
     } catch (error) {
         console.error('Error fetching vaccine schedule:', error);
         res.status(500).json({ error: 'Failed to fetch vaccine schedule' });
     }
 };
+
 export const getAllVaccineSchedules = async (req, res) => {
     try {
         const schedules = await prisma.vaccineScheduleVersion.findMany({
@@ -39,23 +58,31 @@ export const getAllVaccineSchedules = async (req, res) => {
 
 export const createVaccineSchedule = async (req, res) => {
     try {
-        const { versionName, doses, catchUpRules } = req.body;
+        const { doses, catchUpRules, userId } = req.body;
 
         const newSchedule = await prisma.vaccineScheduleVersion.create({
             data: {
-                versionName,
+                lastModifiedBy: userId,
                 doses: {
                     create: doses.map(d => ({
-                        vaccineName: d.vaccineName,
+                        vaccineType: d.vaccineType,
                         doseNumber: d.doseNumber,
-                        recommendedAgeWeeks: d.recommendedAgeWeeks,
-                        recommendedAgeMonths: d.recommendedAgeMonths,
+                        recommendedAtDays: d.recommendedAtDays,
+                        recommendedAtWeeks: d.recommendedAtWeeks,
+                        recommendedAtMonths: d.recommendedAtMonths,
+                        recommendedAtYears: d.recommendedAtYears,
+                        isBooster: d.isBooster ?? false,
                     })),
                 },
                 catchUpRules: {
                     create: catchUpRules.map(r => ({
-                        vaccineName: r.vaccineName,
-                        ruleText: r.ruleText,
+                        vaccineType: r.vaccineType,
+                        maxAgeDays: r.maxAgeDays,
+                        maxAgeWeeks: r.maxAgeWeeks,
+                        maxAgeMonths: r.maxAgeMonths,
+                        maxAgeYears: r.maxAgeYears,
+                        minIntervalWeeks: r.minIntervalWeeks,
+                        totalDoses: r.totalDoses,
                     })),
                 },
             },
@@ -65,26 +92,55 @@ export const createVaccineSchedule = async (req, res) => {
         res.status(201).json(newSchedule);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create schedule' });
+        res.status(500).json({ error: "Failed to create schedule" });
     }
 };
 
-// UPDATE existing schedule version (basic)
+
+
 export const updateVaccineSchedule = async (req, res) => {
     try {
         const { id } = req.params;
-        const { versionName } = req.body;
+        const { doses, catchUpRules, userId } = req.body;
 
+        // Clear old relations
+        await prisma.dose.deleteMany({ where: { scheduleVersionId: parseInt(id) } });
+        await prisma.catchUpRule.deleteMany({ where: { scheduleVersionId: parseInt(id) } });
+
+        // Update version + recreate relations
         const updated = await prisma.vaccineScheduleVersion.update({
             where: { id: parseInt(id) },
-            data: { versionName },
+            data: {
+                lastModifiedBy: userId,
+                doses: {
+                    create: doses.map(d => ({
+                        vaccineType: d.vaccineType,
+                        doseNumber: d.doseNumber,
+                        recommendedAtDays: d.recommendedAtDays,
+                        recommendedAtWeeks: d.recommendedAtWeeks,
+                        recommendedAtMonths: d.recommendedAtMonths,
+                        recommendedAtYears: d.recommendedAtYears,
+                        isBooster: d.isBooster ?? false,
+                    })),
+                },
+                catchUpRules: {
+                    create: catchUpRules.map(r => ({
+                        vaccineType: r.vaccineType,
+                        maxAgeDays: r.maxAgeDays,
+                        maxAgeWeeks: r.maxAgeWeeks,
+                        maxAgeMonths: r.maxAgeMonths,
+                        maxAgeYears: r.maxAgeYears,
+                        minIntervalWeeks: r.minIntervalWeeks,
+                        totalDoses: r.totalDoses,
+                    })),
+                },
+            },
             include: { doses: true, catchUpRules: true },
         });
 
         res.json(updated);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update schedule' });
+        res.status(500).json({ error: "Failed to update schedule" });
     }
 };
-

@@ -10,19 +10,37 @@ import {
 async function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
   if (!vaccines) return [];
 
-  // Get latest vaccine schedule version
+  // 1. Get latest vaccine schedule version
+  //    Include the vaccineType relation to access the name and id
   const scheduleVersion = await prisma.vaccineScheduleVersion.findFirst({
     orderBy: { id: 'desc' },
-    include: { doses: true },
+    include: {
+      doses: {
+        include: {
+          vaccineType: true // Include the related VaccineType model
+        }
+      }
+    },
   });
   if (!scheduleVersion) throw new Error('No vaccine schedule found in the database');
 
-  return Object.entries(vaccines).flatMap(([vaccineName, doses]) => {
-    const vaccineTypeEnum = mapVaccineNameToEnum(vaccineName);
+  // 2. Fetch all vaccine types to create a name-to-ID map
+  const vaccineTypes = await prisma.vaccineType.findMany();
+  const vaccineNameToIdMap = new Map(vaccineTypes.map(vt => [vt.name, vt.id]));
 
-    // Get valid doses from schedule
+  return Object.entries(vaccines).flatMap(([vaccineName, doses]) => {
+    // 3. Find the ID for the current vaccine name
+    const vaccineTypeId = vaccineNameToIdMap.get(vaccineName);
+
+    // If the vaccine name from the payload doesn't exist in the database, skip it
+    if (!vaccineTypeId) {
+      console.warn(`Vaccine type '${vaccineName}' not found in database. Skipping.`);
+      return [];
+    }
+
+    // 4. Get valid doses from schedule using the vaccineTypeId
     const validDoseNumbers = scheduleVersion.doses
-      .filter(d => d.vaccineType === vaccineTypeEnum)
+      .filter(d => d.vaccineTypeId === vaccineTypeId)
       .map(d => d.doseNumber);
 
     return doses
@@ -36,8 +54,9 @@ async function prepareVaccinationCreateData(vaccines, user, administeredByUserId
         const dateGiven = parseBsDateString(doseObj.date);
         if (!dateGiven) return null;
 
+        // 5. Create the data object with the correct vaccineTypeId
         return {
-          vaccineType: vaccineTypeEnum,
+          vaccineTypeId: vaccineTypeId, // <-- Use the correct ID here
           doseNumber,
           dateGiven,
           isComplete: true,
@@ -51,6 +70,8 @@ async function prepareVaccinationCreateData(vaccines, user, administeredByUserId
   });
 }
 
+
+// --- Calculate ChildDueVaccine entries based on schedule + catch-up rules
 // --- Calculate ChildDueVaccine entries based on schedule + catch-up rules
 export async function prepareChildDueVaccines(birthDateBs, scheduleVersionId = null) {
   const birthDate = parseBsDateString(birthDateBs);
@@ -71,7 +92,7 @@ export async function prepareChildDueVaccines(birthDateBs, scheduleVersionId = n
     if (dose.recommendedAtYears != null) dueDate.setFullYear(dueDate.getFullYear() + dose.recommendedAtYears);
 
     return {
-      vaccineType: dose.vaccineType,
+      vaccineTypeId: dose.vaccineTypeId, // <-- This is the fix. Use the correct foreign key.
       doseNumber: dose.doseNumber,
       dueDate,
       isCompleted: false,
@@ -79,7 +100,6 @@ export async function prepareChildDueVaccines(birthDateBs, scheduleVersionId = n
     };
   });
 }
-
 // --- Full createChild controller
 export const createChild = async (req, res) => {
   try {

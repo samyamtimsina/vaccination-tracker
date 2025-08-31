@@ -1,4 +1,3 @@
-// context/VaccineScheduleContext.jsx
 import React, { createContext, useState, useEffect } from 'react';
 import axiosClient from '../api/axiosClient';
 
@@ -13,17 +12,20 @@ export const VaccineScheduleProvider = ({ children }) => {
             try {
                 const res = await axiosClient.get('/api/vaccine-schedule');
                 const data = res.data;
+                console.log("Fetched vaccine schedule data:", data);
 
                 // Transform doses
                 const dosesByVaccine = data.doses.reduce((acc, dose) => {
-                    if (!acc[dose.vaccineType]) acc[dose.vaccineType] = [];
-                    acc[dose.vaccineType].push(dose);
+                    // Changed from dose.vaccineType to dose.vaccineName
+                    if (!acc[dose.vaccineName]) acc[dose.vaccineName] = [];
+                    acc[dose.vaccineName].push(dose);
                     return acc;
                 }, {});
 
                 // Transform catchUpRules
                 const catchupRules = data.catchUpRules.reduce((acc, rule) => {
-                    acc[rule.vaccineType] = rule;
+                    // Changed from rule.vaccineType to rule.vaccineName
+                    acc[rule.vaccineName] = rule;
                     return acc;
                 }, {});
 
