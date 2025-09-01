@@ -85,6 +85,7 @@ const VaccineScheduleManager = () => {
             };
 
             // CORRECTED: Changed the endpoint URL to /api/vaccine-schedule
+            console.log('payload', payload)
             const response = await axiosClient.post('/api/vaccine-schedule/', payload);
             const versionsData = await fetchVersions();
             setVersions(versionsData);
