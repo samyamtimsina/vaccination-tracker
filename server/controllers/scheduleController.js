@@ -70,44 +70,62 @@ export const getAllVaccineSchedules = async (req, res) => {
 // Create new schedule version (snapshot + optional modifications)
 export const createNewScheduleVersion = async (req, res) => {
     try {
-        const { userId, copyFromVersionId, doses, catchUpRules } = req.body;
+        const { id: userId } = req.user;
+        const { copyFromVersionId, doses, catchUpRules } = req.body;
 
         let baseDoses = [];
         let baseCatchUps = [];
 
+        // Helper to sanitize Dose objects
+        const sanitizeDose = (d) => ({
+            vaccineType: { connect: { id: d.vaccineTypeId } },
+            doseNumber: d.doseNumber,
+            recommendedAtDays: d.recommendedAtDays,
+            recommendedAtWeeks: d.recommendedAtWeeks,
+            recommendedAtMonths: d.recommendedAtMonths,
+            recommendedAtYears: d.recommendedAtYears,
+            isBooster: d.isBooster,
+        });
+
+        // Helper to sanitize CatchUpRule objects
+        const sanitizeCatchUp = (r) => ({
+            vaccineType: { connect: { id: r.vaccineTypeId } },
+            maxAgeDays: r.maxAgeDays,
+            maxAgeWeeks: r.maxAgeWeeks,
+            maxAgeMonths: r.maxAgeMonths,
+            maxAgeYears: r.maxAgeYears,
+            minIntervalWeeks: r.minIntervalWeeks,
+            totalDoses: r.totalDoses,
+        });
+
+        // If copying from an existing version
         if (copyFromVersionId) {
             const oldVersion = await prisma.vaccineScheduleVersion.findUnique({
                 where: { id: parseInt(copyFromVersionId) },
                 include: { doses: true, catchUpRules: true },
             });
-            if (!oldVersion) return res.status(404).json({ error: 'Base version not found' });
 
-            baseDoses = oldVersion.doses.map(d => ({
-                vaccineTypeId: d.vaccineTypeId,
-                doseNumber: d.doseNumber,
-                recommendedAtDays: d.recommendedAtDays,
-                recommendedAtWeeks: d.recommendedAtWeeks,
-                recommendedAtMonths: d.recommendedAtMonths,
-                recommendedAtYears: d.recommendedAtYears,
-                isBooster: d.isBooster,
-            }));
-            baseCatchUps = oldVersion.catchUpRules.map(r => ({
-                vaccineTypeId: r.vaccineTypeId,
-                maxAgeDays: r.maxAgeDays,
-                maxAgeWeeks: r.maxAgeWeeks,
-                maxAgeMonths: r.maxAgeMonths,
-                maxAgeYears: r.maxAgeYears,
-                minIntervalWeeks: r.minIntervalWeeks,
-                totalDoses: r.totalDoses,
-            }));
+            if (!oldVersion) {
+                return res.status(404).json({ error: "Base version not found" });
+            }
+
+            baseDoses = oldVersion.doses.map(sanitizeDose);
+            baseCatchUps = oldVersion.catchUpRules.map(sanitizeCatchUp);
         }
 
+        // Sanitize incoming payload if provided
+        const dosesToCreate = doses?.length ? doses.map(sanitizeDose) : baseDoses;
+        const catchUpsToCreate = catchUpRules?.length ? catchUpRules.map(sanitizeCatchUp) : baseCatchUps;
+
+        // Create the new schedule version
         const newVersion = await prisma.vaccineScheduleVersion.create({
             data: {
-                lastModifiedBy: userId,
-                copiedFromVersionId: copyFromVersionId ? parseInt(copyFromVersionId) : null,
-                doses: { create: doses?.length ? doses : baseDoses },
-                catchUpRules: { create: catchUpRules?.length ? catchUpRules : baseCatchUps },
+                user: { connect: { id: userId } },
+                copiedFromVersion: copyFromVersionId
+                    ? { connect: { id: parseInt(copyFromVersionId) } }
+                    : undefined,
+                doses: { create: dosesToCreate },
+                catchUpRules: { create: catchUpsToCreate },
             },
             include: { doses: true, catchUpRules: true },
         });
@@ -115,9 +133,10 @@ export const createNewScheduleVersion = async (req, res) => {
         res.status(201).json(newVersion);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create new schedule version', details: err.message });
+        res.status(500).json({ error: "Failed to create new schedule version", details: err.message });
     }
 };
+
 
 // --- Vaccine Type CRUD ---
 

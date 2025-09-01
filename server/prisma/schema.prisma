@@ -179,6 +179,11 @@ model VaccineScheduleVersion {
   user            User?    @relation(fields: [lastModifiedBy], references: [id])
   doses           Dose[]
   catchUpRules    CatchUpRule[]
+  copiedFromVersionId   Int?
+  copiedFromVersion     VaccineScheduleVersion?    @relation("CopyOfSchedule", fields: [copiedFromVersionId], references: [id], onDelete: SetNull)
+  
+  // This is the inverse relation, for easy lookup
+  subsequentVersions    VaccineScheduleVersion[]   @relation("CopyOfSchedule")
 }
 
 model ChildDueVaccine {

@@ -84,7 +84,8 @@ const VaccineScheduleManager = () => {
                 catchUpRules: versionData.catchUpRules
             };
 
-            const response = await axiosClient.post('/api/vaccine-schedule/versions', payload);
+            // CORRECTED: Changed the endpoint URL to /api/vaccine-schedule
+            const response = await axiosClient.post('/api/vaccine-schedule/', payload);
             const versionsData = await fetchVersions();
             setVersions(versionsData);
             showNotification('New version created successfully!');
@@ -403,39 +404,58 @@ const VaccineScheduleManager = () => {
 
     const handleSaveDose = async () => {
         try {
-            const cleanedData = {
-                vaccineTypeId: editValues.vaccineTypeId,
-                doseNumber: editValues.doseNumber,
-                recommendedAtDays: editValues.recommendedAtDays || null,
-                recommendedAtWeeks: editValues.recommendedAtWeeks || null,
-                recommendedAtMonths: editValues.recommendedAtMonths || null,
-                recommendedAtYears: editValues.recommendedAtYears || null,
-                isBooster: editValues.isBooster
+            const latestVersion = getLatestVersion();
+            const dosesWithoutEdited = latestVersion.doses.filter(d => d.id !== editingDose);
+
+            const updatedDose = {
+                vaccineTypeId: parseInt(editValues.vaccineTypeId),
+                doseNumber: parseInt(editValues.doseNumber),
+                recommendedAtDays: editValues.recommendedAtDays ? parseInt(editValues.recommendedAtDays) : null,
+                recommendedAtWeeks: editValues.recommendedAtWeeks ? parseInt(editValues.recommendedAtWeeks) : null,
+                recommendedAtMonths: editValues.recommendedAtMonths ? parseInt(editValues.recommendedAtMonths) : null,
+                recommendedAtYears: editValues.recommendedAtYears ? parseFloat(editValues.recommendedAtYears) : null,
+                isBooster: Boolean(editValues.isBooster)
             };
-            await updateDoseAPI(editingDose, cleanedData);
+
+            const payload = {
+                copyFromVersionId: latestVersion.id,
+                doses: [...dosesWithoutEdited, updatedDose],
+                catchUpRules: latestVersion.catchUpRules
+            };
+
+            await createNewVersion(payload);
             setEditingDose(null);
             setEditValues({});
         } catch (error) {
-            // Error handling already done in updateDoseAPI
+            console.error('Failed to update dose:', error);
+            showNotification('Failed to update dose. Please try again.', 'error');
         }
     };
 
     const handleSaveCatchUpRule = async () => {
         try {
-            const cleanedData = {
-                vaccineTypeId: editValues.vaccineTypeId,
-                maxAgeDays: editValues.maxAgeDays || null,
-                maxAgeWeeks: editValues.maxAgeWeeks || null,
-                maxAgeMonths: editValues.maxAgeMonths || null,
-                maxAgeYears: editValues.maxAgeYears || null,
-                minIntervalWeeks: editValues.minIntervalWeeks || null,
-                totalDoses: editValues.totalDoses
+            const latestVersion = getLatestVersion();
+            const rulesWithoutEdited = latestVersion.catchUpRules.filter(r => r.id !== editingRule);
+
+            const updatedRule = {
+                vaccineTypeId: parseInt(editValues.vaccineTypeId),
+                maxAgeMonths: editValues.maxAgeMonths ? parseInt(editValues.maxAgeMonths) : null,
+                minIntervalWeeks: editValues.minIntervalWeeks ? parseInt(editValues.minIntervalWeeks) : null,
+                totalDoses: parseInt(editValues.totalDoses)
             };
-            await updateCatchUpRuleAPI(editingRule, cleanedData);
+
+            const payload = {
+                copyFromVersionId: latestVersion.id,
+                doses: latestVersion.doses,
+                catchUpRules: [...rulesWithoutEdited, updatedRule]
+            };
+
+            await createNewVersion(payload);
             setEditingRule(null);
             setEditValues({});
         } catch (error) {
-            // Error handling already done in updateCatchUpRuleAPI
+            console.error('Failed to update catch-up rule:', error);
+            showNotification('Failed to update catch-up rule. Please try again.', 'error');
         }
     };
 
@@ -585,7 +605,18 @@ const VaccineScheduleManager = () => {
         }
 
         try {
-            const cleanedData = {
+            const latestVersion = getLatestVersion();
+            const baseDoses = latestVersion ? latestVersion.doses.map(d => ({
+                vaccineTypeId: d.vaccineTypeId,
+                doseNumber: d.doseNumber,
+                recommendedAtDays: d.recommendedAtDays,
+                recommendedAtWeeks: d.recommendedAtWeeks,
+                recommendedAtMonths: d.recommendedAtMonths,
+                recommendedAtYears: d.recommendedAtYears,
+                isBooster: d.isBooster
+            })) : [];
+
+            const newDose = {
                 vaccineTypeId: parseInt(quickAddDose.vaccineTypeId),
                 doseNumber: parseInt(quickAddDose.doseNumber),
                 recommendedAtDays: quickAddDose.recommendedAtDays ? parseInt(quickAddDose.recommendedAtDays) : null,
@@ -595,7 +626,13 @@ const VaccineScheduleManager = () => {
                 isBooster: Boolean(quickAddDose.isBooster)
             };
 
-            await addDoseToCurrentVersion(cleanedData);
+            const payload = {
+                copyFromVersionId: latestVersion ? latestVersion.id : null,
+                doses: [...baseDoses, newDose],
+                catchUpRules: latestVersion ? latestVersion.catchUpRules : []
+            };
+
+            await createNewVersion(payload);
             setQuickAddDose({
                 vaccineTypeId: '',
                 doseNumber: 1,
@@ -607,7 +644,8 @@ const VaccineScheduleManager = () => {
                 show: false
             });
         } catch (error) {
-            // Error handling already done in addDoseToCurrentVersion
+            console.error('Failed to add dose:', error);
+            showNotification('Failed to add dose. Please try again.', 'error');
         }
     };
 
@@ -618,14 +656,31 @@ const VaccineScheduleManager = () => {
         }
 
         try {
-            const cleanedData = {
+            const latestVersion = getLatestVersion();
+            const baseRules = latestVersion ? latestVersion.catchUpRules.map(r => ({
+                vaccineTypeId: r.vaccineTypeId,
+                maxAgeDays: r.maxAgeDays,
+                maxAgeWeeks: r.maxAgeWeeks,
+                maxAgeMonths: r.maxAgeMonths,
+                maxAgeYears: r.maxAgeYears,
+                minIntervalWeeks: r.minIntervalWeeks,
+                totalDoses: r.totalDoses
+            })) : [];
+
+            const newRule = {
                 vaccineTypeId: parseInt(quickAddRule.vaccineTypeId),
                 maxAgeMonths: quickAddRule.maxAgeMonths ? parseInt(quickAddRule.maxAgeMonths) : null,
                 minIntervalWeeks: quickAddRule.minIntervalWeeks ? parseInt(quickAddRule.minIntervalWeeks) : null,
                 totalDoses: parseInt(quickAddRule.totalDoses)
             };
 
-            await addCatchUpRuleToCurrentVersion(cleanedData);
+            const payload = {
+                copyFromVersionId: latestVersion ? latestVersion.id : null,
+                doses: latestVersion ? latestVersion.doses : [],
+                catchUpRules: [...baseRules, newRule]
+            };
+
+            await createNewVersion(payload);
             setQuickAddRule({
                 vaccineTypeId: '',
                 maxAgeMonths: '',
@@ -634,7 +689,8 @@ const VaccineScheduleManager = () => {
                 show: false
             });
         } catch (error) {
-            // Error handling already done in addCatchUpRuleToCurrentVersion
+            console.error('Failed to add rule:', error);
+            showNotification('Failed to add rule. Please try again.', 'error');
         }
     };
 
