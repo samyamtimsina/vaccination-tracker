@@ -1,6 +1,9 @@
+
+// components/ProtectedRoute.jsx
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
-export default function ProtectedRoute({ children }) {
+
+export default function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -31,11 +34,15 @@ export default function ProtectedRoute({ children }) {
     );
   }
 
-  // If the auth check is done and there's no user, redirect to login.
   if (!user) {
+    // Not logged in
     return <Navigate to="/login" replace />;
   }
 
-  // If a user exists and the check is done, render the children.
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // Logged in but role not allowed
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return children;
 }

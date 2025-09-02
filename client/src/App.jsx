@@ -38,15 +38,12 @@ import AdminDashboard from './components/Dashboards/AdminDashboard.jsx';
 import Schedule from './components/Schedule.jsx'
 
 
-// A simple layout component that includes the navbar
-const MainLayout = () => {
-  return (
-    <div>
-      <Navbar />
-      <Outlet />
-    </div>
-  );
-};
+const MainLayout = () => (
+  <div>
+    <Navbar />
+    <Outlet />
+  </div>
+);
 
 function App() {
   return (
@@ -55,44 +52,51 @@ function App() {
         <VaccineScheduleProvider>
           <ChildProvider>
             <MotherProvider>
-              {' '}
               <BrowserRouter>
                 <Routes>
-                  {/* Login route has no navbar */}
+                  {/* Public Routes */}
                   <Route path="/login" element={<Login />} />
                   <Route path="/verify-otp" element={<VerifyOTP />} />
 
-                  {/* These routes will use the MainLayout, which includes the Navbar */}
-                  <Route element={<MainLayout />}>
+                  {/* Main layout routes (any logged-in user) */}
+                  <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
                     <Route path="/" element={<Home />} />
-
+                    <Route path="/dashboard" element={<RoleBasedRedirect />} />
                   </Route>
 
-                  <Route element={<ProtectedRoute><SuperAdminLayout /></ProtectedRoute>}>
+                  {/* Super Admin routes */}
+                  <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><SuperAdminLayout /></ProtectedRoute>}>
                     <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
                     <Route path="/super-admin/users" element={<UsersManagementPage />} />
-                    {/* <Route path="/super-admin/children" element={<ChildrenPage />} /> */}
-                    {/* <Route path="/super-admin/mothers" element={<MothersPage />} /> */}
                     <Route path="/super-admin/analytics" element={<AnalyticsPage />} />
+                    <Route path="/super-admin/schedule" element={<Schedule />} />
                   </Route>
 
-                  <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                  {/* Admin dashboard (read-only) */}
+                  <Route element={<ProtectedRoute allowedRoles={['ADMIN']}><Layout /></ProtectedRoute>}>
+                    <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                  </Route>
 
-                  {/* Nested protected routes within the main layout */}
-                  <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-
-                    <Route path="/ward-officer/dashboard" element={<Dashboard />} />
-                    <Route path="/users/:userId" element={<UserProfile />} />
-                    <Route path="/dashboard" element={<RoleBasedRedirect />} />
+                  {/* Add/Edit routes (Super Admin + Ward Officer) */}
+                  <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARD_OFFICER']}><Layout /></ProtectedRoute>}>
                     <Route path="/add-child" element={<AddChild />} />
                     <Route path="/edit-child" element={<EditChild />} />
                     <Route path="/add-mother" element={<AddMother />} />
-                    <Route path="/schedule" element={<Schedule />} />
+                  </Route>
+
+                  {/* View routes (All roles) */}
+                  <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'WARD_OFFICER']}><Layout /></ProtectedRoute>}>
                     <Route path="/view-children" element={<ViewChildren />} />
                     <Route path="/view-mothers" element={<ViewMothers />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/graph" element={<Graph />} />
                     <Route path="/print" element={<PrintCardWrapper />} />
+                    <Route path="/users/:userId" element={<UserProfile />} />
+                  </Route>
+
+                  {/* Ward Officer dashboard */}
+                  <Route element={<ProtectedRoute allowedRoles={['WARD_OFFICER']}><Layout /></ProtectedRoute>}>
+                    <Route path="/ward-officer/dashboard" element={<Dashboard />} />
                   </Route>
 
                 </Routes>
