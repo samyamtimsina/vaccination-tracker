@@ -73,8 +73,19 @@ export const createNewScheduleVersion = async (req, res) => {
         const { id: userId } = req.user;
         const { copyFromVersionId, doses, catchUpRules } = req.body;
 
-        let baseDoses = [];
-        let baseCatchUps = [];
+        if (!copyFromVersionId) {
+            return res.status(400).json({ error: "copyFromVersionId is required" });
+        }
+
+        // Get old version
+        const oldVersion = await prisma.vaccineScheduleVersion.findUnique({
+            where: { id: parseInt(copyFromVersionId) },
+            include: { doses: true, catchUpRules: true },
+        });
+
+        if (!oldVersion) {
+            return res.status(404).json({ error: "Base version not found" });
+        }
 
         // Helper to sanitize Dose objects
         const sanitizeDose = (d) => ({
@@ -98,32 +109,34 @@ export const createNewScheduleVersion = async (req, res) => {
             totalDoses: r.totalDoses,
         });
 
-        // If copying from an existing version
-        if (copyFromVersionId) {
-            const oldVersion = await prisma.vaccineScheduleVersion.findUnique({
-                where: { id: parseInt(copyFromVersionId) },
-                include: { doses: true, catchUpRules: true },
+        // Decide what to copy/create
+        const dosesToCreate =
+            doses?.length > 0
+                ? doses.map(sanitizeDose) // use incoming changes
+                : oldVersion.doses.map(sanitizeDose); // fallback to clone
+
+        const catchUpsToCreate =
+            catchUpRules?.length > 0
+                ? catchUpRules.map(sanitizeCatchUp)
+                : oldVersion.catchUpRules.map(sanitizeCatchUp);
+
+        // If nothing actually changed → return old version
+        const noChanges =
+            JSON.stringify(dosesToCreate) === JSON.stringify(oldVersion.doses.map(sanitizeDose)) &&
+            JSON.stringify(catchUpsToCreate) === JSON.stringify(oldVersion.catchUpRules.map(sanitizeCatchUp));
+
+        if (noChanges) {
+            return res.status(200).json({
+                message: "No changes detected, not creating a new version",
+                version: oldVersion,
             });
-
-            if (!oldVersion) {
-                return res.status(404).json({ error: "Base version not found" });
-            }
-
-            baseDoses = oldVersion.doses.map(sanitizeDose);
-            baseCatchUps = oldVersion.catchUpRules.map(sanitizeCatchUp);
         }
-
-        // Sanitize incoming payload if provided
-        const dosesToCreate = doses?.length ? doses.map(sanitizeDose) : baseDoses;
-        const catchUpsToCreate = catchUpRules?.length ? catchUpRules.map(sanitizeCatchUp) : baseCatchUps;
 
         // Create the new schedule version
         const newVersion = await prisma.vaccineScheduleVersion.create({
             data: {
                 user: { connect: { id: userId } },
-                copiedFromVersion: copyFromVersionId
-                    ? { connect: { id: parseInt(copyFromVersionId) } }
-                    : undefined,
+                copiedFromVersion: { connect: { id: parseInt(copyFromVersionId) } },
                 doses: { create: dosesToCreate },
                 catchUpRules: { create: catchUpsToCreate },
             },
@@ -133,9 +146,13 @@ export const createNewScheduleVersion = async (req, res) => {
         res.status(201).json(newVersion);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: "Failed to create new schedule version", details: err.message });
+        res.status(500).json({
+            error: "Failed to create new schedule version",
+            details: err.message,
+        });
     }
 };
+
 
 
 // --- Vaccine Type CRUD ---

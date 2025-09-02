@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Plus, Calendar, Shield, Clock, AlertCircle, Edit2, Trash2, Save, X, Eye, CheckCircle, Ban } from 'lucide-react';
 
@@ -97,122 +98,6 @@ const VaccineScheduleManager = () => {
             throw error;
         } finally {
             setSaving(false);
-        }
-    };
-
-    const addDoseToCurrentVersion = async (doseData) => {
-        try {
-            setSaving(true);
-            const latestVersion = getLatestVersion();
-            if (!latestVersion) {
-                throw new Error('No current version found');
-            }
-
-            const payload = {
-                ...doseData,
-                versionId: latestVersion.id
-            };
-
-            await axiosClient.post('/api/vaccine-schedule/dose', payload);
-            const versionsData = await fetchVersions();
-            setVersions(versionsData);
-            showNotification('Dose added successfully!');
-        } catch (error) {
-            console.error('Failed to add dose:', error);
-            showNotification('Failed to add dose. Please try again.', 'error');
-            throw error;
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const addCatchUpRuleToCurrentVersion = async (ruleData) => {
-        try {
-            setSaving(true);
-            const latestVersion = getLatestVersion();
-            if (!latestVersion) {
-                throw new Error('No current version found');
-            }
-
-            const payload = {
-                ...ruleData,
-                versionId: latestVersion.id
-            };
-
-            await axiosClient.post('/api/vaccine-schedule/catch-up-rules', payload);
-            const versionsData = await fetchVersions();
-            setVersions(versionsData);
-            showNotification('Catch-up rule added successfully!');
-        } catch (error) {
-            console.error('Failed to add catch-up rule:', error);
-            showNotification('Failed to add catch-up rule. Please try again.', 'error');
-            throw error;
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const deleteDose = async (doseId) => {
-        try {
-            await axiosClient.delete(`/api/vaccine-schedule/dose/${doseId}`);
-            const versionsData = await fetchVersions();
-            setVersions(versionsData);
-            showNotification('Dose deleted successfully!');
-        } catch (error) {
-            console.error('Failed to delete dose:', error);
-            showNotification('Failed to delete dose. Please try again.', 'error');
-        }
-    };
-
-    const deleteCatchUpRule = async (ruleId) => {
-        try {
-            await axiosClient.delete(`/api/vaccine-schedule/catch-up-rules/${ruleId}`);
-            const versionsData = await fetchVersions();
-            setVersions(versionsData);
-            showNotification('Catch-up rule deleted successfully!');
-        } catch (error) {
-            console.error('Failed to delete catch-up rule:', error);
-            showNotification('Failed to delete catch-up rule. Please try again.', 'error');
-        }
-    };
-
-    const updateDoseAPI = async (doseId, updates) => {
-        try {
-            await axiosClient.put(`/api/vaccine-schedule/dose/${doseId}`, updates);
-            const versionsData = await fetchVersions();
-            setVersions(versionsData);
-            showNotification('Dose updated successfully!');
-        } catch (error) {
-            console.error('Failed to update dose:', error);
-            showNotification('Failed to update dose. Please try again.', 'error');
-            throw error;
-        }
-    };
-
-    const updateCatchUpRuleAPI = async (ruleId, updates) => {
-        try {
-            await axiosClient.put(`/api/vaccine-schedule/catch-up-rules/${ruleId}`, updates);
-            const versionsData = await fetchVersions();
-            setVersions(versionsData);
-            showNotification('Catch-up rule updated successfully!');
-        } catch (error) {
-            console.error('Failed to update catch-up rule:', error);
-            showNotification('Failed to update catch-up rule. Please try again.', 'error');
-            throw error;
-        }
-    };
-
-    // New API functions for vaccine types
-    const updateVaccineTypeAPI = async (id, updates) => {
-        try {
-            await axiosClient.patch(`/api/vaccine-schedule/types/${id}`, updates);
-            const updatedTypes = await fetchVaccineTypes();
-            setVaccineTypes(updatedTypes);
-            showNotification('Vaccine type updated successfully!');
-        } catch (error) {
-            console.error('Failed to update vaccine type:', error);
-            showNotification('Failed to update vaccine type. Please try again.', 'error');
-            throw error;
         }
     };
 
@@ -355,11 +240,27 @@ const VaccineScheduleManager = () => {
     const handleExecuteAction = async () => {
         const { type, id } = confirmAction;
         setSaving(true);
+        const latestVersion = getLatestVersion();
+
         try {
             if (type === 'deleteDose') {
-                await deleteDose(id);
+                const dosesWithoutDeleted = latestVersion.doses.filter(d => d.id !== id);
+                const payload = {
+                    copyFromVersionId: latestVersion.id,
+                    doses: dosesWithoutDeleted,
+                    catchUpRules: latestVersion.catchUpRules
+                };
+                await createNewVersion(payload);
+                showNotification('Dose deleted successfully!');
             } else if (type === 'deleteRule') {
-                await deleteCatchUpRule(id);
+                const rulesWithoutDeleted = latestVersion.catchUpRules.filter(r => r.id !== id);
+                const payload = {
+                    copyFromVersionId: latestVersion.id,
+                    doses: latestVersion.doses,
+                    catchUpRules: rulesWithoutDeleted
+                };
+                await createNewVersion(payload);
+                showNotification('Catch-up rule deleted successfully!');
             } else if (type === 'deleteType') {
                 await deleteVaccineTypeAPI(id);
             } else if (type === 'enableType') {
@@ -367,6 +268,9 @@ const VaccineScheduleManager = () => {
             } else if (type === 'disableType') {
                 await disableVaccineTypeAPI(id);
             }
+        } catch (error) {
+            console.error(`Failed to perform action: ${type}`, error);
+            showNotification(`Failed to perform action. Please try again.`, 'error');
         } finally {
             setSaving(false);
             setConfirmAction({ type: null, id: null, message: '', confirmText: '', buttonClass: '' });
