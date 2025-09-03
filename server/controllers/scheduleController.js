@@ -1,5 +1,6 @@
 // controllers/vaccineScheduleController.js
 import { prisma } from '../utils/prisma.js';
+import { recalculateChildVaccines } from '../services/recalculateChildVaccines.js';
 
 // --- Schedule endpoints ---
 
@@ -142,6 +143,9 @@ export const createNewScheduleVersion = async (req, res) => {
             },
             include: { doses: true, catchUpRules: true },
         });
+        recalculateChildVaccines(newVersion.id)
+            .then(() => console.log(`Recalculation started for schedule version ${newVersion.id}`))
+            .catch(err => console.error('Recalculation worker error:', err));
 
         res.status(201).json(newVersion);
     } catch (err) {

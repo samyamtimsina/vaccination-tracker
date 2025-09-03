@@ -170,6 +170,8 @@ model Dose {
   scheduleVersionId   Int @default(1)
   scheduleVersion     VaccineScheduleVersion @relation(fields: [scheduleVersionId], references: [id])
   @@unique([vaccineTypeId, doseNumber, scheduleVersionId])
+  // Add for clarity (optional, but recommended)
+  isPrimary Boolean? @default(true)
 }
 
 model VaccineScheduleVersion {
@@ -194,9 +196,14 @@ model ChildDueVaccine {
   vaccineType         VaccineType @relation(fields: [vaccineTypeId], references: [id])
   doseNumber      Int
   dueDate         DateTime
+  previousDueDate  DateTime?     // for corrective SMS
   isCompleted     Boolean       @default(false)   // mark true once administered
+  notificationSent Boolean       @default(false) // tracks if SMS was sent
+  correctiveSent   Boolean       @default(false)
   createdAt       DateTime      @default(now())
   scheduleVersion Int @default(1)           // tie to VaccineScheduleVersion for recalculation
+  catchUpLocked    Boolean      @default(false)
+  isCatchUp Boolean @default(false)
 }
 
 model CatchUpRule {

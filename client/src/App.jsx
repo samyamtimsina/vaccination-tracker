@@ -36,6 +36,7 @@ import UsersManagementPage from './components/UsersManagement.jsx';
 import AnalyticsPage from './components/SuperAdminAnalytics.jsx';
 import AdminDashboard from './components/Dashboards/AdminDashboard.jsx';
 import Schedule from './components/Schedule.jsx'
+import NotFound from './pages/NotFound.jsx';
 
 
 const MainLayout = () => (
@@ -99,6 +100,13 @@ function App() {
                     <Route path="/ward-officer/dashboard" element={<Dashboard />} />
                   </Route>
 
+                  {/* Catch-all 404 for logged-in users */}
+                  <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'WARD_OFFICER']}><Layout /></ProtectedRoute>}>
+                    <Route path="*" element={<NotFound />} />
+                  </Route>
+
+                  {/* Optional: Catch-all 404 for public routes (not logged-in) */}
+                  <Route path="*" element={<NotFound />} />
                 </Routes>
               </BrowserRouter>
             </MotherProvider>

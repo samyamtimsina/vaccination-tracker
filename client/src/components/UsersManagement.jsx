@@ -43,8 +43,21 @@ const apiService = {
         }
     },
 
+    async addUser(userData) {
+        try {
+            const response = await axiosClient.post('/api/auth/register', userData);
+            return response.data;
+        } catch (error) {
+            console.error('Error adding user:', error);
+            // Handle specific errors from the backend
+            if (error.response && error.response.data && error.response.data.error) {
+                throw new Error(error.response.data.error);
+            }
+            throw error;
+        }
+    },
+
     async updateUser(id, userData) {
-        console.log('userData', userData);
         try {
             const response = await axiosClient.patch(`/api/users/${id}`, userData);
             return response.data;
@@ -380,7 +393,7 @@ const UserDetailsModal = ({ user, isOpen, onClose, onEdit }) => {
                     {childrenCount === 0 && vaccinationsCreated === 0 && weightRecordsCreated === 0 && (
                         <div className="card bg-base-200 border border-base-300">
                             <div className="card-body p-8 text-center">
-                                <FiActivity className="w-16 h-16 text-base-content/30 mx-auto mb-4" />
+                                <FiActivity className="w-16 h-16 text-base-content/20 mx-auto mb-4" />
                                 <h4 className="text-lg font-semibold text-base-content mb-2">No Activity Yet</h4>
                                 <p className="text-base-content/70">
                                     This user hasn't created any records or registered any children yet.
@@ -424,7 +437,7 @@ const EditUserModal = ({ user, isOpen, onClose, onSave }) => {
             await onSave(user.id, formData);
             onClose();
         } catch (error) {
-            console.error('Error saving user:', error);
+            toast.error('Failed to save changes.');
         } finally {
             setLoading(false);
         }
@@ -481,6 +494,85 @@ const EditUserModal = ({ user, isOpen, onClose, onSave }) => {
                         <button type="submit" className={`btn btn-primary ${loading ? 'loading' : ''}`} disabled={loading} >
                             {!loading && <FiSave className="w-4 h-4 mr-2" />}
                             Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// Add User Modal Component
+const AddUserModal = ({ isOpen, onClose, onAdd }) => {
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        password: '',
+        phoneNumber: '',
+        wardId: ''
+    });
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            await onAdd(formData);
+            toast.success('User added successfully!');
+            onClose();
+        } catch (error) {
+            toast.error(error.message || 'Failed to add user.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="modal modal-open">
+            <div className="modal-box w-11/12 max-w-2xl">
+                <h3 className="font-bold text-lg text-base-content mb-4">Add New User</h3>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="form-control">
+                        <label className="label">
+                            <span className="label-text">Name</span>
+                        </label>
+                        <input type="text" className="input input-bordered w-full" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} required />
+                    </div>
+                    <div className="form-control">
+                        <label className="label">
+                            <span className="label-text">Email</span>
+                        </label>
+                        <input type="email" className="input input-bordered w-full" value={formData.email} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} required />
+                    </div>
+                    <div className="form-control">
+                        <label className="label">
+                            <span className="label-text">Password</span>
+                        </label>
+                        <input type="password" className="input input-bordered w-full" value={formData.password} onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))} required />
+                    </div>
+                    <div className="form-control">
+                        <label className="label">
+                            <span className="label-text">Phone Number</span>
+                        </label>
+                        <input type="tel" className="input input-bordered w-full" value={formData.phoneNumber} onChange={(e) => setFormData(prev => ({ ...prev, phoneNumber: e.target.value }))} required />
+                    </div>
+                    <div className="form-control">
+                        <label className="label">
+                            <span className="label-text">Ward ID</span>
+                        </label>
+                        <input type="number" className="input input-bordered w-full" value={formData.wardId} onChange={(e) => setFormData(prev => ({ ...prev, wardId: parseInt(e.target.value) || '' }))} required />
+                    </div>
+                    <div className="modal-action">
+                        <button type="button" className="btn btn-ghost" onClick={onClose} disabled={loading} >
+                            <FiX className="w-4 h-4 mr-2" />
+                            Cancel
+                        </button>
+                        <button type="submit" className={`btn btn-primary ${loading ? 'loading' : ''}`} disabled={loading} >
+                            {!loading && <FiUserPlus className="w-4 h-4 mr-2" />}
+                            Add User
                         </button>
                     </div>
                 </form>
@@ -606,6 +698,7 @@ const UsersManagementPage = () => {
     const [selectedRole, setSelectedRole] = useState('All');
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [viewingUser, setViewingUser] = useState(null);
     const [viewMode, setViewMode] = useState('grid');
@@ -655,6 +748,15 @@ const UsersManagementPage = () => {
         }
     };
 
+    const handleAddUser = async (userData) => {
+        try {
+            await apiService.addUser(userData);
+            fetchUsers(); // Refresh the list after adding a new user
+        } catch (error) {
+            toast.error(error.message || 'Failed to add user.');
+        }
+    };
+
     const handleEditUser = (user) => {
         setEditingUser(user);
         setIsEditModalOpen(true);
@@ -671,6 +773,7 @@ const UsersManagementPage = () => {
     };
 
     const handleDeleteUser = async (user) => {
+        // IMPORTANT: Replace window.confirm with a custom modal for better UI/UX
         if (window.confirm(`Are you sure you want to delete ${user.name}?`)) {
             try {
                 await apiService.deleteUser(user.id);
@@ -728,7 +831,7 @@ const UsersManagementPage = () => {
             <div className="mb-8">
                 <div className="flex items-center justify-between mb-6">
                     <h1 className="text-3xl font-bold text-base-content">User Management</h1>
-                    <button className="btn btn-primary">
+                    <button className="btn btn-primary" onClick={() => setIsAddUserModalOpen(true)}>
                         <FiUserPlus className="w-5 h-5 mr-2" />
                         Add New User
                     </button>
@@ -897,6 +1000,14 @@ const UsersManagementPage = () => {
                 }}
                 onSave={handleSaveUser}
             />
+
+            {/* Add User Modal */}
+            <AddUserModal
+                isOpen={isAddUserModalOpen}
+                onClose={() => setIsAddUserModalOpen(false)}
+                onAdd={handleAddUser}
+            />
+
         </div>
     );
 };

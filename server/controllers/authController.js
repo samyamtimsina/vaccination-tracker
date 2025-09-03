@@ -14,6 +14,7 @@ if (!JWT_SECRET) {
 export const register = async (req, res) => {
   const validationResult = registerSchema.safeParse(req.body);
 
+  console.log('validatonResult', validationResult);
   if (!validationResult.success) {
     // Return detailed Zod validation errors
     return res.status(400).json({

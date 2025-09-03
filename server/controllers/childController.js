@@ -1,10 +1,11 @@
 import { prisma } from '../utils/prisma.js';
 import { createChildSchema } from '../schemas/childSchema.js';
-import { checkPermission, filterChildData } from '../../client/src/utils/permissionService.js';
+import { checkPermission, filterChildData } from '../utils/permissionService.js';
 import {
   toMonths,
   mapVaccineNameToEnum,
   parseBsDateString,
+  checkAllPrimaryComplete
 } from '../utils/helpers.js';
 
 async function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
@@ -112,6 +113,7 @@ export const createChild = async (req, res) => {
     if (!birthDate) return res.status(400).json({ error: 'Invalid BS birthDate string' });
 
     const createdChild = await prisma.$transaction(async (tx) => {
+      // --- Create Child ---
       const child = await tx.child.create({
         data: {
           isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
@@ -130,7 +132,7 @@ export const createChild = async (req, res) => {
         },
       });
 
-      // Vaccination records
+      // --- Vaccination records ---
       const vaccinationCreateData = await prepareVaccinationCreateData(
         validatedData.vaccines,
         req.user,
@@ -146,7 +148,7 @@ export const createChild = async (req, res) => {
         await tx.vaccinationRecord.createMany({ data: vaccinationsWithChildId });
       }
 
-      // Weight records
+      // --- Weight records ---
       if (validatedData.weightRecords?.length) {
         const weightData = validatedData.weightRecords.map((w) => ({
           childId: child.id,
@@ -159,11 +161,33 @@ export const createChild = async (req, res) => {
         await tx.weightRecord.createMany({ data: weightData });
       }
 
-      // ChildDueVaccine entries
+      // --- ChildDueVaccine entries ---
       const dueVaccines = await prepareChildDueVaccines(validatedData.birthDate);
       if (dueVaccines.length) {
         const dueVaccinesWithChildId = dueVaccines.map((v) => ({ ...v, childId: child.id }));
         await tx.childDueVaccine.createMany({ data: dueVaccinesWithChildId });
+      }
+
+      // --- Catch-up deletion + lock logic ---
+      for (const v of vaccinationCreateData) {
+        const vaccineTypeId = v.vaccineTypeId;
+        const primaryComplete = await checkAllPrimaryComplete(child.id, vaccineTypeId, tx);
+
+        if (primaryComplete) {
+          await tx.childDueVaccine.deleteMany({
+            where: {
+              childId: child.id,
+              vaccineTypeId,
+              isCompleted: false,
+              isCatchUp: true,
+            },
+          });
+
+          await tx.childDueVaccine.updateMany({
+            where: { childId: child.id, vaccineTypeId },
+            data: { catchUpLocked: true },
+          });
+        }
       }
 
       return await tx.child.findUnique({
@@ -184,6 +208,8 @@ export const createChild = async (req, res) => {
     res.status(500).json({ error: 'Child creation failed', details: error.message });
   }
 };
+
+
 
 
 
@@ -436,7 +462,7 @@ export const updateChild = async (req, res) => {
     if (!hasPermission) return res.status(403).json({ error: 'Not authorized to edit this child\'s data.' });
 
     await prisma.$transaction(async (tx) => {
-      // Update demographic data
+      // --- Update demographic data ---
       const isSameWard = existingChild.wardNumber === currentUser.wardId;
       if (isSameWard || currentUser.role === 'SUPER_ADMIN') {
         const updateData = {
@@ -506,6 +532,28 @@ export const updateChild = async (req, res) => {
         const dueWithChildId = childDueVaccines.map(v => ({ ...v, childId: existingChild.id }));
         await tx.childDueVaccine.deleteMany({ where: { childId: existingChild.id } });
         await tx.childDueVaccine.createMany({ data: dueWithChildId });
+      }
+
+      // --- Catch-up deletion + lock logic ---
+      const vaccineTypeIds = [...new Set(updatedVaccinations.map(v => v.vaccineTypeId))];
+      for (const vaccineTypeId of vaccineTypeIds) {
+        const primaryComplete = await checkAllPrimaryComplete(existingChild.id, vaccineTypeId, tx);
+
+        if (primaryComplete) {
+          await tx.childDueVaccine.deleteMany({
+            where: {
+              childId: existingChild.id,
+              vaccineTypeId,
+              isCompleted: false,
+              isCatchUp: true,
+            },
+          });
+
+          await tx.childDueVaccine.updateMany({
+            where: { childId: existingChild.id, vaccineTypeId },
+            data: { catchUpLocked: true },
+          });
+        }
       }
     });
 

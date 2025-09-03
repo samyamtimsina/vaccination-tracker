@@ -15,16 +15,9 @@ export const registerSchema = z.object({
     .min(8, { message: 'Password must be at least 8 characters long' }),
 
   // 'wardId' must be a number and is required
-  wardId: z.string().transform((val, ctx) => {
-    const parsed = parseInt(val, 10);
-    if (isNaN(parsed)) {
-      ctx.addIssue({
-        message: 'Ward number must be a number',
-      });
-      return z.NEVER;
-    }
-    return parsed;
-  }),
+  wardId: z.coerce.number({
+    invalid_type_error: 'Ward number must be a number',
+  }).int().positive(),
 });
 
 // Schema for the user login request body

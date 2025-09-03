@@ -1,5 +1,7 @@
 // Helper to convert days/weeks/months to months (approximate)
+
 import { bsToAd, adToBs } from '@sbmdkl/nepali-date-converter';
+import dayjs from 'dayjs';
 export function toMonths({
   recommendedAtDays = 0,
   recommendedAtWeeks = 0,
@@ -10,6 +12,8 @@ export function toMonths({
   );
 }
 import { faker } from '@faker-js/faker';
+
+import { prisma } from '../utils/prisma.js';
 
 // Maps a vaccine name string to a standardized enum-like string
 export const mapVaccineNameToEnum = (vaccineName) => {
@@ -87,4 +91,49 @@ export const addMonthsToDate = (date, months) => {
   const newDate = new Date(date);
   newDate.setMonth(newDate.getMonth() + months);
   return newDate;
+};
+
+export async function checkAllPrimaryComplete(childId, vaccineTypeId) {
+  const allPrimaryDoses = await prisma.dose.findMany({
+    where: { vaccineTypeId },
+  });
+
+  const administered = await prisma.vaccinationRecord.findMany({
+    where: { citizenId: childId, vaccineTypeId, isComplete: true },
+  });
+
+  // Check if every primary dose has been administered
+  const administeredDoseNumbers = administered.map(v => v.doseNumber);
+  return allPrimaryDoses.every(d => administeredDoseNumbers.includes(d.doseNumber));
+}
+
+export const getMissedPrimaryVaccineTypes = async (childId) => {
+  const dueVaccines = await prisma.childDueVaccine.findMany({
+    where: { childId, isCompleted: false },
+    include: { vaccineType: true },
+  });
+  return dueVaccines.filter(v => v.vaccine?.isPrimary).map(v => v.vaccineTypeId);
+};
+
+// --- Helper: calculate due date based on birth date + schedule dose ---
+export const calculateDueDate = (birthDate, dose) => {
+  let date = dayjs(birthDate);
+  if (dose.recommendedAtDays) date = date.add(dose.recommendedAtDays, 'day');
+  if (dose.recommendedAtWeeks) date = date.add(dose.recommendedAtWeeks, 'week');
+  if (dose.recommendedAtMonths) date = date.add(dose.recommendedAtMonths, 'month');
+  if (dose.recommendedAtYears) date = date.add(dose.recommendedAtYears, 'year');
+  return date.toDate();
+};
+
+// --- Helper: check if child is over X months old ---
+export const isChildOverMonths = (birthDate, months) => {
+  return dayjs().diff(dayjs(birthDate), 'month') >= months;
+};
+
+// --- Helper: send correction SMS ---
+export const sendCorrectionSMS = async (child, dose, newDueDate) => {
+  // Replace with Twilio or mock
+  console.log(
+    `Correction SMS: Sorry, the due date for ${dose.vaccineTypeId} dose ${dose.doseNumber} of ${child.fullName} has changed to ${newDueDate}`
+  );
 };
