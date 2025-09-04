@@ -7,6 +7,7 @@ export const VaccineScheduleContext = createContext();
 export const VaccineScheduleProvider = ({ children }) => {
     const [vaccineSchedule, setvaccineSchedule] = useState(null);
     const [loading, setLoading] = useState(true);
+
     useEffect(() => {
         async function fetchSchedule() {
             try {
@@ -16,20 +17,12 @@ export const VaccineScheduleProvider = ({ children }) => {
 
                 // Transform doses
                 const dosesByVaccine = data.doses.reduce((acc, dose) => {
-                    // Changed from dose.vaccineType to dose.vaccineName
                     if (!acc[dose.vaccineName]) acc[dose.vaccineName] = [];
                     acc[dose.vaccineName].push(dose);
                     return acc;
                 }, {});
 
-                // Transform catchUpRules
-                const catchupRules = data.catchUpRules.reduce((acc, rule) => {
-                    // Changed from rule.vaccineType to rule.vaccineName
-                    acc[rule.vaccineName] = rule;
-                    return acc;
-                }, {});
-
-                setvaccineSchedule({ doses: dosesByVaccine, catchupRules });
+                setvaccineSchedule({ doses: dosesByVaccine });
             } catch (err) {
                 console.error('Failed to fetch vaccine schedule', err);
             } finally {

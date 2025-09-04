@@ -11,7 +11,6 @@ export const getLatestVaccineSchedule = async (req, res) => {
             orderBy: { id: 'desc' },
             include: {
                 doses: { include: { vaccineType: true } },
-                catchUpRules: { include: { vaccineType: true } },
             },
         });
         if (!scheduleVersion)
@@ -21,15 +20,10 @@ export const getLatestVaccineSchedule = async (req, res) => {
             ...d,
             vaccineName: d.vaccineType.name,
         }));
-        const catchUpWithNames = scheduleVersion.catchUpRules.map(r => ({
-            ...r,
-            vaccineName: r.vaccineType.name,
-        }));
 
         res.status(200).json({
             ...scheduleVersion,
             doses: dosesWithNames,
-            catchUpRules: catchUpWithNames,
         });
     } catch (err) {
         console.error(err);
@@ -43,7 +37,6 @@ export const getAllVaccineSchedules = async (req, res) => {
         const schedules = await prisma.vaccineScheduleVersion.findMany({
             include: {
                 doses: { include: { vaccineType: true } },
-                catchUpRules: { include: { vaccineType: true } },
             },
             orderBy: { id: 'desc' },
         });
@@ -53,10 +46,6 @@ export const getAllVaccineSchedules = async (req, res) => {
             doses: version.doses.map(d => ({
                 ...d,
                 vaccineName: d.vaccineType.name,
-            })),
-            catchUpRules: version.catchUpRules.map(r => ({
-                ...r,
-                vaccineName: r.vaccineType.name,
             })),
         }));
 
@@ -72,7 +61,7 @@ export const getAllVaccineSchedules = async (req, res) => {
 export const createNewScheduleVersion = async (req, res) => {
     try {
         const { id: userId } = req.user;
-        const { copyFromVersionId, doses, catchUpRules } = req.body;
+        const { copyFromVersionId, doses } = req.body;
 
         if (!copyFromVersionId) {
             return res.status(400).json({ error: "copyFromVersionId is required" });
@@ -81,7 +70,7 @@ export const createNewScheduleVersion = async (req, res) => {
         // Get old version
         const oldVersion = await prisma.vaccineScheduleVersion.findUnique({
             where: { id: parseInt(copyFromVersionId) },
-            include: { doses: true, catchUpRules: true },
+            include: { doses: true },
         });
 
         if (!oldVersion) {
@@ -97,17 +86,11 @@ export const createNewScheduleVersion = async (req, res) => {
             recommendedAtMonths: d.recommendedAtMonths,
             recommendedAtYears: d.recommendedAtYears,
             isBooster: d.isBooster,
-        });
-
-        // Helper to sanitize CatchUpRule objects
-        const sanitizeCatchUp = (r) => ({
-            vaccineType: { connect: { id: r.vaccineTypeId } },
-            maxAgeDays: r.maxAgeDays,
-            maxAgeWeeks: r.maxAgeWeeks,
-            maxAgeMonths: r.maxAgeMonths,
-            maxAgeYears: r.maxAgeYears,
-            minIntervalWeeks: r.minIntervalWeeks,
-            totalDoses: r.totalDoses,
+            isPrimary: d.isPrimary,
+            maxAgeDays: d.maxAgeDays,
+            maxAgeWeeks: d.maxAgeWeeks,
+            maxAgeMonths: d.maxAgeMonths,
+            maxAgeYears: d.maxAgeYears,
         });
 
         // Decide what to copy/create
@@ -116,15 +99,9 @@ export const createNewScheduleVersion = async (req, res) => {
                 ? doses.map(sanitizeDose) // use incoming changes
                 : oldVersion.doses.map(sanitizeDose); // fallback to clone
 
-        const catchUpsToCreate =
-            catchUpRules?.length > 0
-                ? catchUpRules.map(sanitizeCatchUp)
-                : oldVersion.catchUpRules.map(sanitizeCatchUp);
-
         // If nothing actually changed → return old version
         const noChanges =
-            JSON.stringify(dosesToCreate) === JSON.stringify(oldVersion.doses.map(sanitizeDose)) &&
-            JSON.stringify(catchUpsToCreate) === JSON.stringify(oldVersion.catchUpRules.map(sanitizeCatchUp));
+            JSON.stringify(dosesToCreate) === JSON.stringify(oldVersion.doses.map(sanitizeDose));
 
         if (noChanges) {
             return res.status(200).json({
@@ -139,9 +116,8 @@ export const createNewScheduleVersion = async (req, res) => {
                 user: { connect: { id: userId } },
                 copiedFromVersion: { connect: { id: parseInt(copyFromVersionId) } },
                 doses: { create: dosesToCreate },
-                catchUpRules: { create: catchUpsToCreate },
             },
-            include: { doses: true, catchUpRules: true },
+            include: { doses: true },
         });
         recalculateChildVaccines(newVersion.id)
             .then(() => console.log(`Recalculation started for schedule version ${newVersion.id}`))
@@ -237,8 +213,6 @@ export const enableVaccineType = async (req, res) => {
         res.status(500).json({ error: 'Failed to enable vaccine type', details: err.message });
     }
 };
-
-//disabled cause using createnewscheduleversion now
 
 // --- Dose CRUD (always linked to latest schedule version) ---
 

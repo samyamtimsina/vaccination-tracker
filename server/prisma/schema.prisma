@@ -16,7 +16,7 @@ model User {
   role                      UserRole 
   wardId                    Int?
   phoneNumber               String 
-  status       UserStatus @default(PENDING)
+  status                    UserStatus @default(PENDING)
   Child                     Child[]
   Mother                    Mother[]
   createdVaccinationRecords VaccinationRecord[] @relation(name: "CreatedByVaccination")
@@ -25,12 +25,12 @@ model User {
   createdWeightRecords      WeightRecord[]      @relation(name: "CreatedByWeight")
   administeredWeightRecords WeightRecord[]      @relation(name: "AdministeredByWeight")
   verifiedChildren          Child[]             @relation(name: "VerifiedBy")
-  createdTDDoses      TDDose[]
-  administeredTDDoses TDDose[] @relation("AdministeredByTDDose")
+  createdTDDoses            TDDose[]
+  administeredTDDoses       TDDose[]            @relation("AdministeredByTDDose")
   RefreshTokens             RefreshToken[]
-  otps                     Otp[]
-  vaccineScheduleVersions    VaccineScheduleVersion[]
-  createdAt DateTime @default(now())
+  otps                      Otp[]
+  vaccineScheduleVersions   VaccineScheduleVersion[]
+  createdAt                 DateTime @default(now())
 }
 enum UserRole {
   SUPER_ADMIN
@@ -53,6 +53,7 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
 }
+
 model Otp {
   id          Int      @id @default(autoincrement())
   otpCode     String   // The hashed OTP code
@@ -61,8 +62,6 @@ model Otp {
   userId      Int
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
-
-
 
 model Child {
   id                        String              @id @default(uuid())
@@ -82,7 +81,7 @@ model Child {
   verifiedById              Int?
   verifiedBy                User?               @relation(name: "VerifiedBy", fields: [verifiedById], references: [id])
   vaccinations              VaccinationRecord[]
-  dueVaccines      ChildDueVaccine[] 
+  dueVaccines               ChildDueVaccine[] 
   createdAt                 DateTime            @default(now())
   NotificationLog           NotificationLog[]
   isFromOtherMunicipality   Boolean             @default(false)
@@ -106,29 +105,28 @@ model Mother {
   createdBy                 User      @relation(fields: [createdById], references: [id])
   isFromOtherMunicipality   Boolean   @default(false)
   NotificationLog           NotificationLog[]
- tdDoses                 TDDose[]
+  tdDoses                   TDDose[]
 }
-model TDDose {
-  id               String    @id @default(uuid())
-  doseNumber       Int       // To identify if it's the 1st, 2nd, or 2nd+ dose
-  dateGiven        DateTime
-  remarks          String?
-  motherId         String
-  mother           Mother    @relation(fields: [motherId], references: [id])
-  createdAt        DateTime  @default(now())
-  createdById      Int
-  createdBy        User      @relation(fields: [createdById], references: [id])
 
-  // New fields to track the user who administered the vaccine
-  administeredById Int
-  administeredBy   User      @relation("AdministeredByTDDose", fields: [administeredById], references: [id])
+model TDDose {
+  id                        String    @id @default(uuid())
+  doseNumber                Int       // To identify if it's the 1st, 2nd, or 2nd+ dose
+  dateGiven                 DateTime
+  remarks                   String?
+  motherId                  String
+  mother                    Mother    @relation(fields: [motherId], references: [id])
+  createdAt                 DateTime  @default(now())
+  createdById               Int
+  createdBy                 User      @relation(fields: [createdById], references: [id])
+  administeredById          Int
+  administeredBy            User      @relation("AdministeredByTDDose", fields: [administeredById], references: [id])
 }
 
 model VaccinationRecord {
   id                        String      @id @default(uuid())
   citizenId                 String
-  vaccineTypeId       Int
-  vaccineType         VaccineType @relation(fields: [vaccineTypeId], references: [id])
+  vaccineTypeId             Int
+  vaccineType               VaccineType @relation(fields: [vaccineTypeId], references: [id])
   doseNumber                Int
   dateGiven                 DateTime
   isComplete                Boolean
@@ -141,21 +139,19 @@ model VaccinationRecord {
   administeredById          Int?
   administeredBy            User?       @relation(name: "AdministeredByVaccination", fields: [administeredById], references: [id])
   createdAt                 DateTime    @default(now())
-   wardOfVaccination     Int
+  wardOfVaccination         Int
 }
+
 model VaccineType {
   id        Int      @id @default(autoincrement())
   name      String   @unique
-  isActive  Boolean  @default(true)   // so you can disable vaccines without deleting
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  doses       Dose[]
-  catchUpRules CatchUpRule[]
+  doses     Dose[]
   dueVaccines ChildDueVaccine[]
-  records     VaccinationRecord[]
+  records   VaccinationRecord[]
 }
-
 
 model Dose {
   id                  Int      @id @default(autoincrement())
@@ -166,25 +162,25 @@ model Dose {
   recommendedAtWeeks  Float?
   recommendedAtMonths Float?
   recommendedAtYears  Float?
-  isBooster           Boolean? @default(false)
+  isBooster           Boolean   @default(false)
+  isPrimary           Boolean   @default(true)
+  maxAgeDays          Float?
+  maxAgeWeeks         Float?
+  maxAgeMonths        Float?
+  maxAgeYears         Float?
   scheduleVersionId   Int @default(1)
   scheduleVersion     VaccineScheduleVersion @relation(fields: [scheduleVersionId], references: [id])
   @@unique([vaccineTypeId, doseNumber, scheduleVersionId])
-  // Add for clarity (optional, but recommended)
-  isPrimary Boolean? @default(true)
 }
 
 model VaccineScheduleVersion {
-    id              Int      @id @default(autoincrement())
-  lastModifiedAt  DateTime @updatedAt
-  lastModifiedBy  Int?
-  user            User?    @relation(fields: [lastModifiedBy], references: [id])
-  doses           Dose[]
-  catchUpRules    CatchUpRule[]
+  id                    Int      @id @default(autoincrement())
+  lastModifiedAt        DateTime @updatedAt
+  lastModifiedBy        Int?
+  user                  User?    @relation(fields: [lastModifiedBy], references: [id])
+  doses                 Dose[]
   copiedFromVersionId   Int?
   copiedFromVersion     VaccineScheduleVersion?    @relation("CopyOfSchedule", fields: [copiedFromVersionId], references: [id], onDelete: SetNull)
-  
-  // This is the inverse relation, for easy lookup
   subsequentVersions    VaccineScheduleVersion[]   @relation("CopyOfSchedule")
 }
 
@@ -192,32 +188,18 @@ model ChildDueVaccine {
   id              String        @id @default(uuid())
   childId         String
   child           Child         @relation(fields: [childId], references: [id])
-  vaccineTypeId       Int
-  vaccineType         VaccineType @relation(fields: [vaccineTypeId], references: [id])
+  vaccineTypeId   Int
+  vaccineType     VaccineType @relation(fields: [vaccineTypeId], references: [id])
   doseNumber      Int
   dueDate         DateTime
-  previousDueDate  DateTime?     // for corrective SMS
-  isCompleted     Boolean       @default(false)   // mark true once administered
-  notificationSent Boolean       @default(false) // tracks if SMS was sent
-  correctiveSent   Boolean       @default(false)
+  previousDueDate DateTime?
+  isCompleted     Boolean       @default(false)
+  notificationSent Boolean       @default(false)
+  correctiveSent  Boolean       @default(false)
   createdAt       DateTime      @default(now())
-  scheduleVersion Int @default(1)           // tie to VaccineScheduleVersion for recalculation
-  catchUpLocked    Boolean      @default(false)
-  isCatchUp Boolean @default(false)
-}
-
-model CatchUpRule {
-  id                Int      @id @default(autoincrement())
-  vaccineTypeId       Int
-  vaccineType         VaccineType @relation(fields: [vaccineTypeId], references: [id])
-  maxAgeDays        Float?
-  maxAgeWeeks       Float?
-  maxAgeMonths      Float?
-  maxAgeYears       Float?
-  minIntervalWeeks  Float?
-  totalDoses        Int?
-  scheduleVersionId Int @default(1)
-  scheduleVersion   VaccineScheduleVersion @relation(fields: [scheduleVersionId], references: [id])
+  scheduleVersion Int @default(1)
+  catchUpLocked   Boolean      @default(false)
+  isCatchUp       Boolean @default(false)
 }
 
 model NotificationLog {
@@ -271,5 +253,5 @@ model WeightRecord {
   administeredBy            User?    @relation(name: "AdministeredByWeight", fields: [administeredById], references: [id])
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
-    wardOfVaccination     Int
+  wardOfVaccination         Int
 }

@@ -1,27 +1,15 @@
 // recalculateChildVaccines.js
 import { prisma } from '../utils/prisma.js';
-import { getMissedPrimaryVaccineTypes, calculateDueDate, isChildOverMonths, sendCorrectionSMS, addMonthsToDate } from '../utils/helpers.js';  // Assume addMonthsToDate handles approximate month adds
+import { getMissedPrimaryVaccineTypes, calculateDueDate, sendCorrectionSMS } from '../utils/helpers.js';
 import dayjs from 'dayjs';
 
 // Helper to calculate age in months
 const getAgeInMonths = (birthDate) => dayjs().diff(dayjs(birthDate), 'month');
 
-// Helper to convert rule maxAge to months (approximate)
-const getMaxAgeMonths = (rule) => {
-    let months = rule.maxAgeMonths || 0;
-    months += (rule.maxAgeWeeks || 0) / 4.345;
-    months += (rule.maxAgeDays || 0) / 30.44;
-    months += (rule.maxAgeYears || 0) * 12;
-    return months;
-};
-
-// Helper to get changed vaccine types between versions
 // Helper to get changed vaccine types between versions
 const getChangedVaccineTypes = async (oldVersionId, newVersionId) => {
     const oldDoses = await prisma.dose.findMany({ where: { scheduleVersionId: oldVersionId } });
     const newDoses = await prisma.dose.findMany({ where: { scheduleVersionId: newVersionId } });
-    const oldRules = await prisma.catchUpRule.findMany({ where: { scheduleVersionId: oldVersionId } });
-    const newRules = await prisma.catchUpRule.findMany({ where: { scheduleVersionId: newVersionId } });
 
     const changedTypes = new Set();
 
@@ -33,22 +21,14 @@ const getChangedVaccineTypes = async (oldVersionId, newVersionId) => {
             oldDose.recommendedAtWeeks !== newDose.recommendedAtWeeks ||
             oldDose.recommendedAtMonths !== newDose.recommendedAtMonths ||
             oldDose.recommendedAtYears !== newDose.recommendedAtYears ||
-            oldDose.isBooster !== newDose.isBooster) {
+            oldDose.isBooster !== newDose.isBooster ||
+            oldDose.isPrimary !== newDose.isPrimary ||
+            oldDose.maxAgeDays !== newDose.maxAgeDays ||
+            oldDose.maxAgeWeeks !== newDose.maxAgeWeeks ||
+            oldDose.maxAgeMonths !== newDose.maxAgeMonths ||
+            oldDose.maxAgeYears !== newDose.maxAgeYears
+        ) {
             changedTypes.add(newDose.vaccineTypeId);
-        }
-    });
-
-    // Compare catch-up rules
-    newRules.forEach((newRule) => {
-        const oldRule = oldRules.find(r => r.vaccineTypeId === newRule.vaccineTypeId);
-        if (!oldRule ||
-            oldRule.maxAgeDays !== newRule.maxAgeDays ||
-            oldRule.maxAgeWeeks !== newRule.maxAgeWeeks ||
-            oldRule.maxAgeMonths !== newRule.maxAgeMonths ||
-            oldRule.maxAgeYears !== newRule.maxAgeYears ||
-            oldRule.minIntervalWeeks !== newRule.minIntervalWeeks ||
-            oldRule.totalDoses !== newRule.totalDoses) {
-            changedTypes.add(newRule.vaccineTypeId);
         }
     });
 
@@ -62,14 +42,12 @@ const getChangedVaccineTypes = async (oldVersionId, newVersionId) => {
     return Array.from(changedTypes);
 };
 
-
-
 export const recalculateChildVaccines = async (newScheduleVersionId, oldScheduleVersionId) => {
     console.log(`--- Recalculation started for schedule version ${newScheduleVersionId} (from ${oldScheduleVersionId}) ---`);
 
     const changedVaccineTypeIds = await getChangedVaccineTypes(oldScheduleVersionId, newScheduleVersionId);
     if (changedVaccineTypeIds.length === 0) {
-        console.log('No changes detected in doses or rules. Skipping recalculation.');
+        console.log('No changes detected in doses. Skipping recalculation.');
         return;
     }
     console.log(`Changed vaccine types: ${changedVaccineTypeIds}`);
@@ -92,12 +70,6 @@ export const recalculateChildVaccines = async (newScheduleVersionId, oldSchedule
                 vaccineTypeId: { in: changedVaccineTypeIds },
             },
         });
-        const catchUpRules = await prisma.catchUpRule.findMany({
-            where: {
-                scheduleVersionId: newScheduleVersionId,
-                vaccineTypeId: { in: changedVaccineTypeIds },
-            },
-        });
 
         for (const dose of scheduleDoses) {
             const existingDue = child.dueVaccines.find(
@@ -111,7 +83,7 @@ export const recalculateChildVaccines = async (newScheduleVersionId, oldSchedule
             console.log(`Existing due: ${oldDueDate}`);
             console.log(`Calculated new due: ${newDueDate}`);
 
-            const isPrimary = !dose.isBooster;  // Fixed assumption
+            const isPrimary = dose.isPrimary;
 
             if (!existingDue) {
                 console.log(`Creating new due (${isPrimary ? 'primary' : 'booster'})`);
@@ -131,7 +103,7 @@ export const recalculateChildVaccines = async (newScheduleVersionId, oldSchedule
                 });
                 totalChanges++;
             } else if (!existingDue.isCompleted &&
-                (isPrimary || (!existingDue.catchUpLocked)) &&  // Respect lock for non-primary
+                (isPrimary || (!existingDue.catchUpLocked)) &&
                 oldDueDate.getTime() !== newDueDate.getTime()) {
                 console.log(`Updating due date (${isPrimary ? 'primary' : 'booster'})`);
                 await prisma.childDueVaccine.update({
@@ -150,50 +122,6 @@ export const recalculateChildVaccines = async (newScheduleVersionId, oldSchedule
                 totalChanges++;
             } else {
                 console.log('No change needed');
-            }
-        }
-
-        // Handle catch-up rules for changed types
-        for (const rule of catchUpRules) {
-            if (!missedPrimaryVaccineTypeIds.includes(rule.vaccineTypeId)) continue;  // Only if missed
-
-            const maxAgeMonths = getMaxAgeMonths(rule);
-            if (ageMonths > maxAgeMonths) continue;  // Too old for catch-up
-
-            // Delete old catch-up dues for this type (if not completed/locked)
-            await prisma.childDueVaccine.deleteMany({
-                where: {
-                    childId: child.id,
-                    vaccineTypeId: rule.vaccineTypeId,
-                    isCatchUp: true,
-                    isCompleted: false,
-                    catchUpLocked: false,
-                },
-            });
-
-            // Generate new catch-up doses (e.g., compressed schedule)
-            let currentDueDate = new Date();  // Start now
-            for (let doseNum = 1; doseNum <= rule.totalDoses; doseNum++) {
-                console.log(`Creating catch-up dose ${doseNum} for ${rule.vaccineTypeId}`);
-                await prisma.childDueVaccine.create({
-                    data: {
-                        childId: child.id,
-                        vaccineTypeId: rule.vaccineTypeId,
-                        doseNumber: doseNum,  // Sequential for catch-up
-                        dueDate: currentDueDate,
-                        isCompleted: false,
-                        catchUpLocked: false,
-                        notificationSent: false,
-                        correctiveSent: false,
-                        scheduleVersion: newScheduleVersionId,
-                        isCatchUp: true,
-                    },
-                });
-                totalChanges++;
-                // Add min interval for next
-                if (rule.minIntervalWeeks) {
-                    currentDueDate = addMonthsToDate(currentDueDate, rule.minIntervalWeeks / 4.345);
-                }
             }
         }
     }
