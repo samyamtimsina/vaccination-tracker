@@ -76,6 +76,7 @@ function App() {
                   {/* Admin dashboard (read-only) */}
                   <Route element={<ProtectedRoute allowedRoles={['ADMIN']}><Layout /></ProtectedRoute>}>
                     <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                    <Route path="/admin/schedule" element={<Schedule />} />
                   </Route>
 
                   {/* Add/Edit routes (Super Admin + Ward Officer) */}

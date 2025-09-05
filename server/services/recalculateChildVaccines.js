@@ -1,20 +1,38 @@
-// recalculateChildVaccines.js
 import { prisma } from '../utils/prisma.js';
 import { getMissedPrimaryVaccineTypes, calculateDueDate, sendCorrectionSMS } from '../utils/helpers.js';
 import dayjs from 'dayjs';
 
-// Helper to calculate age in months
+const BATCH_SIZE = 1000; // Adjust based on memory
+
+// Calculate age in months
 const getAgeInMonths = (birthDate) => dayjs().diff(dayjs(birthDate), 'month');
 
-// Helper to get changed vaccine types between versions
-const getChangedVaccineTypes = async (oldVersionId, newVersionId) => {
+// Simple log with timestamp
+const log = (msg) => console.log(`[${new Date().toISOString()}] ${msg}`);
+
+// Prefetch doses for given vaccine types
+const getScheduleDosesMap = async (scheduleVersionId, changedVaccineTypeIds) => {
+    const doses = await prisma.dose.findMany({
+        where: { scheduleVersionId, vaccineTypeId: { in: changedVaccineTypeIds } },
+    });
+
+    const doseMap = new Map();
+    doses.forEach(d => {
+        if (!doseMap.has(d.vaccineTypeId)) doseMap.set(d.vaccineTypeId, new Map());
+        doseMap.get(d.vaccineTypeId).set(d.doseNumber, d);
+    });
+
+    return doseMap;
+};
+
+// Get changed vaccine types between old/new versions
+export const getChangedVaccineTypes = async (oldVersionId, newVersionId) => {
     const oldDoses = await prisma.dose.findMany({ where: { scheduleVersionId: oldVersionId } });
     const newDoses = await prisma.dose.findMany({ where: { scheduleVersionId: newVersionId } });
 
     const changedTypes = new Set();
 
-    // Compare doses
-    newDoses.forEach((newDose) => {
+    newDoses.forEach(newDose => {
         const oldDose = oldDoses.find(d => d.vaccineTypeId === newDose.vaccineTypeId && d.doseNumber === newDose.doseNumber);
         if (!oldDose ||
             oldDose.recommendedAtDays !== newDose.recommendedAtDays ||
@@ -27,13 +45,10 @@ const getChangedVaccineTypes = async (oldVersionId, newVersionId) => {
             oldDose.maxAgeWeeks !== newDose.maxAgeWeeks ||
             oldDose.maxAgeMonths !== newDose.maxAgeMonths ||
             oldDose.maxAgeYears !== newDose.maxAgeYears
-        ) {
-            changedTypes.add(newDose.vaccineTypeId);
-        }
+        ) changedTypes.add(newDose.vaccineTypeId);
     });
 
-    // Also include removed types
-    oldDoses.forEach((oldDose) => {
+    oldDoses.forEach(oldDose => {
         if (!newDoses.some(d => d.vaccineTypeId === oldDose.vaccineTypeId && d.doseNumber === oldDose.doseNumber)) {
             changedTypes.add(oldDose.vaccineTypeId);
         }
@@ -42,89 +57,120 @@ const getChangedVaccineTypes = async (oldVersionId, newVersionId) => {
     return Array.from(changedTypes);
 };
 
+// Main recalculation function with console.log progress
 export const recalculateChildVaccines = async (newScheduleVersionId, oldScheduleVersionId) => {
-    console.log(`--- Recalculation started for schedule version ${newScheduleVersionId} (from ${oldScheduleVersionId}) ---`);
+    log(`--- Recalculation started for schedule version ${newScheduleVersionId} ---`);
 
     const changedVaccineTypeIds = await getChangedVaccineTypes(oldScheduleVersionId, newScheduleVersionId);
     if (changedVaccineTypeIds.length === 0) {
-        console.log('No changes detected in doses. Skipping recalculation.');
+        log('No changes detected. Skipping recalculation.');
         return;
     }
-    console.log(`Changed vaccine types: ${changedVaccineTypeIds}`);
+    log(`Changed vaccine types: ${changedVaccineTypeIds}`);
 
-    const children = await prisma.child.findMany({
-        include: { dueVaccines: true, vaccinations: true },
-    });
+    const scheduleDosesMap = await getScheduleDosesMap(newScheduleVersionId, changedVaccineTypeIds);
 
+    const totalChildren = await prisma.child.count();
+    log(`Total children to process: ${totalChildren}`);
+
+    let skip = 0;
     let totalChanges = 0;
 
-    for (const child of children) {
-        console.log(`Processing child: ${child.fullName} (${child.id})`);
-        const birthDate = child.birthDate;
-        const ageMonths = getAgeInMonths(birthDate);
-
-        const missedPrimaryVaccineTypeIds = await getMissedPrimaryVaccineTypes(child.id);
-        const scheduleDoses = await prisma.dose.findMany({
-            where: {
-                scheduleVersionId: newScheduleVersionId,
-                vaccineTypeId: { in: changedVaccineTypeIds },
-            },
+    while (true) {
+        const children = await prisma.child.findMany({
+            skip,
+            take: BATCH_SIZE,
+            include: { dueVaccines: true, vaccinations: true },
         });
 
-        for (const dose of scheduleDoses) {
-            const existingDue = child.dueVaccines.find(
-                (v) => v.vaccineTypeId === dose.vaccineTypeId && v.doseNumber === dose.doseNumber
-            );
+        if (children.length === 0) break;
 
-            const newDueDate = calculateDueDate(birthDate, dose);
-            const oldDueDate = existingDue ? new Date(existingDue.dueDate) : null;
+        const newDueVaccines = [];
+        const updateDueVaccines = [];
+        const correctionSMSQueue = [];
 
-            console.log(`Dose: VaccineType ${dose.vaccineTypeId}, DoseNumber ${dose.doseNumber}`);
-            console.log(`Existing due: ${oldDueDate}`);
-            console.log(`Calculated new due: ${newDueDate}`);
+        for (const child of children) {
+            const birthDate = child.birthDate;
+            const missedPrimaryVaccineTypeIds = await getMissedPrimaryVaccineTypes(child.id);
 
-            const isPrimary = dose.isPrimary;
+            for (const vaccineTypeId of changedVaccineTypeIds) {
+                const dosesMap = scheduleDosesMap.get(vaccineTypeId);
+                if (!dosesMap) continue;
 
-            if (!existingDue) {
-                console.log(`Creating new due (${isPrimary ? 'primary' : 'booster'})`);
-                await prisma.childDueVaccine.create({
-                    data: {
-                        childId: child.id,
-                        vaccineTypeId: dose.vaccineTypeId,
-                        doseNumber: dose.doseNumber,
-                        dueDate: newDueDate,
-                        isCompleted: false,
-                        catchUpLocked: false,
-                        notificationSent: false,
-                        correctiveSent: false,
-                        scheduleVersion: newScheduleVersionId,
-                        isCatchUp: false,  // Regular dose
-                    },
-                });
-                totalChanges++;
-            } else if (!existingDue.isCompleted &&
-                (isPrimary || (!existingDue.catchUpLocked)) &&
-                oldDueDate.getTime() !== newDueDate.getTime()) {
-                console.log(`Updating due date (${isPrimary ? 'primary' : 'booster'})`);
-                await prisma.childDueVaccine.update({
-                    where: { id: existingDue.id },
-                    data: {
-                        previousDueDate: existingDue.dueDate,
-                        dueDate: newDueDate,
-                        correctiveSent: existingDue.notificationSent ? true : false,
-                        scheduleVersion: newScheduleVersionId,
-                    },
-                });
-                if (existingDue.notificationSent) {
-                    console.log('Sending correction SMS');
-                    await sendCorrectionSMS(child, dose, newDueDate);
+                for (const [doseNumber, dose] of dosesMap) {
+                    const existingDue = child.dueVaccines.find(
+                        v => v.vaccineTypeId === dose.vaccineTypeId && v.doseNumber === dose.doseNumber
+                    );
+
+                    const newDueDate = calculateDueDate(birthDate, dose);
+                    const oldDueDate = existingDue ? new Date(existingDue.dueDate) : null;
+                    const isPrimary = dose.isPrimary;
+
+                    if (!existingDue) {
+                        newDueVaccines.push({
+                            childId: child.id,
+                            vaccineTypeId: dose.vaccineTypeId,
+                            doseNumber: dose.doseNumber,
+                            dueDate: newDueDate,
+                            isCompleted: false,
+                            catchUpLocked: false,
+                            notificationSent: false,
+                            correctiveSent: false,
+                            scheduleVersion: newScheduleVersionId,
+                            isCatchUp: false,
+                        });
+                        totalChanges++;
+                    } else if (!existingDue.isCompleted &&
+                        (isPrimary || !existingDue.catchUpLocked) &&
+                        oldDueDate.getTime() !== newDueDate.getTime()) {
+
+                        updateDueVaccines.push({
+                            id: existingDue.id,
+                            previousDueDate: existingDue.dueDate,
+                            dueDate: newDueDate,
+                            correctiveSent: existingDue.notificationSent ? true : false,
+                            scheduleVersion: newScheduleVersionId,
+                        });
+
+                        if (existingDue.notificationSent) {
+                            correctionSMSQueue.push({ child, dose, newDueDate });
+                        }
+                        totalChanges++;
+                        console.log(`Updated dueDate for child ${child.id}, vaccineType ${dose.vaccineTypeId}, dose ${doseNumber}`);
+                    }
                 }
-                totalChanges++;
-            } else {
-                console.log('No change needed');
             }
         }
+
+        // Bulk insert new due vaccines
+        if (newDueVaccines.length > 0) {
+            await prisma.childDueVaccine.createMany({ data: newDueVaccines, skipDuplicates: true });
+        }
+
+        // Sequential update
+        for (const upd of updateDueVaccines) {
+            await prisma.childDueVaccine.update({
+                where: { id: upd.id },
+                data: {
+                    previousDueDate: upd.previousDueDate,
+                    dueDate: upd.dueDate,
+                    correctiveSent: upd.correctiveSent,
+                    scheduleVersion: upd.scheduleVersion,
+                },
+            });
+        }
+
+        // Send correction SMS
+        for (const sms of correctionSMSQueue) {
+            sendCorrectionSMS(sms.child, sms.dose, sms.newDueDate).catch(err => console.error(err));
+        }
+
+        skip += BATCH_SIZE;
+        console.log(`Processed ${skip}/${totalChildren} children so far. Total changes: ${totalChanges}`);
+
+        // Prevent CPU/memory spike
+        await new Promise(r => setTimeout(r, 20));
     }
 
-    console.log(`--- Recalculation completed. Total changes: ${totalChanges} ---`);
+    log(`--- Recalculation completed. Total changes: ${totalChanges} ---`);
 };

@@ -1,6 +1,7 @@
 // controllers/vaccineScheduleController.js
 import { prisma } from '../utils/prisma.js';
 import { recalculateChildVaccines } from '../services/recalculateChildVaccines.js';
+import { Worker } from 'node:worker_threads';
 
 // --- Schedule endpoints ---
 
@@ -119,9 +120,19 @@ export const createNewScheduleVersion = async (req, res) => {
             },
             include: { doses: true },
         });
-        recalculateChildVaccines(newVersion.id)
-            .then(() => console.log(`Recalculation started for schedule version ${newVersion.id}`))
-            .catch(err => console.error('Recalculation worker error:', err));
+        // Launch worker for recalculation
+        const worker = new Worker('../server/services/recalculateWorker.js', {
+            workerData: { newVersionId: newVersion.id, oldVersionId: copyFromVersionId },
+        });
+
+        worker.on('message', (msg) => {
+            if (msg.error) console.error('Worker error:', msg.error);
+            else if (msg.done) console.log(`✅ Recalculation finished for version ${newVersion.id}`);
+            else console.log(`Progress: ${msg.processed}/${msg.totalChildren} children, total changes: ${msg.totalChanges}`);
+        });
+
+        worker.on('error', (err) => console.error('Worker thread error:', err));
+        worker.on('exit', (code) => console.log(`Worker exited with code ${code}`));
 
         res.status(201).json(newVersion);
     } catch (err) {

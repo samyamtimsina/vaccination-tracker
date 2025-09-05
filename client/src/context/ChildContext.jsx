@@ -13,7 +13,7 @@ export function ChildProvider({ children }) {
     if (fetched) return; // Skip if already fetched
     setLoading(true);
     try {
-      const res = await axiosClient.get('/api/child/ward');
+      const res = await axiosClient.get('/api/child/all');
       setChildrenData(res.data);
       setFetched(true);
     } catch (err) {

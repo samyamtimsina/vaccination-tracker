@@ -27,7 +27,7 @@ import {
   safeFormatDate,
   safeFormatDateYYMMDD,
 } from '../utils/date.js';
-import { vaccineSchedule} from '../utils/vaccineSchedule.js';
+import { vaccineSchedule } from '../utils/vaccineSchedule.js';
 import { adToBs } from '@sbmdkl/nepali-date-converter';
 import VaccinationCardOverlay from '../components/print';
 import { useChildContext } from '../context/ChildContext';
@@ -35,41 +35,77 @@ import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 export default function AllChildren() {
-const navigate = useNavigate();
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation('viewChildren');
   const [selectedChild, setSelectedChild] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showPrintComponent, setShowPrintComponent] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [vaccineTypes, setVaccineTypes] = useState([]);
+  const [loadingVaccineTypes, setLoadingVaccineTypes] = useState(false);
   const itemsPerPage = 20;
   const { childrenData, error, loading, fetchChildren } = useChildContext();
 
-  console.log('children data',childrenData)
+  console.log('children data', childrenData);
+
   // Function to change language
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
   };
 
+  // Fetch vaccine types
+  useEffect(() => {
+    const fetchVaccineTypes = async () => {
+      setLoadingVaccineTypes(true);
+      try {
+        const response = await axiosClient.get('/api/vaccine-schedule/types');
+        setVaccineTypes(response.data || []);
+      } catch (error) {
+        console.error('Error fetching vaccine types:', error);
+        setVaccineTypes([]);
+      } finally {
+        setLoadingVaccineTypes(false);
+      }
+    };
+
+    fetchVaccineTypes();
+  }, []);
+
   useEffect(() => {
     fetchChildren();
-    ('childrenData updated:', childrenData);
   }, [fetchChildren]);
 
+  // Extract children array from the new data structure
+  const childrenArray = useMemo(() => {
+    if (!childrenData) return [];
+
+    // Handle both old array format and new object format
+    if (Array.isArray(childrenData)) {
+      return childrenData;
+    }
+
+    if (childrenData.children && Array.isArray(childrenData.children)) {
+      return childrenData.children;
+    }
+
+    return [];
+  }, [childrenData]);
+
   const filteredChildren = useMemo(() => {
-    if (!childrenData) {
+    if (!childrenArray || childrenArray.length === 0) {
       return [];
     }
-    return childrenData.filter(
+    return childrenArray.filter(
       (child) =>
         child.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (child.lastName &&
           child.lastName.toLowerCase().includes(searchTerm.toLowerCase())),
     );
-  }, [childrenData, searchTerm]);
+  }, [childrenArray, searchTerm]);
 
   useEffect(() => {
     const totalPages = Math.ceil(filteredChildren.length / itemsPerPage);
-    if (currentPage > totalPages) {
+    if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(Math.max(1, totalPages));
     }
   }, [filteredChildren, currentPage, itemsPerPage]);
@@ -97,11 +133,10 @@ const navigate = useNavigate();
     return t('childDetails.vaccinationRecords.recommendedAt.unknown');
   };
 
-   const handleButtonClick = () => {
+  const handleButtonClick = () => {
     console.log('selectedChild:', selectedChild);
-  navigate('/graph', { state: { childrenData: selectedChild } });
+    navigate('/graph', { state: { childrenData: selectedChild } });
   };
-
 
   const getVaccineTypeLabel = (type) => {
     switch (type) {
@@ -116,28 +151,32 @@ const navigate = useNavigate();
     }
   };
 
-
   const getOverallVaccinationStats = (child) => {
     const givenVaccinations = child.vaccinations || [];
     const vaccinationMap = {};
+
+    // Group vaccinations by vaccine type name
     givenVaccinations.forEach((vacc) => {
-      const vaccineType = vacc.vaccineType;
-      if (!vaccinationMap[vaccineType]) {
-        vaccinationMap[vaccineType] = [];
+      // Use the vaccine type name from the vaccination record
+      const vaccineTypeName = vacc.vaccineType?.name || vacc.vaccineType || 'Unknown';
+
+      if (!vaccinationMap[vaccineTypeName]) {
+        vaccinationMap[vaccineTypeName] = [];
       }
-      vaccinationMap[vaccineType].push({
+      vaccinationMap[vaccineTypeName].push({
         date: vacc.dateGiven || vacc.givenDate || vacc.createdAt,
-        dose: vacc.doseNumber || vaccinationMap[vaccineType].length + 1,
-        createdById: vacc.createdById,
+        dose: vacc.doseNumber || vaccinationMap[vaccineTypeName].length + 1,
+        createdById: vacc.createdById || vacc.createdBy?.id,
         createdAt: vacc.createdAt,
         remarks: vacc.remarks,
         isComplete: vacc.isComplete,
         customVaccineName: vacc.customVaccineName,
-        createdBy: vacc.createdBy, // Include createdBy
-        type: vacc.type, // Include vaccine type
+        createdBy: vacc.createdBy,
+        type: vacc.type,
       });
     });
 
+    // Sort doses by date for each vaccine
     Object.keys(vaccinationMap).forEach((vaccine) => {
       vaccinationMap[vaccine].sort(
         (a, b) => new Date(a.date) - new Date(b.date),
@@ -150,18 +189,39 @@ const navigate = useNavigate();
     let inProgressVaccines = 0;
     let notStartedVaccines = 0;
 
-    Object.entries(vaccineSchedule).forEach(([vaccineName, schedule]) => {
-      const givenDoses = vaccinationMap[vaccineName] || [];
-      const given = givenDoses.length;
-      const required = schedule.length;
+    // Calculate stats based on available vaccine types
+    const availableVaccineTypes = vaccineTypes.length > 0 ? vaccineTypes : Object.keys(vaccineSchedule);
 
-      totalGiven += given;
-      totalRequired += required;
+    if (vaccineTypes.length > 0) {
+      // Use vaccine types from API
+      vaccineTypes.forEach((vaccineType) => {
+        const givenDoses = vaccinationMap[vaccineType.name] || [];
+        const given = givenDoses.length;
+        // Assume each vaccine has multiple doses - you might want to get this from API too
+        const required = vaccineSchedule[vaccineType.name]?.length || 3; // Default to 3 doses
 
-      if (given === required) completeVaccines++;
-      else if (given > 0) inProgressVaccines++;
-      else notStartedVaccines++;
-    });
+        totalGiven += given;
+        totalRequired += required;
+
+        if (given === required) completeVaccines++;
+        else if (given > 0) inProgressVaccines++;
+        else notStartedVaccines++;
+      });
+    } else {
+      // Fallback to existing logic
+      Object.entries(vaccineSchedule).forEach(([vaccineName, schedule]) => {
+        const givenDoses = vaccinationMap[vaccineName] || [];
+        const given = givenDoses.length;
+        const required = schedule.length;
+
+        totalGiven += given;
+        totalRequired += required;
+
+        if (given === required) completeVaccines++;
+        else if (given > 0) inProgressVaccines++;
+        else notStartedVaccines++;
+      });
+    }
 
     return {
       totalGiven,
@@ -169,12 +229,12 @@ const navigate = useNavigate();
       completeVaccines,
       inProgressVaccines,
       notStartedVaccines,
-      overallPercentage: Math.round((totalGiven / totalRequired) * 100) || 0,
+      overallPercentage: totalRequired > 0 ? Math.round((totalGiven / totalRequired) * 100) : 0,
       vaccinationMap,
     };
   };
 
-  if (loading) {
+  if (loading || loadingVaccineTypes) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-200">
         <div className="text-center">
@@ -374,17 +434,17 @@ const navigate = useNavigate();
                         <span>{t('childDetails.personalInfo.recordInfo')}</span>
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 text-xs">
-<div>
-  <span className="text-base-content/70">
-    {t('childDetails.personalInfo.createdBy')}:
-  </span>
-  <span 
-    className="font-semibold text-base-content ml-2 hover:text-primary hover:underline cursor-pointer"
-    onClick={() => navigate(`/users/${selectedChild.createdBy.id}`)}
-  >
-    {selectedChild.createdBy.name}
-  </span>
-</div>
+                        <div>
+                          <span className="text-base-content/70">
+                            {t('childDetails.personalInfo.createdBy')}:
+                          </span>
+                          <span
+                            className="font-semibold text-base-content ml-2 hover:text-primary hover:underline cursor-pointer"
+                            onClick={() => navigate(`/users/${selectedChild.createdBy.id}`)}
+                          >
+                            {selectedChild.createdBy.name}
+                          </span>
+                        </div>
                         <div>
                           <span className="text-base-content/70">{t('childDetails.personalInfo.createdOn')}:</span>
                           <span className="font-semibold text-base-content ml-2">
@@ -475,7 +535,6 @@ const navigate = useNavigate();
                 {selectedChild.weightRecords && selectedChild.weightRecords.length > 0 && (
                   <div className="bg-base-100 rounded-lg shadow-md border border-base-300 p-4">
                     <h3 className="font-bold text-base-content mb-3 flex items-center space-x-2">
-
                       <FaWeight className="text-primary" />
                       <span>{t('childDetails.weightTracking.title')}</span>
                     </h3>
@@ -504,24 +563,23 @@ const navigate = useNavigate();
 
                             <div className="flex items-center justify-between text-xs text-base-content/60">
                               <div className="flex items-center space-x-1">
-  <FaUserMd />
-  <span 
-    className="hover:text-primary hover:underline cursor-pointer"
-    onClick={() => navigate(`/users/${record.createdBy.id}`)}
-  >
-    {t('childDetails.weightTracking.recordedBy')}: {record.createdBy.name}
-  </span>
-</div>
-                              <div className="flex items-center space-x-1">
-                                <FaClock />
-                                <span>{t('childDetails.weightTracking.recordedOn')} {safeFormatDate(record.createdAt)}</span>
-
-                    <button className='btn btn-primary' onClick={handleButtonClick}>Show graph</button>
+                                <FaUserMd />
+                                <span
+                                  className="hover:text-primary hover:underline cursor-pointer"
+                                  onClick={() => navigate(`/users/${record.createdBy.id}`)}
+                                >
+                                  {t('childDetails.weightTracking.recordedBy')}: {record.createdBy.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-1">
+                                  <FaClock />
+                                  <span>{t('childDetails.weightTracking.recordedOn')} {safeFormatDate(record.createdAt)}</span>
+                                </div>
+                                <button className='btn btn-sm btn-primary' onClick={handleButtonClick}>Show graph</button>
                               </div>
                             </div>
-
                           </div>
-
                         ))}
                     </div>
                   </div>
@@ -572,14 +630,17 @@ const navigate = useNavigate();
 
                   <div className="p-4">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                      {Object.entries(vaccineSchedule).map(
-                        ([vaccineName, schedule]) => {
+                      {/* Use vaccine types from API if available, otherwise fallback to schedule */}
+                      {(vaccineTypes.length > 0 ? vaccineTypes : Object.keys(vaccineSchedule).map(name => ({ name }))).map(
+                        (vaccineType) => {
+                          const vaccineName = vaccineType.name;
                           const givenDoses = vaccinationMap[vaccineName] || [];
                           const totalGiven = givenDoses.length;
-                          const totalRequired = schedule.length;
-                          const completionPercentage = Math.round(
-                            (totalGiven / totalRequired) * 100,
-                          );
+
+                          // Get required doses from schedule or default
+                          const scheduleInfo = vaccineSchedule[vaccineName];
+                          const totalRequired = scheduleInfo ? scheduleInfo.length : 3; // Default to 3 doses if no schedule
+                          const completionPercentage = totalRequired > 0 ? Math.round((totalGiven / totalRequired) * 100) : 0;
 
                           return (
                             <div
@@ -618,33 +679,110 @@ const navigate = useNavigate();
                               </div>
 
                               <div className="space-y-2">
-                                {schedule.map((scheduleItem, index) => {
-                                  const dose = givenDoses[index];
-                                  const isGiven = dose !== undefined;
+                                {/* Show schedule if available, otherwise show given doses */}
+                                {scheduleInfo ? (
+                                  scheduleInfo.map((scheduleItem, index) => {
+                                    const dose = givenDoses[index];
+                                    const isGiven = dose !== undefined;
 
-                                  return (
-                                    <div
-                                      key={index}
-                                      className="bg-base-200 rounded-lg p-3 space-y-2"
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-2">
-                                          <div
-                                            className={`w-2 h-2 rounded-full ${isGiven ? 'bg-success' : 'bg-base-content/30'}`}
-                                          />
-                                          <span className="font-medium text-sm">
-                                            {t('childDetails.vaccinationRecords.dose', { dose: scheduleItem.dose })}
-                                          </span>
-                                          <span className="text-base-content/60 bg-base-300 px-2 py-1 rounded text-xs">
-                                            {getRecommendedAgeText(scheduleItem)}
-                                          </span>
+                                    return (
+                                      <div
+                                        key={index}
+                                        className="bg-base-200 rounded-lg p-3 space-y-2"
+                                      >
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center space-x-2">
+                                            <div
+                                              className={`w-2 h-2 rounded-full ${isGiven ? 'bg-success' : 'bg-base-content/30'}`}
+                                            />
+                                            <span className="font-medium text-sm">
+                                              {t('childDetails.vaccinationRecords.dose', { dose: scheduleItem.dose })}
+                                            </span>
+                                            <span className="text-base-content/60 bg-base-300 px-2 py-1 rounded text-xs">
+                                              {getRecommendedAgeText(scheduleItem)}
+                                            </span>
+                                          </div>
+                                          {isGiven && dose.isComplete && (
+                                            <FaCheckCircle className="text-success text-sm" />
+                                          )}
                                         </div>
-                                        {isGiven && dose.isComplete && (
-                                          <FaCheckCircle className="text-success text-sm" />
+
+                                        {isGiven ? (
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                                            <div className="space-y-1">
+                                              <div className="font-medium text-base-content">
+                                                {t('childDetails.vaccinationRecords.givenOnBS', { date: adToBs(safeFormatDateYYMMDD(dose.date)) })}
+                                              </div>
+                                              <div className="text-base-content/60">
+                                                {t('childDetails.vaccinationRecords.givenOnAD', { date: safeFormatDate(dose.date) })}
+                                              </div>
+                                              {dose.type && (
+                                                <div className="mt-1">
+                                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getVaccineTypeLabel(dose.type).class}`}>
+                                                    {getVaccineTypeLabel(dose.type).label}
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </div>
+                                            <div className="space-y-1">
+                                              <div className="flex items-center space-x-1 text-base-content/70">
+                                                <FaUserMd className="text-xs" />
+                                                <span
+                                                  className="hover:text-primary hover:underline cursor-pointer"
+                                                  onClick={() => navigate(`/users/${dose.createdById}`)}
+                                                >
+                                                  {t('childDetails.vaccinationRecords.givenBy')}: {dose.createdBy?.name || 'Unknown'}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center space-x-1 text-base-content/70">
+                                                <FaClock className="text-xs" />
+                                                <span>{t('childDetails.vaccinationRecords.recorded', { date: safeFormatDate(dose.createdAt) })}</span>
+                                              </div>
+                                            </div>
+                                            {dose.remarks && (
+                                              <div className="md:col-span-2 mt-2 p-2 bg-base-100 rounded border-l-2 border-primary">
+                                                <div className="text-xs text-base-content/70 mb-1">{t('childDetails.vaccinationRecords.remarks')}</div>
+                                                <div className="text-sm text-base-content">{dose.remarks}</div>
+                                              </div>
+                                            )}
+                                            {dose.customVaccineName && (
+                                              <div className="md:col-span-2 mt-1">
+                                                <span className="text-xs bg-info/20 text-info px-2 py-1 rounded">
+                                                  {t('childDetails.vaccinationRecords.customVaccine', { name: dose.customVaccineName })}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <div className="text-center py-2">
+                                            <span className="text-base-content/50 italic text-sm">
+                                              {t('childDetails.vaccinationRecords.notAdministered')}
+                                            </span>
+                                          </div>
                                         )}
                                       </div>
+                                    );
+                                  })
+                                ) : (
+                                  // Show given doses when no schedule is available
+                                  givenDoses.length > 0 ? (
+                                    givenDoses.map((dose, index) => (
+                                      <div
+                                        key={index}
+                                        className="bg-base-200 rounded-lg p-3 space-y-2"
+                                      >
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center space-x-2">
+                                            <div className="w-2 h-2 rounded-full bg-success" />
+                                            <span className="font-medium text-sm">
+                                              Dose {index + 1}
+                                            </span>
+                                          </div>
+                                          {dose.isComplete && (
+                                            <FaCheckCircle className="text-success text-sm" />
+                                          )}
+                                        </div>
 
-                                      {isGiven ? (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                                           <div className="space-y-1">
                                             <div className="font-medium text-base-content">
@@ -663,14 +801,14 @@ const navigate = useNavigate();
                                           </div>
                                           <div className="space-y-1">
                                             <div className="flex items-center space-x-1 text-base-content/70">
-  <FaUserMd className="text-xs" />
-  <span 
-    className="hover:text-primary hover:underline cursor-pointer"
-    onClick={() => navigate(`/users/${dose.createdById}`)}
-  >
-    {t('childDetails.vaccinationRecords.givenBy')}: {dose.createdBy.name}
-  </span>
-</div>
+                                              <FaUserMd className="text-xs" />
+                                              <span
+                                                className={`${dose.createdById ? 'hover:text-primary hover:underline cursor-pointer' : ''}`}
+                                                onClick={() => dose.createdById && navigate(`/users/${dose.createdById}`)}
+                                              >
+                                                {t('childDetails.vaccinationRecords.givenBy')}: {dose.createdBy?.name || 'Unknown'}
+                                              </span>
+                                            </div>
                                             <div className="flex items-center space-x-1 text-base-content/70">
                                               <FaClock className="text-xs" />
                                               <span>{t('childDetails.vaccinationRecords.recorded', { date: safeFormatDate(dose.createdAt) })}</span>
@@ -690,16 +828,16 @@ const navigate = useNavigate();
                                             </div>
                                           )}
                                         </div>
-                                      ) : (
-                                        <div className="text-center py-2">
-                                          <span className="text-base-content/50 italic text-sm">
-                                            {t('childDetails.vaccinationRecords.notAdministered')}
-                                          </span>
-                                        </div>
-                                      )}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="text-center py-4">
+                                      <span className="text-base-content/50 italic text-sm">
+                                        No doses recorded for this vaccine
+                                      </span>
                                     </div>
-                                  );
-                                })}
+                                  )
+                                )}
                               </div>
                             </div>
                           );
@@ -730,14 +868,14 @@ const navigate = useNavigate();
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              <button 
+              <button
                 onClick={() => changeLanguage('en')}
                 className={`text-sm font-medium ${i18n.language === 'en' ? 'text-primary' : 'text-base-content/60'}`}
               >
                 English
               </button>
               <span className="text-base-content/30">|</span>
-              <button 
+              <button
                 onClick={() => changeLanguage('ne')}
                 className={`text-sm font-medium ${i18n.language === 'ne' ? 'text-primary' : 'text-base-content/60'}`}
               >
@@ -774,7 +912,7 @@ const navigate = useNavigate();
               </div>
               <div>
                 <p className="text-2xl font-bold text-base-content">
-                  {childrenData.length}
+                  {childrenArray.length}
                 </p>
                 <p className="text-xs text-base-content/70">{t('stats.totalChildren')}</p>
               </div>
@@ -788,7 +926,7 @@ const navigate = useNavigate();
               </div>
               <div>
                 <p className="text-2xl font-bold text-base-content">
-                  {childrenData.filter((child) => child.purnaKhop).length}
+                  {childrenArray.filter((child) => child.purnaKhop).length}
                 </p>
                 <p className="text-xs text-base-content/70">{t('stats.fullyVaccinated')}</p>
               </div>
@@ -895,17 +1033,20 @@ const navigate = useNavigate();
                             </span>
                           </div>
                         )}
-                      <div className="flex items-center justify-between text-xs pt-2 border-t border-base-300">
-  <span className="text-base-content/60 flex items-center space-x-1">
-    <FaUserMd className="text-xs" />
-    <span 
-      className="hover:text-primary hover:underline cursor-pointer"
-      onClick={() => navigate(`/users/${child.createdBy.id}`)}
-    >
-      {t('childCard.createdBy')}: {child.createdBy.name}
-    </span>
-  </span>
-</div>
+                        <div className="flex items-center justify-between text-xs pt-2 border-t border-base-300">
+                          <span className="text-base-content/60 flex items-center space-x-1">
+                            <FaUserMd className="text-xs" />
+                            <span
+                              className="hover:text-primary hover:underline cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/users/${child.createdBy.id}`);
+                              }}
+                            >
+                              {t('childCard.createdBy')}: {child.createdBy.name}
+                            </span>
+                          </span>
+                        </div>
                       </div>
                       <button className="w-full bg-base-200 hover:bg-primary hover:text-primary-content text-base-content py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 border border-base-300 group-hover:bg-primary group-hover:text-primary-content">
                         <FaEye />

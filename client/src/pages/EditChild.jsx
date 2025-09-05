@@ -768,9 +768,9 @@ export default function EditChild() {
     (sum, cat) => sum + cat.count,
     0
   );
-  const totalResults = searchResults.length;
+  const totalResults = searchResults.total; // Use the total count from the object
   const totalPages = Math.ceil(totalResults / resultsPerPage);
-  const paginatedResults = searchResults.slice(
+  const paginatedResults = searchResults?.children?.slice( // Correctly access the children array
     (currentPage - 1) * resultsPerPage,
     currentPage * resultsPerPage
   );

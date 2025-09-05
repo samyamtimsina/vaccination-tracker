@@ -25,7 +25,18 @@ const corsOptions = {
 
 app.use(cookieParser());
 app.use(cors(corsOptions));
-app.use(morgan('dev'));
+app.use(
+  morgan((tokens, req, res) => {
+    return [
+      `[${new Date().toISOString()}]`,
+      tokens.method(req, res),
+      tokens.url(req, res),
+      tokens.status(req, res),
+      tokens['response-time'](req, res), 'ms -',
+      tokens.res(req, res, 'content-length')
+    ].join(' ');
+  })
+);
 
 const PORT = process.env.PORT || 5000;
 

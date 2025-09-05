@@ -212,7 +212,6 @@ export const createChild = async (req, res) => {
 
 
 
-
 export const updateChildPurnaKhop = async (req, res) => {
   try {
     const { id } = req.params;
@@ -243,31 +242,87 @@ export const updateChildPurnaKhop = async (req, res) => {
 // Get all children (with schedule & nested data)
 export const getAllChildren = async (req, res) => {
   try {
-    const children = await prisma.child.findMany({
-      include: {
-        createdBy: { select: { id: true, name: true } },
-        verifiedBy: { select: { id: true, name: true } },
-        vaccinations: {
-          include: {
-            createdBy: { select: { id: true, name: true } },
-            administeredBy: { select: { id: true, name: true } },
-          },
-        },
-        weightRecords: {
-          include: {
-            createdBy: { select: { id: true, name: true } },
-            administeredBy: { select: { id: true, name: true } },
-          },
-        },
-        dueVaccines: true, // include the schedule
-      },
-    });
+    const currentUser = req.user;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
 
-    if (!children.length) {
+    let where = {};
+    if (currentUser.role === 'WARD_OFFICER') {
+      where.wardNumber = currentUser.wardId;
+    }
+
+    const [total, children] = await Promise.all([
+      prisma.child.count({ where }),
+      prisma.child.findMany({
+        where,
+        skip,
+        take: limit,
+        // We use a single 'select' statement to retrieve all the requested fields
+        // and relations, as Prisma does not allow 'select' and 'include' at the same
+        // top level.
+        select: {
+          // Original scalar fields
+          id: true,
+          sewaDartaNumber: true,
+          fullName: true,
+          wardNumber: true,
+          birthDate: true,
+          purnaKhop: true,
+          gender: true,
+          parentName: true,
+          tole: true,
+          phoneNumber: true,
+          isFromOtherMunicipality: true,
+          casteCode: true,
+
+          // Count of vaccinations, as in the original query
+          _count: { select: { vaccinations: true } },
+
+          // Select for the latest weight record, as in the original query
+          weightRecords: {
+            select: {
+              id: true, // Select at least one field for the vaccination record itself
+              createdAt: true, // It's often useful to include a timestamp
+              createdBy: { select: { id: true, name: true } },
+              administeredBy: { select: { id: true, name: true } },
+              date: true,
+            },
+            orderBy: { date: 'desc' },
+
+            take: 1,
+          },
+
+          // Included vaccinations with nested select for createdBy and administeredBy
+          vaccinations: {
+            select: {
+              id: true, // Select at least one field for the vaccination record itself
+              createdAt: true, // It's often useful to include a timestamp
+              createdBy: { select: { id: true, name: true } },
+              administeredBy: { select: { id: true, name: true } },
+              vaccineType: true,
+              dateGiven: true,
+            },
+          },
+
+          // Included all fields for dueVaccines
+          dueVaccines: true,
+
+          // Included createdBy user with specific fields
+          createdBy: { select: { id: true, name: true } },
+
+          // Included verifiedBy user with specific fields
+          verifiedBy: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
+
+
+    if (!children.length && page === 1) {
       return res.status(404).json({ error: 'No children found' });
     }
 
-    res.status(200).json(children);
+    res.status(200).json({ children, total, page, limit });
   } catch (error) {
     console.error('Error fetching all children:', error);
     res.status(500).json({ error: 'Failed to retrieve children data', details: error.message });
@@ -282,28 +337,69 @@ export const getWardChildren = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized. User or wardId not found.' });
     }
 
-    const children = await prisma.child.findMany({
-      where: { wardNumber: currentUser.wardId },
-      include: {
-        createdBy: { select: { id: true, name: true } },
-        verifiedBy: { select: { id: true, name: true } },
-        vaccinations: {
-          include: {
-            createdBy: { select: { id: true, name: true } },
-            administeredBy: { select: { id: true, name: true } },
-          },
-        },
-        weightRecords: {
-          include: {
-            createdBy: { select: { id: true, name: true } },
-            administeredBy: { select: { id: true, name: true } },
-          },
-        },
-        dueVaccines: true, // include the schedule
-      },
-    });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
 
-    res.status(200).json(children);
+    const where = { wardNumber: currentUser.wardId };
+
+    const [total, children] = await Promise.all([
+      prisma.child.count({ where }),
+      prisma.child.findMany({
+        where,
+        skip,
+        take: limit,
+        // We use a single 'select' statement to retrieve all the requested fields
+        // and relations, as Prisma does not allow 'select' and 'include' at the same
+        // top level.
+        select: {
+          // Original scalar fields
+          id: true,
+          sewaDartaNumber: true,
+          fullName: true,
+          wardNumber: true,
+          birthDate: true,
+          purnaKhop: true,
+          gender: true,
+          parentName: true,
+          tole: true,
+          phoneNumber: true,
+          isFromOtherMunicipality: true,
+          casteCode: true,
+
+          // Count of vaccinations, as in the original query
+          _count: { select: { vaccinations: true } },
+
+          // Select for the latest weight record, as in the original query
+          weightRecords: {
+            select: { weight: true, date: true },
+            orderBy: { date: 'desc' },
+            take: 1,
+          },
+
+          // Included vaccinations with nested select for createdBy and administeredBy
+          vaccinations: {
+            select: {
+              id: true, // Select at least one field for the vaccination record itself
+              createdAt: true, // It's often useful to include a timestamp
+              createdBy: { select: { id: true, name: true } },
+              administeredBy: { select: { id: true, name: true } },
+            },
+          },
+
+          // Included all fields for dueVaccines
+          dueVaccines: true,
+
+          // Included createdBy user with specific fields
+          createdBy: { select: { id: true, name: true } },
+
+          // Included verifiedBy user with specific fields
+          verifiedBy: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
+
+    res.status(200).json({ children, total, page, limit });
   } catch (error) {
     console.error('Error fetching ward children:', error);
     res.status(500).json({ error: 'Failed to fetch ward children', details: error.message });
@@ -332,7 +428,7 @@ export const getChild = async (req, res) => {
             administeredBy: { select: { id: true, name: true } },
           },
         },
-        dueVaccines: true, // include schedule
+        dueVaccines: true, // This already includes the data, but you can select specific fields
         createdBy: { select: { id: true, name: true } },
         verifiedBy: { select: { id: true, name: true } },
       },
@@ -353,11 +449,16 @@ export const getChild = async (req, res) => {
   }
 };
 
+
 // Search children (with query filters)
 export const searchChildren = async (req, res) => {
   try {
     const { name, phoneNumber, sewaDartaNumber, gender, wardId, createdByMe } = req.query;
     const currentUser = req.user;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
 
     const whereClause = {};
 
@@ -373,13 +474,39 @@ export const searchChildren = async (req, res) => {
     if (gender) whereClause.gender = gender.toUpperCase();
     if (createdByMe === 'true') whereClause.createdById = currentUser.id;
 
-    const children = await prisma.child.findMany({
-      where: whereClause,
-      include: { dueVaccines: true }, // include schedule for search results
-      take: 20,
-    });
+    const [total, children] = await Promise.all([
+      prisma.child.count({ where: whereClause }),
+      prisma.child.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          sewaDartaNumber: true,
+          fullName: true,
+          wardNumber: true,
+          birthDate: true,
+          purnaKhop: true,
+          gender: true,
+          parentName: true,
+          tole: true,
+          phoneNumber: true,
+          isFromOtherMunicipality: true,
+          casteCode: true,
+          createdBy: { select: { id: true, name: true } },
+          verifiedBy: { select: { id: true, name: true } },
+          _count: { select: { vaccinations: true } },
+          weightRecords: {
+            select: { weight: true, date: true },
+            orderBy: { date: 'desc' },
+            take: 1,
+          },
+          dueVaccines: true, // Kept as per original, but can remove if not needed for search results
+        },
+      }),
+    ]);
 
-    res.status(200).json(children);
+    res.status(200).json({ children, total, page, limit });
   } catch (error) {
     console.error('Error searching children:', error);
     res.status(500).json({ error: 'Failed to perform search', details: error.message });
