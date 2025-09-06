@@ -1,6 +1,5 @@
 // controllers/vaccineScheduleController.js
 import { prisma } from '../utils/prisma.js';
-import { recalculateChildVaccines } from '../services/recalculateChildVaccines.js';
 import { Worker } from 'node:worker_threads';
 
 // --- Schedule endpoints ---

@@ -1,85 +1,133 @@
-// src/cron/vaccineReminderJob.js
-import { PrismaClient } from '../generated/prisma/client.js';
-import twilio from 'twilio';
-import { getVaccinationStatus } from '../utils/vaccinationStatus.js';
+// sendUpcomingVaccinationSMS.js
+import { prisma } from '../utils/prisma.js';
+import dayjs from 'dayjs';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const NepaliDate = require('nepali-date');
 
-const prisma = new PrismaClient();
+/**
+ * Dummy SMS sender
+ */
+const sendSMS = async (phoneNumber, message) => {
+  console.log(`✅ SMS sent to ${phoneNumber}: ${message}`);
+  return true;
+};
 
-const isTest = process.env.NODE_ENV === 'test';
-const client = twilio(
-  isTest ? process.env.TWILIO_TEST_ACCOUNT_SID : process.env.TWILIO_ACCOUNT_SID,
-  isTest ? process.env.TWILIO_TEST_AUTH_TOKEN : process.env.TWILIO_AUTH_TOKEN,
-);
+/**
+ * Converts a date from AD to Bikram Sambat.
+ */
+const convertToBikramSambat = (date) => {
+  const nepaliDate = new NepaliDate(date);
+  return nepaliDate.format('yyyy-mm-dd');
+};
 
-export async function runVaccinationReminderJob() {
-  console.log('🔔 Running vaccination reminder job...');
+/**
+ * Send SMS reminders for due vaccines:
+ * - 3 days ahead
+ * - missed yesterday/today (catch-up)
+ * - respects dose maxAge
+ */
+export const sendUpcomingVaccinationSMS = async () => {
+  const today = dayjs().startOf('day');
+  const threeDaysAhead = today.add(3, 'day').endOf('day');
 
-  const citizens = await prisma.citizen.findMany({
-    include: { vaccinations: true },
-  });
+  console.log(`[${new Date().toISOString()}] Starting SMS notification job...`);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const BATCH_SIZE = 1000;
+  let skip = 0;
+  let hasMore = true;
 
-  for (const citizen of citizens) {
-    if (!citizen.phoneNumber) continue;
+  while (hasMore) {
+    console.log(`[${new Date().toISOString()}] Fetching batch starting at offset ${skip}...`);
 
-    const statusList = getVaccinationStatus(
-      citizen.birthDate,
-      citizen.vaccinations,
-    );
+    const dueVaccines = await prisma.childDueVaccine.findMany({
+      skip,
+      take: BATCH_SIZE,
+      where: {
+        dueDate: { lte: threeDaysAhead.toDate() },
+        isCompleted: false,
+        notificationSent: false,
+      },
+      include: {
+        child: true,
+        vaccineType: { include: { doses: true } },
+      },
+    });
 
-    for (const vaccine of statusList) {
-      for (const dose of vaccine.doses) {
-        const alreadySent = await prisma.notificationLog.findFirst({
-          where: {
-            citizenId: citizen.id,
-            vaccineType: vaccine.vaccineType,
-            doseNumber: dose.doseNumber,
-            type: 'due',
+    console.log(`[${new Date().toISOString()}] Fetched ${dueVaccines.length} due vaccines`);
+
+    if (dueVaccines.length === 0) {
+      hasMore = false;
+      break;
+    }
+
+    for (const v of dueVaccines) {
+      const birthDate = v.child.birthDate;
+      const dose = v.vaccineType.doses.find(d => d.doseNumber === v.doseNumber);
+
+      // maxAge validation
+      if (dose) {
+        let maxAge = dayjs(birthDate);
+        if (dose.maxAgeDays) maxAge = maxAge.add(dose.maxAgeDays, 'day');
+        if (dose.maxAgeWeeks) maxAge = maxAge.add(dose.maxAgeWeeks, 'week');
+        if (dose.maxAgeMonths) maxAge = maxAge.add(dose.maxAgeMonths, 'month');
+        if (dose.maxAgeYears) maxAge = maxAge.add(dose.maxAgeYears, 'year');
+
+        if (dayjs().isAfter(maxAge)) {
+          console.log(`⚠️ Skipping ${v.child.fullName} (DOB: ${dayjs(birthDate).format('YYYY-MM-DD')}): ` +
+            `dose ${v.doseNumber} of ${v.vaccineType.name} exceeds max age (${maxAge.format('YYYY-MM-DD')}) today is ${dayjs().format('YYYY-MM-DD')}`);
+          continue;
+        }
+      }
+
+      // Convert dueDate and today to Bikram Sambat
+      const formattedDueDateBS = convertToBikramSambat(v.dueDate);
+      const formattedTodayBS = convertToBikramSambat(today.toDate());
+
+      // Dynamic message depending on overdue or upcoming
+      let msg;
+      if (dayjs(v.dueDate).isAfter(today)) {
+        // Upcoming vaccine
+        msg = `Dear parent, your child ${v.child.fullName} has ${v.vaccineType.name} scheduled on ${formattedDueDateBS}`;
+      } else {
+        // Overdue vaccine
+        msg = `Dear parent, your child ${v.child.fullName} missed ${v.vaccineType.name} scheduled on ${formattedDueDateBS}. Please visit the clinic to catch up.`;
+      }
+
+      try {
+        await sendSMS(v.child.phoneNumber, msg);
+
+        // log in NotificationLog
+        await prisma.notificationLog.create({
+          data: {
+            childId: v.childId,
+            message: msg,
+            sentAt: new Date(),
           },
         });
 
-        if (alreadySent) continue;
+        // update ChildDueVaccine
+        await prisma.childDueVaccine.update({
+          where: { id: v.id },
+          data: { notificationSent: true },
+        });
 
-        const oneWeekBeforeDueDate = new Date(dose.dueDate);
-        oneWeekBeforeDueDate.setDate(oneWeekBeforeDueDate.getDate() - 7);
-        oneWeekBeforeDueDate.setHours(0, 0, 0, 0);
-
-        const isOneWeekReminderDueToday =
-          oneWeekBeforeDueDate.toDateString() === today.toDateString();
-
-        if (isOneWeekReminderDueToday) {
-          try {
-            const message = `Upcoming: ${citizen.fullName}'s ${vaccine.vaccineType} (Dose ${dose.doseNumber}) is due next week on ${dose.dueDate.toLocaleDateString()}.`;
-
-            await client.messages.create({
-              body: message,
-              from: process.env.TWILIO_PHONE_NUMBER,
-              to: isTest ? '+15005550006' : citizen.phoneNumber, // test vs real
-            });
-
-            await prisma.notificationLog.create({
-              data: {
-                citizenId: citizen.id,
-                vaccineType: vaccine.vaccineType,
-                doseNumber: dose.doseNumber,
-                type: 'due',
-              },
-            });
-
-            console.log(`📨 Reminder sent to ${citizen.fullName} `);
-          } catch (err) {
-            console.error(
-              `❌ Failed to send SMS to ${citizen.fullName}
-`,
-              err.message,
-            );
-          }
-        }
+        console.log(`[${new Date().toISOString()}] Notification sent and updated for ${v.child.fullName}`);
+      } catch (err) {
+        console.error(`❌ Failed to send SMS for ${v.child.fullName}`, err);
       }
     }
+
+    skip += BATCH_SIZE;
+    await new Promise(r => setTimeout(r, 200));
   }
 
-  console.log(`✅ Job completed ${isTest ? 'test' : 'not test'}`);
+  console.log(`[${new Date().toISOString()}] SMS notification job completed`);
+};
+
+/**
+ * Run directly
+ */
+if (import.meta.url === `file://${process.argv[1]}`) {
+  sendUpcomingVaccinationSMS().catch(err => console.error('Job failed:', err));
 }

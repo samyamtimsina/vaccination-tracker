@@ -7,9 +7,10 @@ import userRoutes from './routes/userRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
+import moment from 'moment-timezone';
 
 import motherRoutes from './routes/motherRoutes.js';
-// import './jobs/smsCronJob.js';
+import './cron/dailySchedule.js';
 
 dotenv.config();
 
@@ -24,11 +25,12 @@ const corsOptions = {
 };
 
 app.use(cookieParser());
+
 app.use(cors(corsOptions));
 app.use(
   morgan((tokens, req, res) => {
     return [
-      `[${new Date().toISOString()}]`,
+      `[${moment().tz('Asia/Kathmandu').format('h:mm:ss A')}]`,
       tokens.method(req, res),
       tokens.url(req, res),
       tokens.status(req, res),
