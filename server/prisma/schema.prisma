@@ -73,6 +73,7 @@ model Child {
   parentName                String
   tole                      String
   phoneNumber               String
+  email                     String?
   birthDate                 DateTime
   purnaKhop                 Boolean             @default(false)
   remarks                   String?

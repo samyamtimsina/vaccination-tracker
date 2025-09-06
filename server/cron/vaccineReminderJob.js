@@ -1,20 +1,44 @@
-// sendUpcomingVaccinationSMS.js
 import { prisma } from '../utils/prisma.js';
 import dayjs from 'dayjs';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const NepaliDate = require('nepali-date');
+import Twilio from 'twilio';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+// Twilio client
+const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+// Toggle dev mode: logs instead of sending
+const DEV_MODE = process.env.DEV_MODE === 'true';
 
 /**
- * Dummy SMS sender
+ * Send SMS via Twilio or log in dev mode
  */
 const sendSMS = async (phoneNumber, message) => {
-  console.log(`✅ SMS sent to ${phoneNumber}: ${message}`);
-  return true;
+  if (DEV_MODE) {
+    console.log(`📱 [DEV MODE] SMS to ${phoneNumber}: ${message}`);
+    return true;
+  }
+
+  try {
+    const msg = await client.messages.create({
+      body: message,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: phoneNumber
+    });
+    console.log(`✅ SMS sent to ${phoneNumber}: ${message}`);
+    return msg;
+  } catch (err) {
+    console.error(`❌ Failed to send SMS to ${phoneNumber}`, err);
+    throw err;
+  }
 };
 
 /**
- * Converts a date from AD to Bikram Sambat.
+ * Converts a date from AD to Bikram Sambat
  */
 const convertToBikramSambat = (date) => {
   const nepaliDate = new NepaliDate(date);
@@ -22,23 +46,20 @@ const convertToBikramSambat = (date) => {
 };
 
 /**
- * Send SMS reminders for due vaccines:
- * - 3 days ahead
- * - missed yesterday/today (catch-up)
- * - respects dose maxAge
+ * Send SMS reminders for due vaccines in Nepali
  */
 export const sendUpcomingVaccinationSMS = async () => {
   const today = dayjs().startOf('day');
   const threeDaysAhead = today.add(3, 'day').endOf('day');
 
-  console.log(`[${new Date().toISOString()}] Starting SMS notification job...`);
+  console.log(`[${new Date().toISOString()}] 🕒 Starting SMS notification job...`);
 
   const BATCH_SIZE = 1000;
   let skip = 0;
   let hasMore = true;
 
   while (hasMore) {
-    console.log(`[${new Date().toISOString()}] Fetching batch starting at offset ${skip}...`);
+    console.log(`[${new Date().toISOString()}] 🔄 Fetching batch starting at offset ${skip}...`);
 
     const dueVaccines = await prisma.childDueVaccine.findMany({
       skip,
@@ -54,7 +75,7 @@ export const sendUpcomingVaccinationSMS = async () => {
       },
     });
 
-    console.log(`[${new Date().toISOString()}] Fetched ${dueVaccines.length} due vaccines`);
+    console.log(`[${new Date().toISOString()}] 📊 Fetched ${dueVaccines.length} due vaccines`);
 
     if (dueVaccines.length === 0) {
       hasMore = false;
@@ -65,7 +86,6 @@ export const sendUpcomingVaccinationSMS = async () => {
       const birthDate = v.child.birthDate;
       const dose = v.vaccineType.doses.find(d => d.doseNumber === v.doseNumber);
 
-      // maxAge validation
       if (dose) {
         let maxAge = dayjs(birthDate);
         if (dose.maxAgeDays) maxAge = maxAge.add(dose.maxAgeDays, 'day');
@@ -80,24 +100,18 @@ export const sendUpcomingVaccinationSMS = async () => {
         }
       }
 
-      // Convert dueDate and today to Bikram Sambat
       const formattedDueDateBS = convertToBikramSambat(v.dueDate);
-      const formattedTodayBS = convertToBikramSambat(today.toDate());
 
-      // Dynamic message depending on overdue or upcoming
       let msg;
       if (dayjs(v.dueDate).isAfter(today)) {
-        // Upcoming vaccine
-        msg = `Dear parent, your child ${v.child.fullName} has ${v.vaccineType.name} scheduled on ${formattedDueDateBS}`;
+        msg = `💉 प्रिय अभिभावक, तपाईंको बच्चा ${v.child.fullName} को ${v.vaccineType.name} खोप ${formattedDueDateBS} मा तय गरिएको छ। कृपया समयमा खोप दिनुहोस्।`;
       } else {
-        // Overdue vaccine
-        msg = `Dear parent, your child ${v.child.fullName} missed ${v.vaccineType.name} scheduled on ${formattedDueDateBS}. Please visit the clinic to catch up.`;
+        msg = `⚠️ प्रिय अभिभावक, तपाईंको बच्चा ${v.child.fullName} को ${v.vaccineType.name} खोप ${formattedDueDateBS} मा छुट्यो। कृपया नजिकको स्वास्थ्य संस्था पुगेर खोप पूरा गर्नुहोस्।`;
       }
 
       try {
         await sendSMS(v.child.phoneNumber, msg);
 
-        // log in NotificationLog
         await prisma.notificationLog.create({
           data: {
             childId: v.childId,
@@ -106,13 +120,12 @@ export const sendUpcomingVaccinationSMS = async () => {
           },
         });
 
-        // update ChildDueVaccine
         await prisma.childDueVaccine.update({
           where: { id: v.id },
           data: { notificationSent: true },
         });
 
-        console.log(`[${new Date().toISOString()}] Notification sent and updated for ${v.child.fullName}`);
+        console.log(`✅ Notification sent and updated for ${v.child.fullName}`);
       } catch (err) {
         console.error(`❌ Failed to send SMS for ${v.child.fullName}`, err);
       }
@@ -122,7 +135,7 @@ export const sendUpcomingVaccinationSMS = async () => {
     await new Promise(r => setTimeout(r, 200));
   }
 
-  console.log(`[${new Date().toISOString()}] SMS notification job completed`);
+  console.log(`[${new Date().toISOString()}] 🏁 SMS notification job completed`);
 };
 
 /**
