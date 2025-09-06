@@ -10,7 +10,7 @@ import morgan from 'morgan';
 import moment from 'moment-timezone';
 
 import motherRoutes from './routes/motherRoutes.js';
-import './cron/dailySchedule.js';
+// import './cron/dailySchedule.js';
 
 dotenv.config();
 

@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { sendUpcomingVaccinationSMS } from './vaccineReminderJob.js';
+import { sendUpcomingVaccinationNotifications } from './vaccineReminderJob.js';
 import path from 'path';
 import url from 'url';
 
@@ -20,7 +20,7 @@ cron.schedule('0 6 * * *', async () => {
 const __filename = url.fileURLToPath(import.meta.url);
 if (path.resolve(process.argv[1]) === path.resolve(__filename)) {
     console.log(`[${new Date().toISOString()}] ⚡ Running vaccination SMS job immediately for testing...`);
-    sendUpcomingVaccinationSMS()
+    sendUpcomingVaccinationNotifications()
         .then(() => console.log(`[${new Date().toISOString()}] ⚡ Immediate job completed`))
         .catch(err => console.error(`[${new Date().toISOString()}] ⚡ Immediate job failed:`, err));
 }
