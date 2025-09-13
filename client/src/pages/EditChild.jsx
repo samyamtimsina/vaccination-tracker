@@ -1,7 +1,6 @@
 import { useForm, Controller, useWatch, useFieldArray } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useMemo, useEffect, useState } from 'react';
-import { vaccineSchedule } from '../utils/vaccineSchedule';
 import axiosClient from '../api/axiosClient.js';
 import { NepaliDatePicker } from 'nepali-datepicker-reactjs';
 import 'nepali-datepicker-reactjs/dist/index.css';
@@ -24,7 +23,10 @@ import {
 } from 'react-icons/fa';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { updateChildSchema } from '../schemas/childSchema.js';
+
 import { useChildContext } from '../context/ChildContext';
+import { useVaccineScheduleContext } from '../context/VaccineScheduleContext';
+
 import { useTheme } from '../context/ThemeContext';
 import { calculateAge } from '../../helpers/calculateAge.jsx';
 import { getFirstErrorMessage } from '../../helpers/getFirstErrorMessage.jsx';
@@ -38,96 +40,83 @@ const safeFormatDateYYMMDD = (dateString) => {
 };
 
 // Enhanced vaccine categorization logic (same as AddChild)
+// Enhanced vaccine categorization logic (same as AddChild)
 const getVaccineStatus = (dose, childAge) => {
-  const ageInDays = childAge.days;
+  // Calculate child's total age in days
+  const ageInDays = (childAge.years || 0) * 365.25 +
+    (childAge.months || 0) * 30.44 +
+    (childAge.days || 0);
 
-  // Calculate recommended age in days
+  // Calculate recommended age in days from the dose info
   let recommendedAgeDays = 0;
-  if (dose.recommendedAtDays !== undefined)
+  if (dose.recommendedAtDays !== null && dose.recommendedAtDays !== undefined) {
     recommendedAgeDays = dose.recommendedAtDays;
-  if (dose.recommendedAtWeeks !== undefined)
+  } else if (dose.recommendedAtWeeks !== null && dose.recommendedAtWeeks !== undefined) {
     recommendedAgeDays = dose.recommendedAtWeeks * 7;
-  if (dose.recommendedAtMonths !== undefined)
-    recommendedAgeDays = dose.recommendedAtMonths * 30;
-  if (dose.recommendedAtYears !== undefined)
-    recommendedAgeDays = dose.recommendedAtYears * 365;
+  } else if (dose.recommendedAtMonths !== null && dose.recommendedAtMonths !== undefined) {
+    recommendedAgeDays = dose.recommendedAtMonths * 30.44;
+  } else if (dose.recommendedAtYears !== null && dose.recommendedAtYears !== undefined) {
+    recommendedAgeDays = dose.recommendedAtYears * 365.25;
+  }
 
   const daysDifference = ageInDays - recommendedAgeDays;
 
-  // Status categories with grace periods
-  if (daysDifference < -30)
-    return {
-      status: 'NOT_YET_ELIGIBLE',
-      priority: 4,
-      color: 'text-gray-500',
-      bgColor: 'bg-gray-50',
-      borderColor: 'border-gray-200',
-    };
-  if (daysDifference >= -30 && daysDifference <= 30)
-    return {
-      status: 'DUE_NOW',
-      priority: 2,
-      color: 'text-yellow-700',
-      bgColor: 'bg-yellow-50',
-      borderColor: 'border-yellow-300',
-    };
-  if (daysDifference > 30 && daysDifference <= 90)
-    return {
-      status: 'OVERDUE',
-      priority: 1,
-      color: 'text-orange-700',
-      bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-300',
-    };
-  if (daysDifference > 90)
-    return {
-      status: 'SEVERELY_OVERDUE',
-      priority: 1,
-      color: 'text-red-700',
-      bgColor: 'bg-red-50',
-      borderColor: 'border-red-300',
-    };
+  // Status categories with appropriate grace periods
+  // If child is more than 7 days younger than recommended age, not yet eligible
+  if (daysDifference < -7) return {
+    status: 'NOT_YET_ELIGIBLE',
+    priority: 4,
+    color: 'text-gray-500',
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-200'
+  };
+  // If within 7 days before to 30 days after recommended age, it's due now
+  if (daysDifference >= -7 && daysDifference <= 30) return {
+    status: 'DUE_NOW',
+    priority: 2,
+    color: 'text-yellow-700',
+    bgColor: 'bg-yellow-50',
+    borderColor: 'border-yellow-300'
+  };
+  if (daysDifference > 30 && daysDifference <= 90) return {
+    status: 'OVERDUE',
+    priority: 1,
+    color: 'text-orange-700',
+    bgColor: 'bg-orange-50',
+    borderColor: 'border-orange-300'
+  };
+  if (daysDifference > 90) return {
+    status: 'SEVERELY_OVERDUE',
+    priority: 1,
+    color: 'text-red-700',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-300'
+  };
 
   return {
     status: 'ACCESSIBLE',
     priority: 3,
     color: 'text-blue-700',
     bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-200',
+    borderColor: 'border-blue-300'
   };
 };
+;
 
 const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
   const categories = {
-    CURRENT: {
-      vaccines: [],
-      count: 0,
-      icon: FaExclamationTriangle,
-      color: 'text-red-600',
-      title: 'Current & Overdue',
-    },
-    CATCH_UP: {
-      vaccines: [],
-      count: 0,
-      icon: FaHistory,
-      color: 'text-orange-600',
-      title: 'Catch-up',
-    },
-    NOT_APPLICABLE: {
-      vaccines: [],
-      count: 0,
-      icon: FaLock,
-      color: 'text-gray-400',
-      title: 'Not Applicable',
-    },
+    CURRENT: { vaccines: [], count: 0, icon: FaExclamationTriangle, color: 'text-red-600', title: 'Current & Overdue' },
+    CATCH_UP: { vaccines: [], count: 0, icon: FaHistory, color: 'text-orange-600', title: 'Catch-up' },
+    NOT_APPLICABLE: { vaccines: [], count: 0, icon: FaLock, color: 'text-gray-400', title: 'Not Applicable' }
   };
 
-  Object.entries(vaccineSchedule).forEach(([vaccineName, doses]) => {
+  Object.entries(vaccineSchedule.doses).forEach(([vaccineName, doses]) => {
+    // Gender-specific filtering
     if (vaccineName === 'HPV' && gender !== 'FEMALE') {
       categories.NOT_APPLICABLE.vaccines.push({
         vaccineName,
         reason: 'Only applicable to females',
-        doses: [],
+        doses: []
       });
       return;
     }
@@ -136,15 +125,15 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
       const statusInfo = getVaccineStatus(dose, childAge);
       return {
         doseIndex: index,
-        dose: dose.dose,
+        dose: dose.doseNumber, // Use doseNumber instead of dose
         doseInfo: dose,
         ...statusInfo,
-        doseType: dose.isBooster ? 'booster' : 'current',
+        doseType: dose.isBooster ? 'booster' : 'current'
       };
     });
 
-    const currentDoses = vaccineDoses.filter((d) => d.doseType === 'current');
-    const boosterDoses = vaccineDoses.filter((d) => d.doseType === 'booster');
+    const currentDoses = vaccineDoses.filter(d => d.doseType === 'current');
+    const boosterDoses = vaccineDoses.filter(d => d.doseType === 'booster');
 
     if (currentDoses.length > 0) {
       categories.CURRENT.vaccines.push({ vaccineName, doses: currentDoses });
@@ -426,8 +415,19 @@ export default function EditChild() {
   const { t, i18n } = useTranslation('addChild');
   const { theme } = useTheme();
   const { updateChildInState } = useChildContext();
+  const { vaccineSchedule, loading } = useVaccineScheduleContext();
+  if (loading || !vaccineSchedule) {
+    return (
+      <div className="min-h-screen bg-base-200 flex items-center justify-center">
+        <div className="text-center">
+          <span className="loading loading-spinner loading-lg text-primary"></span>
+          <p className="mt-4 text-base-content/70">Loading vaccine schedule...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const MOCK_CURRENT_USER_ID = 2; // This should be replaced with actual user info
+
   const {
     register,
     handleSubmit,
@@ -443,7 +443,7 @@ export default function EditChild() {
       birthDate: '',
       administeredById: '',
       vaccines: Object.fromEntries(
-        Object.entries(vaccineSchedule).map(([vaccineName, doses]) => [
+        Object.entries(vaccineSchedule.doses).map(([vaccineName, doses]) => [
           vaccineName,
           doses.map(() => ({ date: '', remarks: '' })),
         ])
@@ -523,10 +523,24 @@ export default function EditChild() {
             isComplete: filters.isComplete,
           },
         });
-        setSearchResults(res.data);
+
+        // Handle different response structures
+        let results = [];
+        if (Array.isArray(res.data)) {
+          results = res.data;
+        } else if (res.data && Array.isArray(res.data.children)) {
+          results = res.data.children;
+        } else if (res.data && Array.isArray(res.data.data)) {
+          results = res.data.data;
+        } else if (res.data && Array.isArray(res.data.items)) {
+          results = res.data.items;
+        }
+
+        setSearchResults(results);
       } catch (err) {
         console.error('Search failed:', err);
         toast.error('खोज्दा त्रुटि भयो');
+        setSearchResults([]); // Ensure it's always an array
       } finally {
         setIsLoading(false);
       }
@@ -572,7 +586,7 @@ export default function EditChild() {
             remarks: childData.remarks || '',
           }),
           vaccines: Object.fromEntries(
-            Object.entries(vaccineSchedule).map(([vaccineName, doses]) => [
+            Object.entries(vaccineSchedule.doses).map(([vaccineName, doses]) => [
               vaccineName,
               doses.map(() => ({ date: '', remarks: '' })),
             ])
@@ -598,23 +612,45 @@ export default function EditChild() {
         }, 0);
 
         console.log('Form state after replace:', getValues('weightRecords'));
+        const vaccineTypeIdToName = {};
+        Object.entries(vaccineSchedule.doses).forEach(([vaccineName, doses]) => {
+          if (doses.length > 0 && doses[0].vaccineTypeId) {
+            vaccineTypeIdToName[doses[0].vaccineTypeId] = vaccineName;
+          }
+        });
+
+        console.log('Created vaccine mapping:', vaccineTypeIdToName);
 
         // Populate vaccine dates
         childData.vaccinations.forEach((vac) => {
-          const vaccineName = vac.vaccineType;
-          const doses = vaccineSchedule[vaccineName];
+          // Map vaccineTypeId to vaccine name
+          const vaccineName = vaccineTypeIdToName[vac.vaccineTypeId];
+
+          if (!vaccineName) {
+            console.warn(`Vaccine type ID ${vac.vaccineTypeId} not found in mapping`);
+            return;
+          }
+
+          const doses = vaccineSchedule.doses[vaccineName];
+
           if (doses) {
-            const index = doses.findIndex((d) => d.dose === vac.doseNumber);
-            if (index !== -1) {
+            // Find the correct dose index by matching doseNumber
+            const doseIndex = doses.findIndex((d) => d.doseNumber === vac.doseNumber);
+
+            if (doseIndex !== -1) {
               setValue(
-                `vaccines.${vaccineName}.${index}.date`,
+                `vaccines.${vaccineName}.${doseIndex}.date`,
                 adToBs(safeFormatDateYYMMDD(vac.dateGiven))
               );
               setValue(
-                `vaccines.${vaccineName}.${index}.remarks`,
+                `vaccines.${vaccineName}.${doseIndex}.remarks`,
                 vac.remarks || ''
               );
+            } else {
+              console.warn(`Dose number ${vac.doseNumber} not found in schedule for ${vaccineName}`);
             }
+          } else {
+            console.warn(`Vaccine ${vaccineName} not found in schedule`);
           }
         });
 
@@ -652,7 +688,6 @@ export default function EditChild() {
     setSelectedChild(child);
     setShowSearchSection(false);
   };
-
   const onSubmit = async (data) => {
     if (!fetchedChild) {
       toast.error(t('submitSection.no_child_loaded'));
@@ -668,7 +703,6 @@ export default function EditChild() {
             weight: parseFloat(rec.weight),
           };
 
-          // Only add id if dbId exists and is not null/undefined/empty
           if (rec.dbId && rec.dbId !== 'null' && rec.dbId !== '' && rec.dbId !== null) {
             weightRecord.id = parseInt(rec.dbId);
           }
@@ -676,13 +710,12 @@ export default function EditChild() {
           return weightRecord;
         });
 
-      // Filter out vaccines that have no date
       const filteredVaccinations = Object.entries(data.vaccines)
         .flatMap(([vaccineName, doses]) =>
           doses
             .filter((dose) => dose.date)
             .map((dose, index) => {
-              const scheduleDose = vaccineSchedule[vaccineName][index];
+              const scheduleDose = vaccineSchedule.doses[vaccineName][index];
               return {
                 vaccineType: vaccineName,
                 doseNumber: scheduleDose.dose,
@@ -692,28 +725,41 @@ export default function EditChild() {
             })
         );
 
-      const payload = {
-        weightRecords: filteredWeightRecords,
-        vaccinations: filteredVaccinations,
-        administeredById: parseInt(data.administeredById),
-        remarks: data.remarks || null,
-      };
+      // Extract administeredById from the form data
+      const administeredById = data.administeredById;
 
-      // Only include demographic data if it's a full profile
+      let payload = {};
+
       if (isFullProfile) {
-        payload.firstName = data.firstName;
-        payload.lastName = data.lastName;
-        payload.gender = data.gender;
-        payload.birthDate = data.birthDate;
-        payload.wardNumber = parseInt(data.wardNumber);
-        payload.casteCode = parseInt(data.casteCode);
-        payload.parentName = data.parentName;
-        payload.tole = data.tole;
-        payload.phoneNumber = data.phoneNumber || null;
-        payload.isFromOtherMunicipality = data.isFromOtherMunicipality;
+        // Full access - same ward
+        payload = {
+          weightRecords: filteredWeightRecords,
+          vaccinations: filteredVaccinations,
+          administeredById: parseInt(administeredById),
+          remarks: data.remarks || null,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          gender: data.gender,
+          birthDate: data.birthDate,
+          wardNumber: parseInt(data.wardNumber),
+          casteCode: parseInt(data.casteCode),
+          parentName: data.parentName,
+          tole: data.tole,
+          phoneNumber: data.phoneNumber || null,
+          isFromOtherMunicipality: data.isFromOtherMunicipality,
+        };
+      } else {
+        // Partial access - different ward (ONLY send allowed fields)
+        payload = {
+          weightRecords: filteredWeightRecords,
+          vaccinations: filteredVaccinations,
+          administeredById: parseInt(administeredById),
+          remarks: data.remarks || null,
+          // DO NOT include any demographic fields for cross-ward updates
+        };
       }
 
-      console.log('Submitting payload:', payload);
+      console.log('Submitting payload:', JSON.stringify(payload, null, 2));
 
       const res = await axiosClient.put(
         `/api/child/${fetchedChild.sewaDartaNumber}`,
@@ -726,6 +772,8 @@ export default function EditChild() {
       toast.error(t('toast.error'));
     }
   };
+
+
   const onErrors = (errors) => {
     console.log('Validation errors:', errors);
     const errorMessage = getFirstErrorMessage(errors);
@@ -768,12 +816,14 @@ export default function EditChild() {
     (sum, cat) => sum + cat.count,
     0
   );
-  const totalResults = searchResults.total; // Use the total count from the object
+  const totalResults = Array.isArray(searchResults) ? searchResults.length : 0;
   const totalPages = Math.ceil(totalResults / resultsPerPage);
-  const paginatedResults = searchResults?.children?.slice( // Correctly access the children array
-    (currentPage - 1) * resultsPerPage,
-    currentPage * resultsPerPage
-  );
+  const paginatedResults = Array.isArray(searchResults)
+    ? searchResults.slice(
+      (currentPage - 1) * resultsPerPage,
+      currentPage * resultsPerPage
+    )
+    : [];
 
 
   return (
@@ -1325,8 +1375,8 @@ export default function EditChild() {
                               <div className="mt-3 p-3 bg-success/10 rounded-lg border border-success/20">
                                 <div className="text-base text-success font-medium">
                                   {t('personalInfo.age', {
-                                    months: age.months,
-                                    days: age.days,
+                                    months: age.months || 0,
+                                    days: age.days || 0
                                   })}
                                 </div>
                               </div>

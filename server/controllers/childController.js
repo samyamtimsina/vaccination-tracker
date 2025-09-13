@@ -575,6 +575,7 @@ export const updateChild = async (req, res) => {
   const { id } = req.params;
   const sewaDartaNumber = parseInt(id, 10);
   const { vaccinations, weightRecords, administeredById, firstName, lastName, ...demographicData } = req.body;
+  console.log('req.boyd', req.body)
   const currentUser = req.user;
 
   try {

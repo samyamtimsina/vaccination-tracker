@@ -1,8 +1,6 @@
 import { useForm, Controller, useWatch, useFieldArray } from 'react-hook-form';
-import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMemo, useEffect, useState } from 'react';
-// import { vaccineSchedule } from '../utils/vaccineSchedule';
 import axiosClient from '../api/axiosClient.js';
 import { NepaliDatePicker } from 'nepali-datepicker-reactjs';
 import 'nepali-datepicker-reactjs/dist/index.css';
@@ -29,7 +27,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { createChildSchema } from '../schemas/childSchema.js';
 
 import { useChildContext } from '../context/ChildContext';
-import { VaccineScheduleContext } from '../context/VaccineScheduleContext';
+import { useVaccineScheduleContext } from '../context/VaccineScheduleContext';
 
 import { useTheme } from '../context/ThemeContext';
 import { calculateAge } from '../../helpers/calculateAge.jsx';
@@ -387,10 +385,9 @@ const VaccineSection = ({
 };
 
 export default function AddChild() {
-  const { vaccineSchedule, loading } = useContext(VaccineScheduleContext);
-  // console.log('vaccineSchedule in AddChild:', vaccineSchedule);
-  // console.log('loading in AddChild:', loading);
+  const { vaccineSchedule, loading } = useVaccineScheduleContext();
   if (loading || !vaccineSchedule) return <div>Loading schedule...</div>;
+
   const { t, i18n } = useTranslation('addChild');
   const { theme } = useTheme();
   const { addChildToState } = useChildContext();

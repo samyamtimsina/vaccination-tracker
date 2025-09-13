@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import axiosClient from '../api/axiosClient';
 
 
@@ -23,6 +23,8 @@ export const VaccineScheduleProvider = ({ children }) => {
                 }, {});
 
                 setvaccineSchedule({ doses: dosesByVaccine });
+                console.log('vaccineschedule from context', vaccineSchedule)
+                setLoading(false);
             } catch (err) {
                 console.error('Failed to fetch vaccine schedule', err);
             } finally {
@@ -40,3 +42,6 @@ export const VaccineScheduleProvider = ({ children }) => {
         </VaccineScheduleContext.Provider>
     );
 };
+export function useVaccineScheduleContext() {
+    return useContext(VaccineScheduleContext);
+}
