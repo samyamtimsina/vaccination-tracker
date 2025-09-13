@@ -23,24 +23,44 @@ import {
 } from 'react-icons/fa';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { updateChildSchema } from '../schemas/childSchema.js';
-
 import { useChildContext } from '../context/ChildContext';
 import { useVaccineScheduleContext } from '../context/VaccineScheduleContext';
-
 import { useTheme } from '../context/ThemeContext';
-import { calculateAge } from '../../helpers/calculateAge.jsx';
 import { getFirstErrorMessage } from '../../helpers/getFirstErrorMessage.jsx';
 import { useTranslation } from 'react-i18next';
 import { adToBs, bsToAd } from '@sbmdkl/nepali-date-converter';
 
-// Add this helper function at the top
+// Helper functions (unchanged)
 const safeFormatDateYYMMDD = (dateString) => {
   if (!dateString) return '';
   return dateString.split('T')[0];
 };
 
-// Enhanced vaccine categorization logic (same as AddChild)
-// Enhanced vaccine categorization logic (same as AddChild)
+// Fixed calculateAge function
+const calculateAge = (birthDateBs) => {
+  if (!birthDateBs) return { years: 0, months: 0, days: 0 };
+
+  const adBirthStr = bsToAd(birthDateBs);
+  const birth = new Date(adBirthStr);
+  const now = new Date();
+
+  let years = now.getFullYear() - birth.getFullYear();
+  let months = now.getMonth() - birth.getMonth();
+  let days = now.getDate() - birth.getDate();
+
+  if (days < 0) {
+    months--;
+    days += new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+  }
+
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+
+  return { years, months, days };
+};
+
 const getVaccineStatus = (dose, childAge) => {
   // Calculate child's total age in days
   const ageInDays = (childAge.years || 0) * 365.25 +
@@ -101,7 +121,6 @@ const getVaccineStatus = (dose, childAge) => {
     borderColor: 'border-blue-300'
   };
 };
-;
 
 const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
   const categories = {
@@ -149,7 +168,7 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
   return categories;
 };
 
-// Vaccine Card Component (same as AddChild)
+// VaccineCard Component
 const VaccineCard = ({
   vaccineName,
   dose,
@@ -160,16 +179,28 @@ const VaccineCard = ({
   showRemarks,
   toggleRemarks,
   theme,
-  t,
+  t
 }) => {
   const isAccessible = dose.status !== 'NOT_YET_ELIGIBLE';
   const remarksKey = `${vaccineName}-${dose.doseIndex}`;
   const showRemark = showRemarks[remarksKey] || false;
 
+  // Helper function to format recommended age text
+  const getRecommendedAgeText = (doseInfo) => {
+    if (doseInfo.recommendedAtDays !== null && doseInfo.recommendedAtDays !== undefined) {
+      return t('vaccine_card.days', { count: doseInfo.recommendedAtDays });
+    } else if (doseInfo.recommendedAtWeeks !== null && doseInfo.recommendedAtWeeks !== undefined) {
+      return t('vaccine_card.weeks', { count: doseInfo.recommendedAtWeeks });
+    } else if (doseInfo.recommendedAtMonths !== null && doseInfo.recommendedAtMonths !== undefined) {
+      return t('vaccine_card.months', { count: doseInfo.recommendedAtMonths });
+    } else if (doseInfo.recommendedAtYears !== null && doseInfo.recommendedAtYears !== undefined) {
+      return t('vaccine_card.years', { count: doseInfo.recommendedAtYears });
+    }
+    return t('vaccine_card.birth');
+  };
+
   return (
-    <div
-      className={`p-4 border rounded-lg transition-all ${dose.bgColor} ${dose.borderColor} border-l-4`}
-    >
+    <div className={`p-4 border rounded-lg transition-all ${dose.bgColor} ${dose.borderColor} border-l-4`}>
       <div className="space-y-3">
         {/* Header */}
         <div className="flex justify-between items-start">
@@ -178,43 +209,24 @@ const VaccineCard = ({
               {vaccineName} - {t('vaccine_card.dose', { dose: dose.dose })}
             </h4>
             <p className="text-xs text-gray-600 mt-1">
-              {t('vaccine_card.recommended_at')}
-              {dose.doseInfo.recommendedAtMonths
-                ? t('vaccine_card.months', {
-                  count: dose.doseInfo.recommendedAtMonths,
-                })
-                : dose.doseInfo.recommendedAtWeeks
-                  ? t('vaccine_card.weeks', {
-                    count: dose.doseInfo.recommendedAtWeeks,
-                  })
-                  : dose.doseInfo.recommendedAtYears
-                    ? t('vaccine_card.years', {
-                      count: dose.doseInfo.recommendedAtYears,
-                    })
-                    : t('vaccine_card.days', {
-                      count: dose.doseInfo.recommendedAtDays,
-                    })}
+              {t('vaccine_card.recommended_at')} {getRecommendedAgeText(dose.doseInfo)}
             </p>
           </div>
           <div className="flex flex-col items-end space-y-1">
-            <span
-              className={`badge ${dose.status === 'SEVERELY_OVERDUE'
-                ? 'badge-error'
-                : dose.status === 'OVERDUE'
-                  ? 'badge-warning'
-                  : dose.status === 'DUE_NOW'
-                    ? 'badge-info'
-                    : dose.status === 'ACCESSIBLE'
-                      ? 'badge-success'
-                      : 'badge-neutral'
-                } text-xs`}
-            >
+            <span className={`badge ${dose.status === 'SEVERELY_OVERDUE'
+              ? 'badge-error'
+              : dose.status === 'OVERDUE'
+                ? 'badge-warning'
+                : dose.status === 'DUE_NOW'
+                  ? 'badge-info'
+                  : dose.status === 'ACCESSIBLE'
+                    ? 'badge-success'
+                    : 'badge-neutral'
+              } text-xs`}>
               {t(`vaccine_card.status.${dose.status.toLowerCase()}`)}
             </span>
             {dose.doseType === 'booster' && (
-              <span className="badge badge-outline badge-xs">
-                {t('vaccine_card.booster')}
-              </span>
+              <span className="badge badge-outline badge-xs">{t('vaccine_card.booster')}</span>
             )}
           </div>
         </div>
@@ -240,12 +252,10 @@ const VaccineCard = ({
                     {field.value && (
                       <button
                         type="button"
-                        onClick={() =>
-                          setValue(
-                            `vaccines.${vaccineName}.${dose.doseIndex}.date`,
-                            ''
-                          )
-                        }
+                        onClick={() => setValue(
+                          `vaccines.${vaccineName}.${dose.doseIndex}.date`,
+                          ''
+                        )}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
                         title={t('vaccine_card.clear_date_title')}
                       >
@@ -261,17 +271,7 @@ const VaccineCard = ({
                     disabled
                     readOnly
                     placeholder={t('vaccine_card.unavailable_placeholder', {
-                      age: dose.doseInfo.recommendedAtMonths
-                        ? t('vaccine_card.months', {
-                          count: dose.doseInfo.recommendedAtMonths,
-                        })
-                        : dose.doseInfo.recommendedAtWeeks
-                          ? t('vaccine_card.weeks', {
-                            count: dose.doseInfo.recommendedAtWeeks,
-                          })
-                          : t('vaccine_card.years', {
-                            count: dose.doseInfo.recommendedAtYears,
-                          }),
+                      age: getRecommendedAgeText(dose.doseInfo)
                     })}
                   />
                 )}
@@ -292,10 +292,7 @@ const VaccineCard = ({
                 <FaClipboardList className="w-3 h-3 mr-1" />
                 {t('vaccine_card.remarks')}
               </span>
-              <span
-                className={`text-xs transform transition-transform ${showRemark ? 'rotate-180' : ''
-                  }`}
-              >
+              <span className={`text-xs transform transition-transform ${showRemark ? 'rotate-180' : ''}`}>
                 ▼
               </span>
             </button>
@@ -303,9 +300,7 @@ const VaccineCard = ({
             {showRemark && (
               <div className="mt-2">
                 <textarea
-                  {...register(
-                    `vaccines.${vaccineName}.${dose.doseIndex}.remarks`
-                  )}
+                  {...register(`vaccines.${vaccineName}.${dose.doseIndex}.remarks`)}
                   className="textarea textarea-bordered textarea-xs w-full"
                   placeholder={t('vaccine_card.remarks_placeholder')}
                   rows={2}
@@ -319,7 +314,7 @@ const VaccineCard = ({
   );
 };
 
-// Vaccine Section Component (same as AddChild)
+// Vaccine Section Component
 const VaccineSection = ({
   sectionKey,
   sectionData,
@@ -331,7 +326,7 @@ const VaccineSection = ({
   showRemarks,
   toggleRemarks,
   theme,
-  t,
+  t
 }) => {
   const isExpanded = expandedSections[sectionKey];
   const isEmpty = sectionData.count === 0;
@@ -341,27 +336,20 @@ const VaccineSection = ({
     return null;
   }
 
-  // Add this to your translation file or handle it in the component
-  const tt = useTranslation('addChild').t;
-
-  // Add fallback for missing translation
   const getSectionTitle = (key) => {
     const titles = {
-      CURRENT: tt('vaccine_section.current', { count: 0 }) || 'Current',
-      CATCH_UP: tt('vaccine_section.catch_up', { count: 0 }) || 'Catch Up',
-      NOT_APPLICABLE:
-        tt('vaccine_section.not_applicable', { count: 0 }) || 'Not Applicable',
+      CURRENT: t('vaccine_section.current', { count: sectionData.count }),
+      CATCH_UP: t('vaccine_section.catch_up', { count: sectionData.count }),
+      NOT_APPLICABLE: t('vaccine_section.not_applicable', { count: sectionData.count })
     };
-    return titles[key] || key;
+    return titles[key];
   };
 
   const getSectionDescription = () => {
     const descriptions = {
-      CURRENT:
-        'These are routine doses for the child. Some may be due, overdue, or upcoming.',
-      CATCH_UP:
-        'These are booster doses for the child. They are administered at specific ages.',
-      NOT_APPLICABLE: 'These vaccines are not applicable for this child',
+      CURRENT: 'These are routine doses for the child. Some may be due, overdue, or upcoming.',
+      CATCH_UP: 'These are booster doses for the child. They are administered at specific ages.',
+      NOT_APPLICABLE: 'These vaccines are not applicable for this child'
     };
     return descriptions[sectionKey];
   };
@@ -401,9 +389,7 @@ const VaccineSection = ({
         <div className="mt-4 ml-4 p-4 bg-green-50 border border-green-200 rounded-lg">
           <div className="text-center">
             <FaCheckCircle className="text-green-500 text-2xl mx-auto mb-2" />
-            <p className="text-green-700 font-medium">
-              {t('vaccine_section.no_vaccines_in_category')}
-            </p>
+            <p className="text-green-700 font-medium">{t('vaccine_section.no_vaccines_in_category')}</p>
           </div>
         </div>
       )}
@@ -412,21 +398,10 @@ const VaccineSection = ({
 };
 
 export default function EditChild() {
-  const { t, i18n } = useTranslation('addChild');
+  const { t } = useTranslation('addChild');
   const { theme } = useTheme();
   const { updateChildInState } = useChildContext();
   const { vaccineSchedule, loading } = useVaccineScheduleContext();
-  if (loading || !vaccineSchedule) {
-    return (
-      <div className="min-h-screen bg-base-200 flex items-center justify-center">
-        <div className="text-center">
-          <span className="loading loading-spinner loading-lg text-primary"></span>
-          <p className="mt-4 text-base-content/70">Loading vaccine schedule...</p>
-        </div>
-      </div>
-    );
-  }
-
 
   const {
     register,
@@ -442,12 +417,7 @@ export default function EditChild() {
       isFromOtherMunicipality: false,
       birthDate: '',
       administeredById: '',
-      vaccines: Object.fromEntries(
-        Object.entries(vaccineSchedule.doses).map(([vaccineName, doses]) => [
-          vaccineName,
-          doses.map(() => ({ date: '', remarks: '' })),
-        ])
-      ),
+      vaccines: {},
       weightRecords: [{ id: null, date: '', weight: '' }],
     },
   });
@@ -456,14 +426,11 @@ export default function EditChild() {
   const gender = useWatch({ control, name: 'gender', defaultValue: '' });
   const birthDate = useWatch({ control, name: 'birthDate', defaultValue: '' });
 
-  // Add new states for the enhanced workflow
   const [selectedChild, setSelectedChild] = useState(null);
   const [showSearchSection, setShowSearchSection] = useState(true);
   const [isFullProfile, setIsFullProfile] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchedChild, setFetchedChild] = useState(null);
-
-  // State management
   const [healthWorkers, setHealthWorkers] = useState([]);
   const [showRemarks, setShowRemarks] = useState({});
   const [expandedSections, setExpandedSections] = useState({
@@ -473,13 +440,7 @@ export default function EditChild() {
   });
   const [activeTab, setActiveTab] = useState('CURRENT');
   const [sewaDartaNumber, setSewaDartaNumber] = useState('');
-
-  // Search state
-  const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [showResults, setShowResults] = useState(false);
-
-  // New states for enhanced search
   const [filters, setFilters] = useState({
     name: '',
     serviceRegistrationNumber: '',
@@ -492,6 +453,23 @@ export default function EditChild() {
   const [currentPage, setCurrentPage] = useState(1);
   const resultsPerPage = 10;
 
+  const { fields, append, remove, replace } = useFieldArray({
+    control,
+    name: 'weightRecords',
+  });
+
+  // Initialize vaccine default values after vaccineSchedule is available
+  useEffect(() => {
+    if (vaccineSchedule && vaccineSchedule.doses) {
+      setValue('vaccines', Object.fromEntries(
+        Object.entries(vaccineSchedule.doses).map(([vaccineName, doses]) => [
+          vaccineName,
+          doses.map(() => ({ date: '', remarks: '' })),
+        ])
+      ));
+    }
+  }, [vaccineSchedule, setValue]);
+
   useEffect(() => {
     const fetchHealthWorkers = async () => {
       try {
@@ -503,6 +481,7 @@ export default function EditChild() {
     };
     fetchHealthWorkers();
   }, []);
+
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
       const hasSearchFilters = filters.name || filters.serviceRegistrationNumber || filters.phoneNumber || filters.gender || filters.wardNumber || filters.isComplete || filters.createdByMe;
@@ -524,7 +503,6 @@ export default function EditChild() {
           },
         });
 
-        // Handle different response structures
         let results = [];
         if (Array.isArray(res.data)) {
           results = res.data;
@@ -540,7 +518,7 @@ export default function EditChild() {
       } catch (err) {
         console.error('Search failed:', err);
         toast.error('खोज्दा त्रुटि भयो');
-        setSearchResults([]); // Ensure it's always an array
+        setSearchResults([]);
       } finally {
         setIsLoading(false);
       }
@@ -549,13 +527,6 @@ export default function EditChild() {
     return () => clearTimeout(delayDebounce);
   }, [filters]);
 
-  // Use useFieldArray to manage the weightRecords array
-  const { fields, append, remove, replace } = useFieldArray({
-    control,
-    name: 'weightRecords',
-  });
-
-  // New useEffect to fetch child data from API when a child is selected
   useEffect(() => {
     const fetchChildData = async () => {
       if (!selectedChild) return;
@@ -564,7 +535,6 @@ export default function EditChild() {
       try {
         const res = await axiosClient.get(`/api/child/${selectedChild.sewaDartaNumber}`);
         const childData = res.data;
-        console.log('Fetched child data:', childData);
 
         const fullProfile = !!childData.parentName;
         setIsFullProfile(fullProfile);
@@ -586,7 +556,7 @@ export default function EditChild() {
             remarks: childData.remarks || '',
           }),
           vaccines: Object.fromEntries(
-            Object.entries(vaccineSchedule.doses).map(([vaccineName, doses]) => [
+            Object.entries(vaccineSchedule?.doses || {}).map(([vaccineName, doses]) => [
               vaccineName,
               doses.map(() => ({ date: '', remarks: '' })),
             ])
@@ -603,40 +573,25 @@ export default function EditChild() {
           }))
           : [{ dbId: null, date: '', weight: '' }];
 
-        console.log('Weight records before replace:', newWeightRecords);
+        replace(newWeightRecords);
 
-        // Clear existing records and replace with new ones
-        replace([]); // Clear first
-        setTimeout(() => {
-          replace(newWeightRecords); // Then replace
-        }, 0);
-
-        console.log('Form state after replace:', getValues('weightRecords'));
         const vaccineTypeIdToName = {};
-        Object.entries(vaccineSchedule.doses).forEach(([vaccineName, doses]) => {
+        Object.entries(vaccineSchedule?.doses || {}).forEach(([vaccineName, doses]) => {
           if (doses.length > 0 && doses[0].vaccineTypeId) {
             vaccineTypeIdToName[doses[0].vaccineTypeId] = vaccineName;
           }
         });
 
-        console.log('Created vaccine mapping:', vaccineTypeIdToName);
-
-        // Populate vaccine dates
         childData.vaccinations.forEach((vac) => {
-          // Map vaccineTypeId to vaccine name
           const vaccineName = vaccineTypeIdToName[vac.vaccineTypeId];
-
           if (!vaccineName) {
             console.warn(`Vaccine type ID ${vac.vaccineTypeId} not found in mapping`);
             return;
           }
 
-          const doses = vaccineSchedule.doses[vaccineName];
-
+          const doses = vaccineSchedule?.doses[vaccineName];
           if (doses) {
-            // Find the correct dose index by matching doseNumber
             const doseIndex = doses.findIndex((d) => d.doseNumber === vac.doseNumber);
-
             if (doseIndex !== -1) {
               setValue(
                 `vaccines.${vaccineName}.${doseIndex}.date`,
@@ -646,11 +601,7 @@ export default function EditChild() {
                 `vaccines.${vaccineName}.${doseIndex}.remarks`,
                 vac.remarks || ''
               );
-            } else {
-              console.warn(`Dose number ${vac.doseNumber} not found in schedule for ${vaccineName}`);
             }
-          } else {
-            console.warn(`Vaccine ${vaccineName} not found in schedule`);
           }
         });
 
@@ -665,9 +616,7 @@ export default function EditChild() {
     };
 
     fetchChildData();
-  }, [selectedChild, reset, setValue, replace, t]);
-
-  // Fetch children data on component mount
+  }, [selectedChild, reset, setValue, replace, t, vaccineSchedule]);
 
   const toggleRemarks = (vaccineName, doseIndex) => {
     const key = `${vaccineName}-${doseIndex}`;
@@ -681,13 +630,12 @@ export default function EditChild() {
     }));
   };
 
-
-  // Simplified handleChildSelect to just set the selected child
   const handleChildSelect = (child) => {
     if (!child) return;
     setSelectedChild(child);
     setShowSearchSection(false);
   };
+
   const onSubmit = async (data) => {
     if (!fetchedChild) {
       toast.error(t('submitSection.no_child_loaded'));
@@ -710,28 +658,42 @@ export default function EditChild() {
           return weightRecord;
         });
 
+      // Create vaccine type ID to name mapping
+      const vaccineTypeIdToName = {};
+      Object.entries(vaccineSchedule.doses).forEach(([vaccineName, doses]) => {
+        if (doses.length > 0 && doses[0].vaccineTypeId) {
+          vaccineTypeIdToName[vaccineName] = doses[0].vaccineTypeId;
+        }
+      });
+
       const filteredVaccinations = Object.entries(data.vaccines)
         .flatMap(([vaccineName, doses]) =>
           doses
             .filter((dose) => dose.date)
             .map((dose, index) => {
               const scheduleDose = vaccineSchedule.doses[vaccineName][index];
+              const vaccineTypeId = vaccineTypeIdToName[vaccineName];
+
+              if (!vaccineTypeId) {
+                console.error(`Vaccine type ID not found for ${vaccineName}`);
+                return null;
+              }
+
               return {
-                vaccineType: vaccineName,
-                doseNumber: scheduleDose.dose,
+                vaccineTypeId: vaccineTypeId,
+                doseNumber: scheduleDose.doseNumber,
                 dateGiven: dose.date,
                 remarks: dose.remarks || null,
+                type: scheduleDose.isBooster ? 'booster' : 'current'
               };
             })
-        );
+        ).filter(vac => vac !== null); // Remove any null entries
 
-      // Extract administeredById from the form data
       const administeredById = data.administeredById;
 
       let payload = {};
 
       if (isFullProfile) {
-        // Full access - same ward
         payload = {
           weightRecords: filteredWeightRecords,
           vaccinations: filteredVaccinations,
@@ -749,22 +711,16 @@ export default function EditChild() {
           isFromOtherMunicipality: data.isFromOtherMunicipality,
         };
       } else {
-        // Partial access - different ward (ONLY send allowed fields)
         payload = {
           weightRecords: filteredWeightRecords,
           vaccinations: filteredVaccinations,
           administeredById: parseInt(administeredById),
           remarks: data.remarks || null,
-          // DO NOT include any demographic fields for cross-ward updates
         };
       }
 
-      console.log('Submitting payload:', JSON.stringify(payload, null, 2));
-
-      const res = await axiosClient.put(
-        `/api/child/${fetchedChild.sewaDartaNumber}`,
-        payload
-      );
+      const res = await axiosClient.put(`/api/child/${fetchedChild.sewaDartaNumber}`, payload);
+      console.log('payload sent for update:', payload);
       updateChildInState(res.data);
       toast.success(t('toast.update_success'));
     } catch (err) {
@@ -772,7 +728,6 @@ export default function EditChild() {
       toast.error(t('toast.error'));
     }
   };
-
 
   const onErrors = (errors) => {
     console.log('Validation errors:', errors);
@@ -782,9 +737,8 @@ export default function EditChild() {
 
   const age = calculateAge(birthDate);
 
-  // Categorize vaccines based on age and gender
   const categorizedVaccines = useMemo(() => {
-    if (!birthDate || !gender) {
+    if (!birthDate || !gender || !vaccineSchedule || loading) {
       return {
         CURRENT: {
           vaccines: [],
@@ -810,7 +764,7 @@ export default function EditChild() {
       };
     }
     return categorizeVaccines(vaccineSchedule, age, gender);
-  }, [age, gender, birthDate]);
+  }, [birthDate, gender, vaccineSchedule, loading]);
 
   const totalVaccines = Object.values(categorizedVaccines).reduce(
     (sum, cat) => sum + cat.count,
@@ -819,17 +773,24 @@ export default function EditChild() {
   const totalResults = Array.isArray(searchResults) ? searchResults.length : 0;
   const totalPages = Math.ceil(totalResults / resultsPerPage);
   const paginatedResults = Array.isArray(searchResults)
-    ? searchResults.slice(
-      (currentPage - 1) * resultsPerPage,
-      currentPage * resultsPerPage
-    )
+    ? searchResults.slice((currentPage - 1) * resultsPerPage, currentPage * resultsPerPage)
     : [];
 
+  // Early return for loading state
+  if (loading || !vaccineSchedule) {
+    return (
+      <div className="min-h-screen bg-base-200 flex items-center justify-center">
+        <div className="text-center">
+          <span className="loading loading-spinner loading-lg text-primary"></span>
+          <p className="mt-4 text-base-content/70">Loading vaccine schedule...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-base-200">
       <ToastContainer position="top-right" autoClose={3000} />
-
       {/* Header */}
       <div className="bg-base-100 border-b border-base-300 sticky top-0 z-50 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 py-5">
@@ -859,7 +820,6 @@ export default function EditChild() {
           </div>
         </div>
       </div>
-
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-6 py-8">
         {showSearchSection ? (
@@ -872,9 +832,6 @@ export default function EditChild() {
                 </h2>
               </div>
             </div>
-
-            {/* Search Input and Filters */}
-            {/* Search Input for Name */}
             <div className="form-control w-full mb-4">
               <label className="label">
                 <span className="label-text font-medium">नाम</span>
@@ -882,15 +839,11 @@ export default function EditChild() {
               <input
                 type="text"
                 value={filters.name}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, name: e.target.value }))
-                }
+                onChange={(e) => setFilters((prev) => ({ ...prev, name: e.target.value }))}
                 className="input input-bordered w-full"
                 placeholder="नाम..."
               />
             </div>
-
-            {/* Search Input for Service Registration Number */}
             <div className="form-control w-full mb-4">
               <label className="label">
                 <span className="label-text font-medium">सेवा दर्ता नं.</span>
@@ -898,18 +851,11 @@ export default function EditChild() {
               <input
                 type="text"
                 value={filters.serviceRegistrationNumber}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    serviceRegistrationNumber: e.target.value,
-                  }))
-                }
+                onChange={(e) => setFilters((prev) => ({ ...prev, serviceRegistrationNumber: e.target.value }))}
                 className="input input-bordered w-full"
                 placeholder="सेवा दर्ता नम्बर..."
               />
             </div>
-
-            {/* Search Input for Phone Number */}
             <div className="form-control w-full mb-6">
               <label className="label">
                 <span className="label-text font-medium">फोन नम्बर</span>
@@ -917,204 +863,144 @@ export default function EditChild() {
               <input
                 type="text"
                 value={filters.phoneNumber}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, phoneNumber: e.target.value }))
-                }
+                onChange={(e) => setFilters((prev) => ({ ...prev, phoneNumber: e.target.value }))}
                 className="input input-bordered w-full"
                 placeholder="फोन नम्बर..."
               />
             </div>
-
-            {/* Filters */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-              {/* Ward Filter */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text">वडा नं.</span>
                 </label>
                 <select
                   value={filters.wardNumber}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      wardNumber: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setFilters((prev) => ({ ...prev, wardNumber: e.target.value }))}
                   className="select select-bordered w-full"
                 >
-                  <option value="">सबै वडा</option>
-                  {[...Array(15)].map((_, i) => (
+                  <option value="">सबै</option>
+                  {[...Array(13)].map((_, i) => (
                     <option key={i + 1} value={i + 1}>
-                      वडा नं. {i + 1}
+                      {i + 1}
                     </option>
                   ))}
                 </select>
               </div>
-
-              {/* Gender Filter */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text">लिङ्ग</span>
                 </label>
                 <select
                   value={filters.gender}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      gender: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setFilters((prev) => ({ ...prev, gender: e.target.value }))}
                   className="select select-bordered w-full"
                 >
                   <option value="">सबै</option>
-                  <option value="MALE">छात्र</option>
-                  <option value="FEMALE">छात्रा</option>
+                  <option value="MALE">पुरुष</option>
+                  <option value="FEMALE">महिला</option>
                   <option value="OTHER">अन्य</option>
                 </select>
               </div>
-
-              {/* Created By Me Filter */}
-              <div className="form-control">
-                <label className="label cursor-pointer justify-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={filters.createdByMe}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        createdByMe: e.target.checked,
-                      }))
-                    }
-                    className="checkbox checkbox-primary"
-                  />
-                  <span className="label-text">मैले दर्ता गरेको</span>
-                </label>
-              </div>
-
-              {/* Complete Vaccination Filter */}
-              <div className="form-control">
-                <label className="label cursor-pointer justify-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={filters.isComplete}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        isComplete: e.target.checked,
-                      }))
-                    }
-                    className="checkbox checkbox-primary"
-                  />
-                  <span className="label-text">पूर्ण खोप लगाएको</span>
-                </label>
+              <div className="form-control flex-row items-center space-x-4">
+                <div className="form-control">
+                  <label className="label cursor-pointer flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={filters.createdByMe}
+                      onChange={(e) => setFilters((prev) => ({ ...prev, createdByMe: e.target.checked }))}
+                      className="checkbox checkbox-primary"
+                    />
+                    <span className="label-text ml-2">मैले दर्ता गरेको</span>
+                  </label>
+                </div>
+                <div className="form-control">
+                  <label className="label cursor-pointer flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={filters.isComplete}
+                      onChange={(e) => setFilters((prev) => ({ ...prev, isComplete: e.target.checked }))}
+                      className="checkbox checkbox-primary"
+                    />
+                    <span className="label-text ml-2">पूर्ण विवरण</span>
+                  </label>
+                </div>
               </div>
             </div>
-
-            {/* Results Section */}
-            {!isLoading && (
+            {isLoading ? (
+              <div className="text-center py-12">
+                <span className="loading loading-spinner loading-lg text-primary"></span>
+              </div>
+            ) : paginatedResults.length > 0 ? (
               <>
-                {totalResults > 0 ? (
-                  <>
-                    <div className="text-sm text-base-content/70 mb-4">
-                      कुल नतिजाहरू: {totalResults}
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="table table-zebra w-full">
-                        <thead>
-                          <tr>
-                            <th>सेवा दर्ता नं.</th>
-                            <th>नाम</th>
-                            <th>वडा नं.</th>
-                            <th>लिङ्ग</th>
-                            <th>जन्म मिति</th>
-                            <th>कार्य</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {paginatedResults.map((child) => (
-                            <tr key={child.id}>
-                              <td>{child.sewaDartaNumber}</td>
-                              <td>{child.fullName}</td>
-                              <td>{child.wardNumber}</td>
-                              <td>
-                                {child.gender === 'MALE'
-                                  ? 'छात्र'
-                                  : child.gender === 'FEMALE'
-                                    ? 'छात्रा'
-                                    : 'अन्य'}
-                              </td>
-                              <td>{adToBs(safeFormatDateYYMMDD(child.birthDate))}</td>
-                              <td>
-                                <button
-                                  className="btn btn-sm btn-primary"
-                                  onClick={() => handleChildSelect(child)}
-                                >
-                                  छान्नुहोस्
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Pagination controls */}
-                    {totalPages > 1 && (
-                      <div className="flex justify-center gap-2 mt-4">
-                        <button
-                          className="btn btn-outline btn-sm"
-                          onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                          disabled={currentPage === 1}
-                        >
-                          पछिल्लो
-                        </button>
-                        <span className="self-center">
-                          {currentPage} / {totalPages}
-                        </span>
-                        <button
-                          className="btn btn-outline btn-sm"
-                          onClick={() =>
-                            setCurrentPage((p) => Math.min(p + 1, totalPages))
-                          }
-                          disabled={currentPage === totalPages}
-                        >
-                          अर्को
-                        </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-base-content/70">कुनै नतिजा फेला परेन</p>
+                <div className="overflow-x-auto">
+                  <table className="table w-full table-zebra">
+                    <thead>
+                      <tr>
+                        <th>सेवा दर्ता नं.</th>
+                        <th>नाम</th>
+                        <th>लिङ्ग</th>
+                        <th>जन्म मिति</th>
+                        <th>वडा नं.</th>
+                        <th>क्रियाहरू</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedResults.map((child) => (
+                        <tr key={child.sewaDartaNumber}>
+                          <td>{child.sewaDartaNumber}</td>
+                          <td>{child.fullName}</td>
+                          <td>
+                            {child.gender === 'MALE' ? 'पुरुष' : child.gender === 'FEMALE' ? 'महिला' : 'अन्य'}
+                          </td>
+                          <td>{adToBs(safeFormatDateYYMMDD(child.birthDate))}</td>
+                          <td>{child.wardNumber}</td>
+                          <td>
+                            <button
+                              onClick={() => handleChildSelect(child)}
+                              className="btn btn-primary btn-sm"
+                            >
+                              छान्नुहोस्
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-center mt-6">
+                  <div className="join">
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <button
+                        key={i}
+                        className={`join-item btn ${currentPage === i + 1 ? 'btn-active' : ''}`}
+                        onClick={() => setCurrentPage(i + 1)}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
               </>
+            ) : (
+              <div className="text-center py-12">
+                <FaInfoCircle className="text-6xl text-base-content/40 mx-auto mb-4" />
+                <p className="text-base-content/70">कुनै बच्चा फेला परेन</p>
+              </div>
             )}
-
           </div>
         ) : (
-          // Main form section - only show if a child is selected
-          <div className="max-w-6xl mx-auto px-6 py-8">
+          <>
             {isLoading ? (
-              <div className="flex justify-center items-center h-96">
+              <div className="text-center py-12">
                 <span className="loading loading-spinner loading-lg text-primary"></span>
+                <p className="mt-4 text-base-content/70">बच्चाको विवरण लोड हुँदैछ...</p>
               </div>
             ) : fetchedChild ? (
               <div className="bg-base-100 shadow-sm rounded-xl border border-base-300 min-w-[20rem]">
-                {/* Warning for cross-ward profiles */}
-                {!isFullProfile && (
-                  <div className="p-4 bg-warning/10 border-b border-warning/20 text-warning rounded-t-xl text-center">
-                    <FaExclamationTriangle className="inline-block mr-2 text-xl" />
-                    <span className='font-medium'>
-                      यो बच्चा अर्को वडाबाट दर्ता भएको हुनाले, तपाईंले खोप र तौल सम्बन्धी जानकारी मात्रै सम्पादन गर्न सक्नुहुन्छ।
-                    </span>
-                  </div>
-                )}
                 <form
                   onSubmit={handleSubmit(onSubmit, onErrors)}
                   className="p-8 space-y-12"
                 >
-                  {/* Personal Information */}
                   <div>
                     <div className="flex items-center mb-8">
                       <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mr-3">
@@ -1124,11 +1010,8 @@ export default function EditChild() {
                         {t('personalInfo.title')}
                       </h2>
                     </div>
-
-                    {/* Show read-only info for limited profile, full form for full profile */}
                     {isFullProfile ? (
                       <>
-                        {/* Municipality Checkbox */}
                         <div className="mb-8 p-4 bg-info/10 border border-info/20 rounded-lg">
                           <div className="flex items-center">
                             <Controller
@@ -1156,14 +1039,12 @@ export default function EditChild() {
                           <div>
                             <label className="label">
                               <span className="label-text text-base font-medium">
-                                {t('personalInfo.form.firstName.label')}{' '}
-                                <span className="text-error">*</span>
+                                {t('personalInfo.form.firstName.label')} <span className="text-error">*</span>
                               </span>
                             </label>
                             <input
                               {...register('firstName')}
-                              className={`input input-bordered w-full ${errors.firstName ? 'input-error' : ''
-                                }`}
+                              className={`input input-bordered w-full ${errors.firstName ? 'input-error' : ''}`}
                               placeholder={t('personalInfo.form.firstName.placeholder')}
                             />
                             {errors.firstName && (
@@ -1172,7 +1053,6 @@ export default function EditChild() {
                               </p>
                             )}
                           </div>
-
                           <div>
                             <label className="label">
                               <span className="label-text text-base font-medium">
@@ -1190,31 +1070,20 @@ export default function EditChild() {
                               </p>
                             )}
                           </div>
-
                           <div>
                             <label className="label">
                               <span className="label-text text-base font-medium">
-                                {t('personalInfo.form.gender.label')}{' '}
-                                <span className="text-error">*</span>
+                                {t('personalInfo.form.gender.label')} <span className="text-error">*</span>
                               </span>
                             </label>
                             <select
                               {...register('gender')}
-                              className={`select select-bordered w-full ${errors.gender ? 'select-error' : ''
-                                }`}
+                              className={`select select-bordered w-full ${errors.gender ? 'select-error' : ''}`}
                             >
-                              <option value="">
-                                {t('personalInfo.form.gender.placeholder')}
-                              </option>
-                              <option value="MALE">
-                                {t('personalInfo.form.gender.options.male')}
-                              </option>
-                              <option value="FEMALE">
-                                {t('personalInfo.form.gender.options.female')}
-                              </option>
-                              <option value="OTHER">
-                                {t('personalInfo.form.gender.options.other')}
-                              </option>
+                              <option value="">{t('personalInfo.form.gender.placeholder')}</option>
+                              <option value="MALE">{t('personalInfo.form.gender.options.male')}</option>
+                              <option value="FEMALE">{t('personalInfo.form.gender.options.female')}</option>
+                              <option value="OTHER">{t('personalInfo.form.gender.options.other')}</option>
                             </select>
                             {errors.gender && (
                               <p className="text-error text-sm mt-1">
@@ -1222,21 +1091,16 @@ export default function EditChild() {
                               </p>
                             )}
                           </div>
-
                           <div>
                             <label className="label">
                               <span className="label-text text-base font-medium">
-                                {t('personalInfo.form.wardNumber.label')}{' '}
-                                <span className="text-error">*</span>
+                                {t('personalInfo.form.wardNumber.label')} <span className="text-error">*</span>
                               </span>
                             </label>
                             <input
                               {...register('wardNumber')}
-                              className={`input input-bordered w-full ${errors.wardNumber ? 'input-error' : ''
-                                }`}
-                              placeholder={t(
-                                'personalInfo.form.wardNumber.placeholder'
-                              )}
+                              className={`input input-bordered w-full ${errors.wardNumber ? 'input-error' : ''}`}
+                              placeholder={t('personalInfo.form.wardNumber.placeholder')}
                             />
                             {errors.wardNumber && (
                               <p className="text-error text-sm mt-1">
@@ -1244,19 +1108,16 @@ export default function EditChild() {
                               </p>
                             )}
                           </div>
-
                           <div>
                             <label className="label">
                               <span className="label-text text-base font-medium">
-                                {t('personalInfo.form.casteCode.label')}{' '}
-                                <span className="text-error">*</span>
+                                {t('personalInfo.form.casteCode.label')} <span className="text-error">*</span>
                               </span>
                             </label>
                             <input
                               type="number"
                               {...register('casteCode')}
-                              className={`input input-bordered w-full ${errors.casteCode ? 'input-error' : ''
-                                }`}
+                              className={`input input-bordered w-full ${errors.casteCode ? 'input-error' : ''}`}
                               placeholder={t('personalInfo.form.casteCode.placeholder')}
                             />
                             {errors.casteCode && (
@@ -1265,21 +1126,16 @@ export default function EditChild() {
                               </p>
                             )}
                           </div>
-
                           <div>
                             <label className="label">
                               <span className="label-text text-base font-medium">
-                                {t('personalInfo.form.parentName.label')}{' '}
-                                <span className="text-error">*</span>
+                                {t('personalInfo.form.parentName.label')} <span className="text-error">*</span>
                               </span>
                             </label>
                             <input
                               {...register('parentName')}
-                              className={`input input-bordered w-full ${errors.parentName ? 'input-error' : ''
-                                }`}
-                              placeholder={t(
-                                'personalInfo.form.parentName.placeholder'
-                              )}
+                              className={`input input-bordered w-full ${errors.parentName ? 'input-error' : ''}`}
+                              placeholder={t('personalInfo.form.parentName.placeholder')}
                             />
                             {errors.parentName && (
                               <p className="text-error text-sm mt-1">
@@ -1287,18 +1143,15 @@ export default function EditChild() {
                               </p>
                             )}
                           </div>
-
                           <div>
                             <label className="label">
                               <span className="label-text text-base font-medium">
-                                {t('personalInfo.form.tole.label')}{' '}
-                                <span className="text-error">*</span>
+                                {t('personalInfo.form.tole.label')} <span className="text-error">*</span>
                               </span>
                             </label>
                             <input
                               {...register('tole')}
-                              className={`input input-bordered w-full ${errors.tole ? 'input-error' : ''
-                                }`}
+                              className={`input input-bordered w-full ${errors.tole ? 'input-error' : ''}`}
                               placeholder={t('personalInfo.form.tole.placeholder')}
                             />
                             {errors.tole && (
@@ -1307,7 +1160,6 @@ export default function EditChild() {
                               </p>
                             )}
                           </div>
-
                           <div>
                             <label className="label">
                               <span className="label-text text-base font-medium">
@@ -1317,9 +1169,7 @@ export default function EditChild() {
                             <input
                               {...register('phoneNumber')}
                               className="input input-bordered w-full"
-                              placeholder={t(
-                                'personalInfo.form.phoneNumber.placeholder'
-                              )}
+                              placeholder={t('personalInfo.form.phoneNumber.placeholder')}
                             />
                             {errors.phoneNumber && (
                               <p className="text-error text-sm mt-1">
@@ -1327,12 +1177,10 @@ export default function EditChild() {
                               </p>
                             )}
                           </div>
-
                           <div>
                             <label className="label">
                               <span className="label-text text-base font-medium">
-                                {t('personalInfo.form.birthDate.label')}{' '}
-                                <span className="text-error">*</span>
+                                {t('personalInfo.form.birthDate.label')} <span className="text-error">*</span>
                               </span>
                             </label>
                             <div className="relative">
@@ -1343,8 +1191,7 @@ export default function EditChild() {
                                   <>
                                     <NepaliDatePicker
                                       className="w-full"
-                                      inputClassName={`input input-bordered w-full pr-10 ${errors.birthDate ? 'input-error' : ''
-                                        }`}
+                                      inputClassName={`input input-bordered w-full pr-10 ${errors.birthDate ? 'input-error' : ''}`}
                                       value={field.value || ''}
                                       onChange={(value) => field.onChange(value)}
                                       language="ne"
@@ -1355,9 +1202,7 @@ export default function EditChild() {
                                         type="button"
                                         onClick={() => setValue('birthDate', '')}
                                         className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/50 hover:text-error transition-colors"
-                                        title={t(
-                                          'personalInfo.form.birthDate.clear_title'
-                                        )}
+                                        title={t('personalInfo.form.birthDate.clear_title')}
                                       >
                                         ✕
                                       </button>
@@ -1374,10 +1219,7 @@ export default function EditChild() {
                             {birthDate && (
                               <div className="mt-3 p-3 bg-success/10 rounded-lg border border-success/20">
                                 <div className="text-base text-success font-medium">
-                                  {t('personalInfo.age', {
-                                    months: age.months || 0,
-                                    days: age.days || 0
-                                  })}
+                                  {t('personalInfo.age', { months: age.months || 0, days: age.days || 0 })}
                                 </div>
                               </div>
                             )}
@@ -1385,7 +1227,6 @@ export default function EditChild() {
                         </div>
                       </>
                     ) : (
-                      // Read-only view for limited profiles
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div className="form-control">
                           <label className="label"><span className="label-text font-medium">सेवा दर्ता नं.</span></label>
@@ -1421,28 +1262,20 @@ export default function EditChild() {
                         </div>
                       </div>
                     )}
-
-                    {/* Administered By Section */}
                     <div className="mt-8">
                       <label className="label">
                         <span className="label-text text-base font-medium">
-                          {t('personalInfo.administered_by.label')}{' '}
-                          <span className="text-error">*</span>
+                          {t('personalInfo.administered_by.label')} <span className="text-error">*</span>
                         </span>
                       </label>
                       <select
                         {...register('administeredById')}
-                        className={`select select-bordered w-full max-w-xs ${errors.administeredById ? 'select-error' : ''
-                          }`}
+                        className={`select select-bordered w-full max-w-xs ${errors.administeredById ? 'select-error' : ''}`}
                         defaultValue=""
                       >
-                        <option value="" disabled>
-                          {t('personalInfo.administered_by.placeholder')}
-                        </option>
+                        <option value="" disabled>{t('personalInfo.administered_by.placeholder')}</option>
                         {healthWorkers.map((worker) => (
-                          <option key={worker.id} value={worker.id}>
-                            {worker.name}
-                          </option>
+                          <option key={worker.id} value={worker.id}>{worker.name}</option>
                         ))}
                       </select>
                       {errors.administeredById && (
@@ -1452,8 +1285,6 @@ export default function EditChild() {
                       )}
                     </div>
                   </div>
-
-                  {/* Weight Tracking */}
                   <div className="border-t border-base-300 pt-12">
                     <div className="flex items-center mb-8">
                       <div className="w-8 h-8 bg-warning/10 rounded-lg flex items-center justify-center mr-3">
@@ -1463,14 +1294,12 @@ export default function EditChild() {
                         {t('weightTracking.title')}
                       </h2>
                     </div>
-
                     <div className="space-y-6">
                       {fields.map((field, index) => (
                         <div
                           key={field.id}
                           className="p-6 bg-base-200 rounded-lg border border-base-300"
                         >
-                          {/* Hidden input to preserve the DB id */}
                           <input
                             type="hidden"
                             {...register(`weightRecords.${index}.dbId`)}
@@ -1480,9 +1309,7 @@ export default function EditChild() {
                             <div>
                               <label className="label">
                                 <span className="label-text text-base font-medium">
-                                  {t('weightTracking.date_label', {
-                                    index: index + 1,
-                                  })}
+                                  {t('weightTracking.date_label', { index: index + 1 })}
                                 </span>
                               </label>
                               <Controller
@@ -1505,7 +1332,6 @@ export default function EditChild() {
                                 </p>
                               )}
                             </div>
-
                             <div>
                               <label className="label">
                                 <span className="label-text text-base font-medium">
@@ -1516,18 +1342,8 @@ export default function EditChild() {
                                 type="number"
                                 step="0.1"
                                 {...register(`weightRecords.${index}.weight`, {
-                                  min: {
-                                    value: 0,
-                                    message: t(
-                                      'weightTracking.errors.weight_positive'
-                                    ),
-                                  },
-                                  max: {
-                                    value: 50,
-                                    message: t(
-                                      'weightTracking.errors.weight_too_large'
-                                    ),
-                                  },
+                                  min: { value: 0, message: t('weightTracking.errors.weight_positive') },
+                                  max: { value: 50, message: t('weightTracking.errors.weight_too_large') },
                                 })}
                                 className="input input-bordered w-full"
                                 placeholder={t('weightTracking.weight_label')}
@@ -1538,7 +1354,6 @@ export default function EditChild() {
                                 </p>
                               )}
                             </div>
-
                             <div className="flex space-x-3">
                               {fields.length > 1 && (
                                 <button
@@ -1564,7 +1379,6 @@ export default function EditChild() {
                           </div>
                         </div>
                       ))}
-
                       {fields.length === 0 && (
                         <div className="text-center py-12">
                           <button
@@ -1579,8 +1393,6 @@ export default function EditChild() {
                       )}
                     </div>
                   </div>
-
-                  {/* Enhanced Vaccines Section */}
                   <div className="border-t border-base-300 pt-12">
                     <div className="flex items-center justify-between mb-8">
                       <div className="flex items-center">
@@ -1591,121 +1403,81 @@ export default function EditChild() {
                           <h2 className="text-xl font-medium text-base-content">
                             {t('vaccine_section.title')}
                           </h2>
-                          {age.months >= 0 && birthDate && gender && (
+                          {age.months >= 0 && birthDate && (
                             <p className="text-sm text-base-content/70">
-                              {t('vaccine_section.age_gender', {
-                                months: age.months,
-                                days: age.days % 30,
-                                gender: t(
-                                  `personalInfo.form.gender.options.${gender.toLowerCase()}`
-                                ),
-                              })}
+                              बच्चाको उमेर: {age.months} महिना, {age.days} दिन
                             </p>
                           )}
+
                         </div>
                       </div>
                       {birthDate && gender && (
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-primary">
-                            {totalVaccines}
-                          </div>
-                          <div className="text-sm text-base-content/70">
-                            {t('vaccine_section.total_vaccines')}
-                          </div>
+                          <div className="text-2xl font-bold text-primary">{totalVaccines}</div>
+                          <div className="text-sm text-base-content/70">{t('vaccine_section.total_vaccines')}</div>
                         </div>
                       )}
                     </div>
-
-                    {/* Show message if birth date or gender not selected */}
                     {(!birthDate || !gender) && (
                       <div className="text-center py-12 bg-base-200 rounded-lg border-2 border-dashed border-base-300">
                         <FaInfoCircle className="text-4xl text-base-content/40 mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-base-content/60 mb-2">
                           {t('vaccine_section.unavailable.title')}
                         </h3>
-                        <p className="text-base-content/50">
-                          {t('vaccine_section.unavailable.description')}
-                        </p>
+                        <p className="text-base-content/50">{t('vaccine_section.unavailable.description')}</p>
                       </div>
                     )}
-
-                    {/* Vaccine Tabs */}
                     {birthDate && gender && (
                       <>
                         <div className="tabs tabs-boxed mb-6">
-                          {Object.entries(categorizedVaccines).map(
-                            ([sectionKey, sectionData]) => {
-                              if (
-                                sectionData.count > 0 ||
-                                sectionKey === 'NOT_APPLICABLE'
-                              ) {
-                                const IconComponent = sectionData.icon;
-                                return (
-                                  <button
-                                    key={sectionKey}
-                                    type="button"
-                                    onClick={() => setActiveTab(sectionKey)}
-                                    className={`tab flex items-center gap-2 ${activeTab === sectionKey ? 'tab-active' : ''
-                                      }`}
-                                  >
-                                    <IconComponent
-                                      className={`text-xl ${sectionData.color}`}
-                                    />
-                                    {t(
-                                      `vaccine_section.tabs.${sectionKey.toLowerCase()}`,
-                                      { count: sectionData.count }
-                                    )}
-                                  </button>
-                                );
-                              }
-                              return null;
+                          {Object.entries(categorizedVaccines).map(([sectionKey, sectionData]) => {
+                            if (sectionData.count > 0 || sectionKey === 'NOT_APPLICABLE') {
+                              const IconComponent = sectionData.icon;
+                              return (
+                                <button
+                                  key={sectionKey}
+                                  type="button"
+                                  onClick={() => setActiveTab(sectionKey)}
+                                  className={`tab flex items-center gap-2 ${activeTab === sectionKey ? 'tab-active' : ''}`}
+                                >
+                                  <IconComponent className={`text-xl ${sectionData.color}`} />
+                                  {t(`vaccine_section.tabs.${sectionKey.toLowerCase()}`, { count: sectionData.count })}
+                                </button>
+                              );
                             }
-                          )}
+                            return null;
+                          })}
                         </div>
-                        {Object.entries(categorizedVaccines).map(
-                          ([sectionKey, sectionData]) =>
-                            activeTab === sectionKey && (
-                              <VaccineSection
-                                key={sectionKey}
-                                sectionKey={sectionKey}
-                                sectionData={sectionData}
-                                expandedSections={expandedSections}
-                                toggleSection={(section) =>
-                                  setExpandedSections((prev) => ({
-                                    ...prev,
-                                    [section]: !prev[section],
-                                  }))
-                                }
-                                control={control}
-                                register={register}
-                                setValue={setValue}
-                                showRemarks={showRemarks}
-                                toggleRemarks={toggleRemarks}
-                                theme={theme}
-                                t={t}
-                              />
-                            )
-                        )}
+                        {Object.entries(categorizedVaccines).map(([sectionKey, sectionData]) => (
+                          activeTab === sectionKey && (
+                            <VaccineSection
+                              key={sectionKey}
+                              sectionKey={sectionKey}
+                              sectionData={sectionData}
+                              expandedSections={expandedSections}
+                              toggleSection={toggleSection}
+                              control={control}
+                              register={register}
+                              setValue={setValue}
+                              showRemarks={showRemarks}
+                              toggleRemarks={toggleRemarks}
+                              theme={theme}
+                              t={t}
+                            />
+                          )
+                        ))}
                       </>
                     )}
-
-                    {/* Summary for completed vaccines */}
-                    {birthDate &&
-                      gender &&
-                      categorizedVaccines.CURRENT.count === 0 && (
-                        <div className="text-center py-8 mt-8 bg-green-50 border border-green-200 rounded-lg">
-                          <div className="text-6xl mb-4">🎉</div>
-                          <h3 className="text-xl font-semibold text-green-600 mb-2">
-                            {t('vaccine_section.all_up_to_date.title')}
-                          </h3>
-                          <p className="text-base-content/70">
-                            {t('vaccine_section.all_up_to_date.description')}
-                          </p>
-                        </div>
-                      )}
+                    {birthDate && gender && categorizedVaccines.CURRENT.count === 0 && (
+                      <div className="text-center py-8 mt-8 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="text-6xl mb-4">🎉</div>
+                        <h3 className="text-xl font-semibold text-green-600 mb-2">
+                          {t('vaccine_section.all_up_to_date.title')}
+                        </h3>
+                        <p className="text-base-content/70">{t('vaccine_section.all_up_to_date.description')}</p>
+                      </div>
+                    )}
                   </div>
-
-                  {/* General Remarks */}
                   <div className="border-t border-base-300 pt-12">
                     <div className="flex items-center mb-8">
                       <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center mr-3">
@@ -1715,7 +1487,6 @@ export default function EditChild() {
                         {t('generalRemarks.title')}
                       </h2>
                     </div>
-
                     <div>
                       <label className="label">
                         <span className="label-text text-base font-medium">
@@ -1733,8 +1504,6 @@ export default function EditChild() {
                       </p>
                     </div>
                   </div>
-
-                  {/* Submit Section */}
                   <div className="border-t border-base-300 pt-12">
                     <div className="flex flex-col sm:flex-row gap-6 justify-between items-center">
                       <div>
@@ -1745,7 +1514,6 @@ export default function EditChild() {
                           {t('submitSection.description')}
                         </p>
                       </div>
-
                       <div className="flex space-x-4">
                         <button
                           type="button"
@@ -1763,27 +1531,15 @@ export default function EditChild() {
                           }}
                           className="btn btn-outline btn-neutral"
                         >
-                          <svg
-                            className="w-5 h-5 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                            />
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                           </svg>
                           {t('submitSection.reset_button')}
                         </button>
-
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className={`btn btn-primary ${isSubmitting ? 'loading' : ''
-                            }`}
+                          className={`btn btn-primary ${isSubmitting ? 'loading' : ''}`}
                         >
                           {isSubmitting ? (
                             <>
@@ -1792,18 +1548,8 @@ export default function EditChild() {
                             </>
                           ) : (
                             <>
-                              <svg
-                                className="w-5 h-5 mr-2"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M5 13l4 4L19 7"
-                                />
+                              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
                               {t('submitSection.save_button')}
                             </>
@@ -1815,7 +1561,6 @@ export default function EditChild() {
                 </form>
               </div>
             ) : (
-              // Show a message if no child is selected yet
               <div className="bg-base-100 shadow-sm rounded-xl border border-base-300 p-4 mb-8">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-4">
@@ -1847,29 +1592,17 @@ export default function EditChild() {
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
-
-      {/* Scroll to Top Button */}
       <button
         type="button"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         className="fixed bottom-8 right-8 btn btn-primary btn-circle shadow-lg"
         title={t('scrollToTop.title')}
       >
-        <svg
-          className="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M5 10l7-7m0 0l7 7m-7-7v18"
-          />
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
         </svg>
       </button>
     </div>

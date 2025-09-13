@@ -544,30 +544,30 @@ async function prepareVaccinationUpdateData(childId, vaccinations, administeredB
 
   const scheduleVersion = await getLatestSchedule();
 
-  // Build vaccine name -> ID map
-  const vaccineNames = vaccinations.map((v) => v.vaccineType);
-  const vaccineNameToIdMap = await mapVaccineNamesToIds(vaccineNames);
+  return vaccinations
+    .filter((v) => v.vaccineTypeId && v.doseNumber && v.dateGiven) // Ensure required fields exist
+    .map((v) => {
+      // Find the scheduled dose in the vaccine schedule
+      const scheduledDose = scheduleVersion.doses.find(
+        (d) => d.vaccineTypeId === v.vaccineTypeId && d.doseNumber === v.doseNumber
+      );
 
-  return vaccinations.flatMap((v) => {
-    const vaccineTypeId = vaccineNameToIdMap[v.vaccineType];
-    if (!vaccineTypeId) return []; // skip unknown vaccines
+      if (!scheduledDose) {
+        console.warn(`Invalid dose: vaccineTypeId=${v.vaccineTypeId}, doseNumber=${v.doseNumber}`);
+        return null; // Skip invalid doses
+      }
 
-    const schedule = scheduleVersion.doses
-      .filter((d) => d.vaccineTypeId === vaccineTypeId)
-      .sort((a, b) => a.doseNumber - b.doseNumber);
-
-    const scheduledDose = schedule.find((d) => d.doseNumber === v.doseNumber);
-    if (!scheduledDose) return []; // skip invalid doseNumber
-
-    return {
-      ...v,
-      vaccineTypeId,
-      citizenId: childId,
-      dateGiven: v.dateGiven ? parseBsDateString(v.dateGiven) : null,
-      administeredById,
-      createdById: v.id ? undefined : v.createdById, // for new records
-    };
-  }).filter(Boolean);
+      return {
+        vaccineTypeId: v.vaccineTypeId,
+        doseNumber: v.doseNumber,
+        dateGiven: parseBsDateString(v.dateGiven),
+        remarks: v.remarks || null,
+        citizenId: childId,
+        administeredById,
+        createdById: v.id ? undefined : administeredById, // Use administeredById for new records
+      };
+    })
+    .filter(Boolean); // Remove null entries
 }
 
 // --- Controller ---

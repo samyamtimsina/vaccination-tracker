@@ -23,7 +23,6 @@ export const VaccineScheduleProvider = ({ children }) => {
                 }, {});
 
                 setvaccineSchedule({ doses: dosesByVaccine });
-                console.log('vaccineschedule from context', vaccineSchedule)
                 setLoading(false);
             } catch (err) {
                 console.error('Failed to fetch vaccine schedule', err);
