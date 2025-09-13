@@ -64,7 +64,7 @@
         "required": "Birth date is required."
       }
     },
-    "age": "Child age: {{months}} months, {{days}} days | Gender: {{gender}}",
+    "age": "Child age: {{months}} months, {{days}} days ",
     "administered_by": {
       "label": "Administered by",
       "placeholder": "Select health worker",
@@ -86,7 +86,7 @@
   },
   "vaccine_section": {
     "title": "Vaccination Schedule",
-    "age_gender": "Child age: {{months}} months, {{days}} days | Gender: {{gender}}",
+    "age_gender": "Child age: {{months}} months, {{days}} days ",
     "total_vaccines": "Total Vaccines",
     "unavailable": {
       "title": "Vaccine Schedule Not Available",

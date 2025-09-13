@@ -86,7 +86,7 @@
   },
   "vaccine_section": {
     "title": "खोप तालिका",
-    "age_gender": "बच्चाको उमेर: {{months}} महिना, {{days}} दिन | लिङ्ग: {{gender}}",
+    "age_gender": "बच्चाको उमेर: {{months}} महिना, {{days}} दिन ",
     "total_vaccines": "कुल खोप",
     "unavailable": {
       "title": "खोप तालिका उपलब्ध छैन",
