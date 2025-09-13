@@ -906,16 +906,13 @@ export default function AddChild() {
                           </span>
                         </label>
                         <input
-                          type="number"
-                          step="0.1"
+                          type="text"  // instead of "number"
                           {...register(`weightRecords.${index}.weight`, {
-                            min: {
-                              value: 0,
-                              message: t('weightTracking.errors.weight_positive'),
-                            },
-                            max: {
-                              value: 50,
-                              message: t('weightTracking.errors.weight_too_large'),
+                            validate: (val) => {
+                              if (val === "" || !/^\d+(\.\d{1,2})?$/.test(val)) {
+                                return "Enter a valid weight (up to 2 decimals)";
+                              }
+                              return true;
                             },
                           })}
                           className="input input-bordered w-full"
