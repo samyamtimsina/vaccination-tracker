@@ -145,7 +145,7 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
       return {
         doseIndex: index,
         dose: dose.doseNumber, // Use doseNumber instead of dose
-        doseInfo: dose,
+        doseInfo: dose``,
         ...statusInfo,
         doseType: dose.isBooster ? 'booster' : 'current'
       };

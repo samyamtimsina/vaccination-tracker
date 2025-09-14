@@ -1,15 +1,18 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import axiosClient from '../api/axiosClient';
+import { useAuth } from './AuthContext';
 
 
 export const VaccineScheduleContext = createContext();
 
 export const VaccineScheduleProvider = ({ children }) => {
+    const { isAuthenticated } = useAuth();
     const [vaccineSchedule, setvaccineSchedule] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function fetchSchedule() {
+            if (!isAuthenticated) return;
             try {
                 const res = await axiosClient.get('/api/vaccine-schedule');
                 const data = res.data;
@@ -32,7 +35,7 @@ export const VaccineScheduleProvider = ({ children }) => {
         }
 
         fetchSchedule();
-    }, []);
+    }, [isAuthenticated]);
 
 
     return (
