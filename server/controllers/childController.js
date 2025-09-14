@@ -258,11 +258,7 @@ export const getAllChildren = async (req, res) => {
         where,
         skip,
         take: limit,
-        // We use a single 'select' statement to retrieve all the requested fields
-        // and relations, as Prisma does not allow 'select' and 'include' at the same
-        // top level.
         select: {
-          // Original scalar fields
           id: true,
           sewaDartaNumber: true,
           fullName: true,
@@ -275,61 +271,65 @@ export const getAllChildren = async (req, res) => {
           phoneNumber: true,
           isFromOtherMunicipality: true,
           casteCode: true,
-
-          // Count of vaccinations, as in the original query
+          createdAt: true,
           _count: { select: { vaccinations: true } },
-
-          // Select for the latest weight record, as in the original query
           weightRecords: {
             select: {
-              id: true, // Select at least one field for the vaccination record itself
-              createdAt: true, // It's often useful to include a timestamp
+              id: true,
+              createdAt: true,
               createdBy: { select: { id: true, name: true } },
               administeredBy: { select: { id: true, name: true } },
               date: true,
+              weight: true,
             },
             orderBy: { date: 'desc' },
-
             take: 1,
           },
-
-          // Included vaccinations with nested select for createdBy and administeredBy
           vaccinations: {
             select: {
-              id: true, // Select at least one field for the vaccination record itself
-              createdAt: true, // It's often useful to include a timestamp
+              id: true,
+              createdAt: true,
               createdBy: { select: { id: true, name: true } },
               administeredBy: { select: { id: true, name: true } },
               vaccineType: true,
               dateGiven: true,
+              doseNumber: true,
             },
           },
-
-          // Included all fields for dueVaccines
-          dueVaccines: true,
-
-          // Included createdBy user with specific fields
+          dueVaccines: {
+            select: {
+              id: true,
+              vaccineTypeId: true,
+              doseNumber: true,
+              dueDate: true,
+              isCompleted: true,
+              isCatchUp: true,
+              catchUpLocked: true,
+            },
+          },
           createdBy: { select: { id: true, name: true } },
-
-          // Included verifiedBy user with specific fields
           verifiedBy: { select: { id: true, name: true } },
         },
       }),
     ]);
 
+    const childrenWithWhatsLeft = children.map(child => {
+      const whatsLeft = (child.dueVaccines || []).filter(dv => !dv.isCompleted).length;
+      return { ...child, whatsLeft };
+    });
 
     if (!children.length && page === 1) {
       return res.status(404).json({ error: 'No children found' });
     }
 
-    res.status(200).json({ children, total, page, limit });
+    res.status(200).json({ children: childrenWithWhatsLeft, total, page, limit });
   } catch (error) {
     console.error('Error fetching all children:', error);
     res.status(500).json({ error: 'Failed to retrieve children data', details: error.message });
   }
 };
 
-// Get children for a specific ward
+// Get children for a specific ward (returns the SAME data shape as getAllChildren)
 export const getWardChildren = async (req, res) => {
   try {
     const currentUser = req.user;
@@ -349,11 +349,7 @@ export const getWardChildren = async (req, res) => {
         where,
         skip,
         take: limit,
-        // We use a single 'select' statement to retrieve all the requested fields
-        // and relations, as Prisma does not allow 'select' and 'include' at the same
-        // top level.
         select: {
-          // Original scalar fields
           id: true,
           sewaDartaNumber: true,
           fullName: true,
@@ -366,47 +362,61 @@ export const getWardChildren = async (req, res) => {
           phoneNumber: true,
           isFromOtherMunicipality: true,
           casteCode: true,
-
-          // Count of vaccinations, as in the original query
+          createdAt: true,
           _count: { select: { vaccinations: true } },
-
-          // Select for the latest weight record, as in the original query
           weightRecords: {
-            select: { weight: true, date: true },
+            select: {
+              id: true,
+              createdAt: true,
+              createdBy: { select: { id: true, name: true } },
+              administeredBy: { select: { id: true, name: true } },
+              date: true,
+              weight: true,
+            },
             orderBy: { date: 'desc' },
             take: 1,
           },
-
-          // Included vaccinations with nested select for createdBy and administeredBy
           vaccinations: {
             select: {
-              id: true, // Select at least one field for the vaccination record itself
-              createdAt: true, // It's often useful to include a timestamp
+              id: true,
+              createdAt: true,
               createdBy: { select: { id: true, name: true } },
               administeredBy: { select: { id: true, name: true } },
+              vaccineType: true,
+              dateGiven: true,
+              doseNumber: true,
             },
           },
-
-          // Included all fields for dueVaccines
-          dueVaccines: true,
-
-          // Included createdBy user with specific fields
+          dueVaccines: {
+            select: {
+              id: true,
+              vaccineTypeId: true,
+              doseNumber: true,
+              dueDate: true,
+              isCompleted: true,
+              isCatchUp: true,
+              catchUpLocked: true,
+            },
+          },
           createdBy: { select: { id: true, name: true } },
-
-          // Included verifiedBy user with specific fields
           verifiedBy: { select: { id: true, name: true } },
         },
       }),
     ]);
 
-    res.status(200).json({ children, total, page, limit });
+    const childrenWithWhatsLeft = children.map(child => {
+      const whatsLeft = (child.dueVaccines || []).filter(dv => !dv.isCompleted).length;
+      return { ...child, whatsLeft };
+    });
+
+    res.status(200).json({ children: childrenWithWhatsLeft, total, page, limit });
   } catch (error) {
     console.error('Error fetching ward children:', error);
     res.status(500).json({ error: 'Failed to fetch ward children', details: error.message });
   }
 };
 
-// Get single child (by ID or Sewa Darta Number)
+// Get single child (by ID or Sewa Darta Number) -- returns the SAME data shape as getAllChildren
 export const getChild = async (req, res) => {
   try {
     const { id } = req.params;
@@ -415,20 +425,54 @@ export const getChild = async (req, res) => {
 
     const child = await prisma.child.findUnique({
       where: isNumber ? { sewaDartaNumber: parseInt(id, 10) } : { id },
-      include: {
-        vaccinations: {
-          include: {
-            createdBy: { select: { id: true, name: true } },
-            administeredBy: { select: { id: true, name: true } },
-          },
-        },
+      select: {
+        id: true,
+        sewaDartaNumber: true,
+        fullName: true,
+        wardNumber: true,
+        birthDate: true,
+        purnaKhop: true,
+        gender: true,
+        parentName: true,
+        tole: true,
+        phoneNumber: true,
+        isFromOtherMunicipality: true,
+        casteCode: true,
+        createdAt: true,
+        _count: { select: { vaccinations: true } },
         weightRecords: {
-          include: {
+          select: {
+            id: true,
+            createdAt: true,
             createdBy: { select: { id: true, name: true } },
             administeredBy: { select: { id: true, name: true } },
+            date: true,
+            weight: true,
+          },
+          orderBy: { date: 'desc' },
+        },
+        vaccinations: {
+          select: {
+            id: true,
+            createdAt: true,
+            createdBy: { select: { id: true, name: true } },
+            administeredBy: { select: { id: true, name: true } },
+            vaccineType: true,
+            dateGiven: true,
+            doseNumber: true,
           },
         },
-        dueVaccines: true, // This already includes the data, but you can select specific fields
+        dueVaccines: {
+          select: {
+            id: true,
+            vaccineTypeId: true,
+            doseNumber: true,
+            dueDate: true,
+            isCompleted: true,
+            isCatchUp: true,
+            catchUpLocked: true,
+          },
+        },
         createdBy: { select: { id: true, name: true } },
         verifiedBy: { select: { id: true, name: true } },
       },
@@ -436,12 +480,14 @@ export const getChild = async (req, res) => {
 
     if (!child) return res.status(404).json({ error: 'Child not found' });
 
-    // Filter data based on read permissions
     if (!checkPermission(currentUser, 'read', child)) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to view this child.' });
     }
 
-    const filteredChild = filterChildData(currentUser, child);
+    // Add whatsLeft for consistency
+    const whatsLeft = (child.dueVaccines || []).filter(dv => !dv.isCompleted).length;
+    const filteredChild = { ...filterChildData(currentUser, child), whatsLeft };
+
     res.status(200).json(filteredChild);
   } catch (error) {
     console.error('Error fetching single child:', error);

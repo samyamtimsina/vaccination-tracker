@@ -16,7 +16,6 @@ export const VaccineScheduleProvider = ({ children }) => {
             try {
                 const res = await axiosClient.get('/api/vaccine-schedule');
                 const data = res.data;
-                console.log("Fetched vaccine schedule data:", data);
 
                 // Transform doses
                 const dosesByVaccine = data.doses.reduce((acc, dose) => {
@@ -26,6 +25,7 @@ export const VaccineScheduleProvider = ({ children }) => {
                 }, {});
 
                 setvaccineSchedule({ doses: dosesByVaccine });
+                console.log('Fetched vaccine schedule:', vaccineSchedule);
                 setLoading(false);
             } catch (err) {
                 console.error('Failed to fetch vaccine schedule', err);
