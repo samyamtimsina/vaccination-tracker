@@ -55,7 +55,7 @@ export default function ViewChildren() {
   const { sewaDartaNumber } = useParams();
   const { t, i18n } = useTranslation('viewChildren');
 
-  // State management
+  // All hooks declared at the top
   const [selectedChild, setSelectedChild] = useState(null);
   const [universalSearch, setUniversalSearch] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -73,25 +73,12 @@ export default function ViewChildren() {
   const [searchResults, setSearchResults] = useState([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [expandedSections, setExpandedSections] = useState({});
-  const itemsPerPage = 12;
 
   const { childrenData, error, loading, fetchChildren } = useChildContext();
   const { vaccineSchedule, loading: scheduleLoading } = useVaccineScheduleContext();
+  console.log('vaccineSchedule', vaccineSchedule);
 
-  // Loading state for schedule
-  if (scheduleLoading || !vaccineSchedule) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 flex items-center justify-center">
-        <div className="bg-white/20 backdrop-blur-lg rounded-3xl p-8 text-center shadow-2xl">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-pink-300 rounded-full animate-spin mx-auto" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}></div>
-          </div>
-          <p className="text-white text-lg font-medium">Loading vaccination schedule...</p>
-        </div>
-      </div>
-    );
-  }
+  const itemsPerPage = 12;
 
   // Safe date conversion function
   const safeAdToBs = (dateString) => {
@@ -163,7 +150,7 @@ export default function ViewChildren() {
     if (sewaDartaNumber && !selectedChild) {
       handleDirectSearch(sewaDartaNumber);
     }
-  }, [sewaDartaNumber]);
+  }, [sewaDartaNumber, selectedChild]);
 
   // Handle direct search by sewaDartaNumber
   const handleDirectSearch = async (number) => {
@@ -185,6 +172,7 @@ export default function ViewChildren() {
     if (!childrenData) return [];
     if (Array.isArray(childrenData)) return childrenData;
     if (childrenData.children && Array.isArray(childrenData.children)) {
+      console.log('childrenData.children from the extract children array function in around like 170', childrenData.children)
       return childrenData.children;
     }
     return [];
@@ -349,6 +337,123 @@ export default function ViewChildren() {
     return result;
   };
 
+  // NEW FUNCTION: Create vaccination template
+  const createVaccinationTemplate = (child) => {
+    if (!vaccineSchedule?.doses) return {};
+
+    const vaccinationTemplate = {};
+
+    // Create template structure from vaccine schedule
+    Object.entries(vaccineSchedule.doses).forEach(([vaccineTypeName, scheduleDoses]) => {
+      vaccinationTemplate[vaccineTypeName] = {
+        name: vaccineTypeName,
+        doses: scheduleDoses.map(scheduleDose => {
+          // Find matching vaccination record
+          const actualVaccination = child.vaccinations?.find(vacc =>
+            vacc.vaccineType?.name === vaccineTypeName &&
+            vacc.doseNumber === scheduleDose.doseNumber
+          );
+
+          // Find matching due vaccine
+          const dueVaccine = child.dueVaccines?.find(due =>
+            due.vaccineTypeId === scheduleDose.vaccineTypeId &&
+            due.doseNumber === scheduleDose.doseNumber
+          );
+
+          // Calculate status
+          let status = 'pending';
+          let statusColor = 'badge-info';
+          let statusIcon = 'FaClock';
+
+          if (actualVaccination) {
+            status = 'completed';
+            statusColor = 'badge-success';
+            statusIcon = 'FaCheckCircle';
+          } else if (dueVaccine && !dueVaccine.isCompleted) {
+            const isOverdue = new Date(dueVaccine.dueDate) < new Date();
+            if (isOverdue) {
+              status = 'overdue';
+              statusColor = 'badge-error';
+              statusIcon = 'FaExclamationTriangle';
+            } else {
+              status = 'due';
+              statusColor = 'badge-warning';
+              statusIcon = 'FaClock';
+            }
+          }
+
+          return {
+            doseNumber: scheduleDose.doseNumber,
+            scheduleInfo: {
+              isPrimary: scheduleDose.isPrimary,
+              isBooster: scheduleDose.isBooster,
+              recommendedAtDays: scheduleDose.recommendedAtDays,
+              recommendedAtWeeks: scheduleDose.recommendedAtWeeks,
+              recommendedAtMonths: scheduleDose.recommendedAtMonths,
+              recommendedAtYears: scheduleDose.recommendedAtYears,
+              maxAgeDays: scheduleDose.maxAgeDays,
+              maxAgeWeeks: scheduleDose.maxAgeWeeks,
+              maxAgeMonths: scheduleDose.maxAgeMonths,
+              maxAgeYears: scheduleDose.maxAgeYears,
+            },
+            actualVaccination,
+            dueVaccine,
+            status,
+            statusColor,
+            statusIcon,
+            // Helper properties
+            dateGiven: actualVaccination?.dateGiven || null,
+            dueDate: dueVaccine?.dueDate || null,
+            administeredBy: actualVaccination?.administeredBy?.name || null,
+            isCatchUp: dueVaccine?.isCatchUp || scheduleDose.isBooster || false, // Map isBooster to isCatchUp
+            overdueDays: dueVaccine && new Date(dueVaccine.dueDate) < new Date()
+              ? Math.floor((new Date() - new Date(dueVaccine.dueDate)) / (1000 * 60 * 60 * 24))
+              : null,
+            daysUntilDue: dueVaccine && new Date(dueVaccine.dueDate) >= new Date()
+              ? Math.ceil((new Date(dueVaccine.dueDate) - new Date()) / (1000 * 60 * 60 * 24))
+              : null
+          };
+        })
+      };
+    });
+
+    return vaccinationTemplate;
+  };
+
+  // NEW FUNCTION: Get recommended age display
+  const getRecommendedAgeDisplay = (scheduleInfo) => {
+    if (scheduleInfo.recommendedAtDays !== null) {
+      return scheduleInfo.recommendedAtDays === 0 ? 'At birth' : `${scheduleInfo.recommendedAtDays} days`;
+    }
+    if (scheduleInfo.recommendedAtWeeks !== null) {
+      return `${scheduleInfo.recommendedAtWeeks} weeks`;
+    }
+    if (scheduleInfo.recommendedAtMonths !== null) {
+      return `${scheduleInfo.recommendedAtMonths} months`;
+    }
+    if (scheduleInfo.recommendedAtYears !== null) {
+      return `${scheduleInfo.recommendedAtYears} years`;
+    }
+    return 'Schedule TBD';
+  };
+
+  // NEW FUNCTION: Get max age display
+  const getMaxAgeDisplay = (scheduleInfo) => {
+    if (scheduleInfo.maxAgeDays !== null) {
+      return `${scheduleInfo.maxAgeDays} days`;
+    }
+    if (scheduleInfo.maxAgeWeeks !== null) {
+      return `${scheduleInfo.maxAgeWeeks} weeks`;
+    }
+    if (scheduleInfo.maxAgeMonths !== null) {
+      return `${scheduleInfo.maxAgeMonths} months`;
+    }
+    if (scheduleInfo.maxAgeYears !== null) {
+      return `${scheduleInfo.maxAgeYears} years`;
+    }
+    return 'No limit';
+  };
+
   // Get vaccination stats
   const getVaccinationStats = (child) => {
     const totalVaccinations = child._count?.vaccinations || 0;
@@ -389,6 +494,59 @@ export default function ViewChildren() {
     }));
   };
 
+  // Loading state for schedule
+  if (scheduleLoading || !vaccineSchedule) {
+    return (
+      <div className="min-h-screen bg-base-200 flex items-center justify-center">
+        <div className="card bg-base-100 shadow-xl">
+          <div className="card-body items-center text-center">
+            <span className="loading loading-spinner loading-lg text-primary"></span>
+            <p className="text-base-content text-lg font-medium mt-4">Loading vaccination schedule...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main loading state
+  if (loading || loadingVaccineTypes) {
+    return (
+      <div className="min-h-screen bg-base-200 flex items-center justify-center">
+        <div className="card bg-base-100 shadow-xl">
+          <div className="card-body items-center text-center">
+            <span className="loading loading-spinner loading-lg text-primary"></span>
+            <p className="text-base-content text-lg font-medium mt-4">Loading children records...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-base-200 flex items-center justify-center">
+        <div className="card bg-base-100 shadow-xl w-full max-w-md">
+          <div className="card-body items-center text-center">
+            <div className="w-12 h-12 bg-error/20 rounded-full flex items-center justify-center mb-4">
+              <FaExclamationTriangle className="text-error text-xl" />
+            </div>
+            <h3 className="card-title text-base-content">Error Loading Data</h3>
+            <p className="text-base-content/70 mb-6">{error}</p>
+            <div className="card-actions">
+              <button
+                onClick={() => window.location.reload()}
+                className="btn btn-error"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Render child card
   const renderChildCard = (child) => {
     const age = calculateDetailedAge(child.birthDate);
@@ -397,114 +555,115 @@ export default function ViewChildren() {
     return (
       <div
         key={child.id}
-        className="group relative bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer border-0 overflow-hidden transform hover:scale-[1.02]"
+        className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow cursor-pointer border border-base-300"
         onClick={() => setSelectedChild(child)}
       >
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-
-        {/* Header with gradient */}
-        <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-5 text-white">
-          <div className="flex justify-between items-start mb-3">
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-white mb-1 group-hover:text-yellow-200 transition-colors">
-                {child.fullName}
-              </h3>
-              <div className="flex items-center gap-3 text-sm text-indigo-200">
-                <span className="flex items-center gap-1">
-                  <FaBirthdayCake className="w-3 h-3" />
-                  {age.formatted}
-                </span>
-                <span>•</span>
-                <span className="bg-white/20 px-2 py-1 rounded-full text-xs">
-                  Ward {child.wardNumber}
-                </span>
+        {/* Header */}
+        <div className="card-body p-0">
+          <div className="bg-primary text-primary-content p-4 rounded-t-2xl">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold mb-1">
+                  {child.fullName}
+                </h3>
+                <div className="flex items-center gap-2 text-sm opacity-90">
+                  <span className="flex items-center gap-1">
+                    <FaBirthdayCake className="w-3 h-3" />
+                    {age.formatted}
+                  </span>
+                  <span>•</span>
+                  <div className="badge badge-primary badge-outline">
+                    Ward {child.wardNumber}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="text-right">
-              <div className={`px-3 py-1 rounded-full text-xs font-bold shadow-lg ${vaccinationStats.isFullyVaccinated
-                  ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white'
-                  : 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white'
-                }`}>
-                {vaccinationStats.isFullyVaccinated ? '✨ Complete' : '⚡ Incomplete'}
-              </div>
-              <div className="text-xs text-indigo-200 mt-1">#{child.sewaDartaNumber}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="relative p-5 space-y-4">
-          {/* Quick info grid */}
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="space-y-1">
-              <div className="text-gray-500 text-xs font-medium">Parent</div>
-              <div className="font-semibold text-gray-800 truncate">{child.parentName}</div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-gray-500 text-xs font-medium">Gender</div>
-              <div className="font-semibold text-gray-800">
-                {child.gender === 'MALE' ? '👦 Male' : '👧 Female'}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-gray-500 text-xs font-medium">Phone</div>
-              <div className="text-gray-700 text-xs truncate">{child.phoneNumber || 'N/A'}</div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-gray-500 text-xs font-medium">Location</div>
-              <div className="text-gray-700 text-xs truncate">{child.tole}</div>
-            </div>
-          </div>
-
-          {/* Stats bar */}
-          <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-4">
-            <div className="grid grid-cols-4 gap-3 text-center">
-              <div className="group-hover:scale-105 transition-transform">
-                <div className="text-lg font-bold text-green-600">{vaccinationStats.totalGiven}</div>
-                <div className="text-xs text-gray-600">Given</div>
-              </div>
-              <div className="group-hover:scale-105 transition-transform">
-                <div className="text-lg font-bold text-red-500">{vaccinationStats.overdueCount}</div>
-                <div className="text-xs text-gray-600">Overdue</div>
-              </div>
-              <div className="group-hover:scale-105 transition-transform">
-                <div className="text-lg font-bold text-blue-500">{vaccinationStats.pendingCount}</div>
-                <div className="text-xs text-gray-600">Pending</div>
-              </div>
-              <div className="group-hover:scale-105 transition-transform">
-                <div className="text-lg font-bold text-purple-500">{vaccinationStats.whatsLeft}</div>
-                <div className="text-xs text-gray-600">Left</div>
+              <div className="text-right">
+                <div className={`badge ${vaccinationStats.isFullyVaccinated
+                  ? 'badge-success'
+                  : 'badge-warning'
+                  }`}>
+                  {vaccinationStats.isFullyVaccinated ? 'Complete' : 'Incomplete'}
+                </div>
+                <div className="text-xs opacity-70 mt-1">#{child.sewaDartaNumber}</div>
               </div>
             </div>
           </div>
 
-          {/* Birth dates */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-100">
-            <div className="text-xs font-medium text-blue-700 mb-2">Birth Information</div>
-            <div className="space-y-1 text-sm">
-              <div className="font-medium text-gray-800">{safeFormatDate(child.birthDate)} (AD)</div>
-              <div className="text-gray-600">{safeAdToBs(child.birthDate)} (BS)</div>
+          {/* Content */}
+          <div className="p-4 space-y-3">
+            {/* Quick info grid */}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <div className="text-base-content/60 text-xs font-medium">Parent</div>
+                <div className="font-medium text-base-content truncate">{child.parentName}</div>
+              </div>
+              <div>
+                <div className="text-base-content/60 text-xs font-medium">Gender</div>
+                <div className="font-medium text-base-content">
+                  {child.gender === 'MALE' ? 'Male' : 'Female'}
+                </div>
+              </div>
+              <div>
+                <div className="text-base-content/60 text-xs font-medium">Phone</div>
+                <div className="text-base-content/80 text-xs truncate">{child.phoneNumber || 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-base-content/60 text-xs font-medium">Location</div>
+                <div className="text-base-content/80 text-xs truncate">{child.tole}</div>
+              </div>
             </div>
-          </div>
 
-          {/* Special badges */}
-          <div className="flex flex-wrap gap-2">
-            {child.isFromOtherMunicipality && (
-              <div className="inline-flex items-center px-2 py-1 bg-gradient-to-r from-blue-400 to-blue-500 text-white rounded-full text-xs font-medium">
-                🏢 Other Municipality
+            {/* Stats */}
+            <div className="bg-base-200 rounded-lg p-3">
+              <div className="stats stats-horizontal w-full">
+                <div className="stat p-2">
+                  <div className="stat-value text-success text-base">{vaccinationStats.totalGiven}</div>
+                  <div className="stat-desc text-xs">Given</div>
+                </div>
+                <div className="stat p-2">
+                  <div className="stat-value text-error text-base">{vaccinationStats.overdueCount}</div>
+                  <div className="stat-desc text-xs">Overdue</div>
+                </div>
+                <div className="stat p-2">
+                  <div className="stat-value text-info text-base">{vaccinationStats.pendingCount}</div>
+                  <div className="stat-desc text-xs">Pending</div>
+                </div>
+                <div className="stat p-2">
+                  <div className="stat-value text-secondary text-base">{vaccinationStats.whatsLeft}</div>
+                  <div className="stat-desc text-xs">Left</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Birth dates */}
+            <div className="alert alert-info">
+              <FaInfoCircle />
+              <div>
+                <div className="text-xs font-medium">Birth Information</div>
+                <div className="space-y-1 text-sm mt-1">
+                  <div className="font-medium">{safeFormatDate(child.birthDate)} (AD)</div>
+                  <div className="opacity-80">{safeAdToBs(child.birthDate)} (BS)</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Badges */}
+            {(child.isFromOtherMunicipality || vaccinationStats.overdueCount > 0) && (
+              <div className="flex flex-wrap gap-2">
+                {child.isFromOtherMunicipality && (
+                  <div className="badge badge-info badge-outline">
+                    Other Municipality
+                  </div>
+                )}
+                {vaccinationStats.overdueCount > 0 && (
+                  <div className="badge badge-error badge-outline">
+                    {vaccinationStats.overdueCount} Overdue
+                  </div>
+                )}
               </div>
             )}
-            {vaccinationStats.overdueCount > 0 && (
-              <div className="inline-flex items-center px-2 py-1 bg-gradient-to-r from-red-400 to-red-500 text-white rounded-full text-xs font-medium animate-pulse">
-                ⚠️ {vaccinationStats.overdueCount} Overdue
-              </div>
-            )}
           </div>
         </div>
-
-        {/* Hover effect overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"></div>
       </div>
     );
   };
@@ -516,345 +675,368 @@ export default function ViewChildren() {
     const vaccinesByType = organizeVaccinesByType(child);
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50">
-        {/* Sticky Header */}
-        <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg border-b border-purple-200 shadow-lg">
-          <div className="max-w-7xl mx-auto px-6 py-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setSelectedChild(null)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg hover:shadow-xl"
-                >
-                  <FaChevronLeft />
-                  <span>Back</span>
-                </button>
-                <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                    {child.fullName}
-                  </h1>
-                  <p className="text-gray-600 font-medium">
-                    #{child.sewaDartaNumber} • {age.formatted} • {child.gender === 'MALE' ? '👦 Male' : '👧 Female'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => navigate('/graph', { state: { childrenData: child } })}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all shadow-lg hover:shadow-xl"
-                >
-                  <FaChartLine />
-                  Growth Chart
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all shadow-lg hover:shadow-xl"
-                >
-                  <FaPrint />
-                  Print
-                </button>
-              </div>
+      <div className="min-h-screen bg-base-200">
+        {/* Header */}
+        <div className="navbar bg-base-100 border-b border-base-300">
+          <div className="navbar-start">
+            <button
+              onClick={() => setSelectedChild(null)}
+              className="btn btn-primary"
+            >
+              <FaChevronLeft />
+              Back
+            </button>
+          </div>
+          <div className="navbar-center">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-base-content">
+                {child.fullName}
+              </h1>
+              <p className="text-base-content/70">
+                #{child.sewaDartaNumber} • {age.formatted} • {child.gender === 'MALE' ? 'Male' : 'Female'}
+              </p>
             </div>
+          </div>
+          <div className="navbar-end gap-2">
+            <button
+              onClick={() => navigate('/graph', { state: { childrenData: child } })}
+              className="btn btn-info"
+            >
+              <FaChartLine />
+              Growth Chart
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="btn btn-success"
+            >
+              <FaPrint />
+              Print
+            </button>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-          {/* Hero Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="container mx-auto px-4 py-6 space-y-6 max-w-7xl">
+          {/* Stats Grid */}
+          <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
             {[
-              { value: vaccinationStats.totalGiven, label: 'Vaccines Given', color: 'from-green-400 to-emerald-500', icon: FaAward },
-              { value: vaccinationStats.overdueCount, label: 'Overdue', color: 'from-red-400 to-red-500', icon: FaExclamationTriangle },
-              { value: vaccinationStats.pendingCount, label: 'Pending', color: 'from-blue-400 to-blue-500', icon: FaClock },
-              { value: vaccinationStats.whatsLeft, label: 'Remaining', color: 'from-purple-400 to-purple-500', icon: FaStar },
-              { value: child.weightRecords?.length || 0, label: 'Weight Records', color: 'from-pink-400 to-pink-500', icon: FaHeart }
+              { value: vaccinationStats.totalGiven, label: 'Vaccines Given', color: 'text-success', icon: FaCheckCircle },
+              { value: vaccinationStats.overdueCount, label: 'Overdue', color: 'text-error', icon: FaExclamationTriangle },
+              { value: vaccinationStats.pendingCount, label: 'Pending', color: 'text-info', icon: FaClock },
+              { value: vaccinationStats.whatsLeft, label: 'Remaining', color: 'text-secondary', icon: FaStar },
+              { value: child.weightRecords?.length || 0, label: 'Weight Records', color: 'text-accent', icon: FaWeight }
             ].map((stat, index) => (
-              <div key={index} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all hover:scale-105">
-                <div className={`w-12 h-12 bg-gradient-to-r ${stat.color} rounded-xl flex items-center justify-center mb-3 shadow-lg`}>
-                  <stat.icon className="text-white text-xl" />
+              <div key={index} className="stat">
+                <div className="stat-figure">
+                  <stat.icon className={`text-2xl ${stat.color}`} />
                 </div>
-                <div className="text-3xl font-bold text-gray-800 mb-1">{stat.value}</div>
-                <div className="text-sm text-gray-600 font-medium">{stat.label}</div>
+                <div className="stat-value">{stat.value}</div>
+                <div className="stat-title">{stat.label}</div>
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Sidebar */}
             <div className="lg:col-span-1 space-y-6">
               {/* Personal Information */}
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-purple-100">
-                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                    <FaUser className="text-white text-sm" />
+              <div className="card bg-base-100 shadow-xl">
+                <div className="card-body">
+                  <h3 className="card-title">
+                    <FaUser className="text-primary" />
+                    Personal Info
+                  </h3>
+                  <div className="space-y-3">
+                    {[
+                      { label: 'Parent', value: child.parentName },
+                      { label: 'Phone', value: child.phoneNumber || 'N/A' },
+                      { label: 'Address', value: child.tole },
+                      { label: 'Ward', value: child.wardNumber },
+                      { label: 'Caste Code', value: child.casteCode },
+                      ...(child.email ? [{ label: 'Email', value: child.email }] : [])
+                    ].map((item, index) => (
+                      <div key={index} className="flex justify-between items-center">
+                        <span className="text-base-content/70 text-sm">{item.label}:</span>
+                        <span className="text-sm font-medium">{item.value}</span>
+                      </div>
+                    ))}
+                    {child.isFromOtherMunicipality && (
+                      <div className="badge badge-info">
+                        Other Municipality
+                      </div>
+                    )}
                   </div>
-                  Personal Info
-                </h3>
-                <div className="space-y-3">
-                  {[
-                    { label: 'Parent', value: child.parentName },
-                    { label: 'Phone', value: child.phoneNumber || 'N/A' },
-                    { label: 'Address', value: child.tole },
-                    { label: 'Ward', value: child.wardNumber },
-                    { label: 'Caste Code', value: child.casteCode },
-                    ...(child.email ? [{ label: 'Email', value: child.email }] : [])
-                  ].map((item, index) => (
-                    <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                      <span className="text-sm text-gray-500 font-medium">{item.label}:</span>
-                      <span className="text-sm font-semibold text-gray-800">{item.value}</span>
-                    </div>
-                  ))}
-                  {child.isFromOtherMunicipality && (
-                    <div className="mt-3 inline-flex items-center px-3 py-1 bg-gradient-to-r from-blue-400 to-blue-500 text-white rounded-full text-xs font-medium">
-                      🏢 Other Municipality
-                    </div>
-                  )}
                 </div>
               </div>
 
               {/* Birth Information */}
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-pink-100">
-                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-red-500 rounded-lg flex items-center justify-center">
-                    <FaBirthdayCake className="text-white text-sm" />
-                  </div>
-                  Birth Info
-                </h3>
-                <div className="space-y-3">
-                  <div className="p-3 bg-gradient-to-r from-pink-50 to-red-50 rounded-xl border border-pink-200">
-                    <div className="text-sm text-pink-700 font-medium mb-1">Birth Date (AD)</div>
-                    <div className="font-bold text-gray-800">{safeFormatDate(child.birthDate)}</div>
-                  </div>
-                  <div className="p-3 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl border border-red-200">
-                    <div className="text-sm text-red-700 font-medium mb-1">Birth Date (BS)</div>
-                    <div className="font-bold text-gray-800">{safeAdToBs(child.birthDate)}</div>
-                  </div>
-                  <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
-                    <div className="text-sm text-purple-700 font-medium mb-1">Current Age</div>
-                    <div className="font-bold text-gray-800">{age.formatted}</div>
+              <div className="card bg-base-100 shadow-xl">
+                <div className="card-body">
+                  <h3 className="card-title">
+                    <FaBirthdayCake className="text-primary" />
+                    Birth Info
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="alert alert-info">
+                      <div>
+                        <div className="text-xs font-medium">Birth Date (AD)</div>
+                        <div className="font-semibold">{safeFormatDate(child.birthDate)}</div>
+                      </div>
+                    </div>
+                    <div className="alert alert-info">
+                      <div>
+                        <div className="text-xs font-medium">Birth Date (BS)</div>
+                        <div className="font-semibold">{safeAdToBs(child.birthDate)}</div>
+                      </div>
+                    </div>
+                    <div className="alert alert-info">
+                      <div>
+                        <div className="text-xs font-medium">Current Age</div>
+                        <div className="font-semibold">{age.formatted}</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Administrative */}
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-green-100">
-                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
-                    <FaShieldAlt className="text-white text-sm" />
+              <div className="card bg-base-100 shadow-xl">
+                <div className="card-body">
+                  <h3 className="card-title">
+                    <FaShieldAlt className="text-primary" />
+                    Administrative
+                  </h3>
+                  <div className="space-y-3">
+                    {[
+                      { label: 'Created', value: safeFormatDate(child.createdAt) },
+                      { label: 'Created By', value: child.createdBy?.name },
+                      ...(child.verifiedBy ? [{ label: 'Verified By', value: child.verifiedBy?.name }] : [])
+                    ].map((item, index) => (
+                      <div key={index} className="flex justify-between items-center">
+                        <span className="text-base-content/70 text-sm">{item.label}:</span>
+                        <span className="text-sm font-medium text-primary">{item.value}</span>
+                      </div>
+                    ))}
                   </div>
-                  Administrative
-                </h3>
-                <div className="space-y-3">
-                  {[
-                    { label: 'Created', value: safeFormatDate(child.createdAt) },
-                    { label: 'Created By', value: child.createdBy?.name },
-                    ...(child.verifiedBy ? [{ label: 'Verified By', value: child.verifiedBy?.name }] : [])
-                  ].map((item, index) => (
-                    <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                      <span className="text-sm text-gray-500 font-medium">{item.label}:</span>
-                      <span className="text-sm font-semibold text-blue-600">{item.value}</span>
-                    </div>
-                  ))}
                 </div>
               </div>
 
               {/* Weight Records */}
               {child.weightRecords && child.weightRecords.length > 0 && (
-                <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-purple-100">
-                  <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                      <FaWeight className="text-white text-sm" />
-                    </div>
-                    Weight Records
-                  </h3>
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {child.weightRecords
-                      .sort((a, b) => new Date(b.date) - new Date(a.date))
-                      .map((record, index) => (
-                        <div key={index} className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 hover:shadow-md transition-shadow">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="text-2xl font-bold text-purple-700">{record.weight} kg</div>
-                            <div className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
-                              #{index + 1}
+                <div className="card bg-base-100 shadow-xl">
+                  <div className="card-body">
+                    <h3 className="card-title">
+                      <FaWeight className="text-primary" />
+                      Weight Records
+                    </h3>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {child.weightRecords
+                        .sort((a, b) => new Date(b.date) - new Date(a.date))
+                        .map((record, index) => (
+                          <div key={index} className="alert alert-info">
+                            <div className="w-full">
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="text-xl font-bold">{record.weight} kg</div>
+                                <div className="badge badge-info">#{index + 1}</div>
+                              </div>
+                              <div className="text-sm opacity-80 mb-1">{safeAdToBs(record.date)} (BS)</div>
+                              <div className="text-xs opacity-70 space-y-1">
+                                <div>Administered: <span className="font-medium">{record.administeredBy?.name}</span></div>
+                                <div>Created: <span className="font-medium">{record.createdBy?.name}</span></div>
+                              </div>
                             </div>
                           </div>
-                          <div className="text-sm text-gray-600 mb-2">{safeAdToBs(record.date)} (BS)</div>
-                          <div className="text-xs text-gray-500 space-y-1">
-                            <div>Administered: <span className="font-medium text-purple-600">{record.administeredBy?.name}</span></div>
-                            <div>Created: <span className="font-medium text-purple-600">{record.createdBy?.name}</span></div>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Main Content - Vaccination Data */}
+            {/* Main Content */}
             <div className="lg:col-span-3">
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-green-100">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
-                    <FaSyringe className="text-white text-lg" />
-                  </div>
-                  Vaccination Records by Type
-                </h2>
+              <div className="card bg-base-100 shadow-xl">
+                <div className="card-body">
+                  <h2 className="card-title text-xl">
+                    <FaSyringe className="text-primary" />
+                    Vaccination Records
+                  </h2>
 
-                {Object.keys(vaccinesByType).length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FaSyringe className="text-gray-400 text-2xl" />
-                    </div>
-                    <p className="text-gray-500 text-lg">No vaccination data available</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {Object.entries(vaccinesByType).map(([vaccineType, data]) => {
-                      const sectionKey = `vaccine-${vaccineType}`;
-                      const isExpanded = expandedSections[sectionKey] !== false;
+                  {(() => {
+                    const vaccinationTemplate = createVaccinationTemplate(child);
 
+                    if (Object.keys(vaccinationTemplate).length === 0) {
                       return (
-                        <div key={vaccineType} className="bg-gradient-to-r from-gray-50 to-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
-                          {/* Vaccine Type Header */}
-                          <button
-                            onClick={() => toggleSection(sectionKey)}
-                            className="w-full p-6 bg-gradient-to-r from-indigo-500 to-purple-600 text-white flex justify-between items-center hover:from-indigo-600 hover:to-purple-700 transition-all"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                                <FaSyringe className="text-white" />
-                              </div>
-                              <div className="text-left">
-                                <h3 className="text-xl font-bold">{vaccineType}</h3>
-                                <div className="text-indigo-200 text-sm">
-                                  {data.completed.length + data.due.length + data.overdue.length} total doses
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="flex gap-2">
-                                {data.completed.length > 0 && (
-                                  <div className="bg-green-400/30 text-green-100 px-3 py-1 rounded-full text-xs font-medium">
-                                    {data.completed.length} ✓
-                                  </div>
-                                )}
-                                {data.overdue.length > 0 && (
-                                  <div className="bg-red-400/30 text-red-100 px-3 py-1 rounded-full text-xs font-medium animate-pulse">
-                                    {data.overdue.length} ⚠
-                                  </div>
-                                )}
-                                {data.due.length > 0 && (
-                                  <div className="bg-yellow-400/30 text-yellow-100 px-3 py-1 rounded-full text-xs font-medium">
-                                    {data.due.length} ⏱
-                                  </div>
-                                )}
-                              </div>
-                              <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                                <FaChevronDown className="text-white" />
-                              </div>
-                            </div>
-                          </button>
-
-                          {/* Vaccine Details */}
-                          {isExpanded && (
-                            <div className="p-6 space-y-4">
-                              {/* Completed Vaccinations */}
-                              {data.completed.map((vacc, index) => (
-                                <div key={`completed-${index}`} className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-md">
-                                        <FaCheckCircle className="text-white text-sm" />
-                                      </div>
-                                      <div>
-                                        <div className="font-bold text-green-800 text-lg">
-                                          Dose {vacc.doseNumber} - Completed ✨
-                                        </div>
-                                        <div className="text-green-600 font-medium">
-                                          {safeAdToBs(vacc.dateGiven)} (BS)
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="text-right text-sm bg-green-100 rounded-lg p-3">
-                                      <div className="text-green-700 font-medium mb-1">👨‍⚕️ Administered by:</div>
-                                      <div className="font-bold text-green-800">{vacc.administeredBy?.name}</div>
-                                      <div className="text-green-600 mt-1">📝 Created by: {vacc.createdBy?.name}</div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-
-                              {/* Overdue Vaccinations */}
-                              {data.overdue.map((vacc, index) => (
-                                <div key={`overdue-${index}`} className="bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-500 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow animate-pulse">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-md">
-                                        <FaExclamationTriangle className="text-white text-sm" />
-                                      </div>
-                                      <div>
-                                        <div className="font-bold text-red-800 text-lg">
-                                          Dose {vacc.doseNumber} - OVERDUE ⚠️
-                                        </div>
-                                        <div className="text-red-600 font-medium">
-                                          Due: {safeAdToBs(vacc.dueDate)} (BS)
-                                        </div>
-                                        <div className="text-red-500 text-sm mt-1">
-                                          {Math.floor((new Date() - new Date(vacc.dueDate)) / (1000 * 60 * 60 * 24))} days overdue
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className={`px-3 py-2 rounded-lg text-white font-medium ${vacc.isCatchUp ? 'bg-orange-500' : 'bg-red-500'
-                                        }`}>
-                                        {vacc.isCatchUp ? '🔄 Catch-up' : '📅 Regular'}
-                                      </div>
-                                      {vacc.catchUpLocked && (
-                                        <div className="text-xs text-red-600 mt-1">🔒 Locked</div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-
-                              {/* Due Soon Vaccinations */}
-                              {data.due.map((vacc, index) => (
-                                <div key={`due-${index}`} className="bg-gradient-to-r from-yellow-50 to-amber-50 border-l-4 border-yellow-500 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center shadow-md">
-                                        <FaClock className="text-white text-sm" />
-                                      </div>
-                                      <div>
-                                        <div className="font-bold text-yellow-800 text-lg">
-                                          Dose {vacc.doseNumber} - Due Soon ⏰
-                                        </div>
-                                        <div className="text-yellow-600 font-medium">
-                                          Due: {safeAdToBs(vacc.dueDate)} (BS)
-                                        </div>
-                                        <div className="text-yellow-600 text-sm mt-1">
-                                          {Math.ceil((new Date(vacc.dueDate) - new Date()) / (1000 * 60 * 60 * 24))} days remaining
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className={`px-3 py-2 rounded-lg text-white font-medium ${vacc.isCatchUp ? 'bg-orange-500' : 'bg-yellow-500'
-                                        }`}>
-                                        {vacc.isCatchUp ? '🔄 Catch-up' : '📅 Regular'}
-                                      </div>
-                                      {vacc.catchUpLocked && (
-                                        <div className="text-xs text-yellow-600 mt-1">🔒 Locked</div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                        <div className="text-center py-8">
+                          <FaSyringe className="text-base-content/40 text-3xl mx-auto mb-3" />
+                          <p className="text-base-content/60">No vaccination schedule available</p>
                         </div>
                       );
-                    })}
-                  </div>
-                )}
+                    }
+
+                    return (
+                      <div className="space-y-4">
+                        {Object.entries(vaccinationTemplate).map(([vaccineTypeName, vaccineData]) => {
+                          const sectionKey = `vaccine-${vaccineTypeName}`;
+                          const isExpanded = expandedSections[sectionKey] !== false;
+
+                          // Calculate summary stats
+                          const completedCount = vaccineData.doses.filter(dose => dose.status === 'completed').length;
+                          const overdueCount = vaccineData.doses.filter(dose => dose.status === 'overdue').length;
+                          const dueCount = vaccineData.doses.filter(dose => dose.status === 'due').length;
+                          const pendingCount = vaccineData.doses.filter(dose => dose.status === 'pending').length;
+
+                          return (
+                            <div key={vaccineTypeName} className="collapse collapse-plus bg-base-200">
+                              <input
+                                type="checkbox"
+                                checked={isExpanded}
+                                onChange={() => toggleSection(sectionKey)}
+                              />
+                              <div className="collapse-title">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <FaSyringe className="text-primary" />
+                                    <div>
+                                      <h3 className="font-semibold">{vaccineTypeName}</h3>
+                                      <div className="text-base-content/60 text-sm">
+                                        {vaccineData.doses.length} total doses
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    {completedCount > 0 && (
+                                      <div className="badge badge-success badge-sm">
+                                        {completedCount} ✓
+                                      </div>
+                                    )}
+                                    {overdueCount > 0 && (
+                                      <div className="badge badge-error badge-sm">
+                                        {overdueCount} ⚠
+                                      </div>
+                                    )}
+                                    {dueCount > 0 && (
+                                      <div className="badge badge-warning badge-sm">
+                                        {dueCount} ⏱
+                                      </div>
+                                    )}
+                                    {pendingCount > 0 && (
+                                      <div className="badge badge-info badge-sm">
+                                        {pendingCount} ⏸
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="collapse-content">
+                                <div className="grid gap-3">
+                                  {vaccineData.doses.map((dose, index) => {
+                                    const IconComponent = dose.statusIcon === 'FaCheckCircle' ? FaCheckCircle
+                                      : dose.statusIcon === 'FaExclamationTriangle' ? FaExclamationTriangle
+                                        : FaClock;
+
+                                    return (
+                                      <div
+                                        key={`${vaccineTypeName}-${dose.doseNumber}`}
+                                        className={`card bg-base-100 border-l-4 ${dose.status === 'completed' ? 'border-l-success'
+                                          : dose.status === 'overdue' ? 'border-l-error'
+                                            : dose.status === 'due' ? 'border-l-warning'
+                                              : 'border-l-info'
+                                          }`}
+                                      >
+                                        <div className="card-body p-4">
+                                          <div className="flex justify-between items-start">
+                                            <div className="flex items-start gap-3">
+                                              <div className={`p-2 rounded-full ${dose.status === 'completed' ? 'bg-success/20 text-success'
+                                                : dose.status === 'overdue' ? 'bg-error/20 text-error'
+                                                  : dose.status === 'due' ? 'bg-warning/20 text-warning'
+                                                    : 'bg-info/20 text-info'
+                                                }`}>
+                                                <IconComponent className="w-4 h-4" />
+                                              </div>
+                                              <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                  <h4 className="font-semibold">Dose {dose.doseNumber}</h4>
+                                                  <div className={`badge ${dose.statusColor} badge-sm`}>
+                                                    {dose.status.charAt(0).toUpperCase() + dose.status.slice(1)}
+                                                  </div>
+                                                  {dose.isCatchUp && (
+                                                    <div className="badge badge-secondary badge-sm">
+                                                      Catch-up
+                                                    </div>
+                                                  )}
+                                                  {dose.scheduleInfo.isPrimary && (
+                                                    <div className="badge badge-primary badge-outline badge-sm">
+                                                      Primary
+                                                    </div>
+                                                  )}
+                                                </div>
+
+                                                {/* Schedule Information */}
+                                                <div className="text-sm space-y-1 mb-3">
+                                                  <div className="text-base-content/70">
+                                                    <span className="font-medium">Recommended at:</span> {getRecommendedAgeDisplay(dose.scheduleInfo)}
+                                                  </div>
+                                                  <div className="text-base-content/70">
+                                                    <span className="font-medium">Max age:</span> {getMaxAgeDisplay(dose.scheduleInfo)}
+                                                  </div>
+                                                </div>
+
+                                                {/* Actual Data */}
+                                                <div className="space-y-2">
+                                                  {dose.dateGiven && (
+                                                    <div className="alert alert-success alert-sm">
+                                                      <FaCheckCircle className="w-4 h-4" />
+                                                      <div>
+                                                        <div className="font-medium">Given on: {safeAdToBs(dose.dateGiven)} (BS)</div>
+                                                        {dose.administeredBy && (
+                                                          <div className="text-xs opacity-80">By: {dose.administeredBy}</div>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+                                                  {dose.dueDate && !dose.dateGiven && (
+                                                    <div className={`alert ${dose.status === 'overdue' ? 'alert-error' : 'alert-warning'
+                                                      } alert-sm`}>
+                                                      <IconComponent className="w-4 h-4" />
+                                                      <div>
+                                                        <div className="font-medium">
+                                                          {dose.status === 'overdue' ? 'Was due:' : 'Due:'} {safeAdToBs(dose.dueDate)} (BS)
+                                                        </div>
+                                                        {dose.overdueDays && (
+                                                          <div className="text-xs opacity-80">{dose.overdueDays} days overdue</div>
+                                                        )}
+                                                        {dose.daysUntilDue && (
+                                                          <div className="text-xs opacity-80">{dose.daysUntilDue} days remaining</div>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+                                                  {!dose.dueDate && !dose.dateGiven && (
+                                                    <div className="alert alert-info alert-sm">
+                                                      <FaInfoCircle className="w-4 h-4" />
+                                                      <div className="text-sm">Scheduled according to vaccination timeline</div>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
           </div>
@@ -871,42 +1053,6 @@ export default function ViewChildren() {
     );
   };
 
-  // Main loading state
-  if (loading || loadingVaccineTypes) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 flex items-center justify-center">
-        <div className="bg-white/20 backdrop-blur-lg rounded-3xl p-8 text-center shadow-2xl">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-pink-300 rounded-full animate-spin mx-auto" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}></div>
-          </div>
-          <p className="text-white text-lg font-medium">Loading children records...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-400 via-pink-500 to-purple-500 flex items-center justify-center">
-        <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl p-8 max-w-md text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaExclamationTriangle className="text-white text-2xl" />
-          </div>
-          <h3 className="text-2xl font-bold text-gray-800 mb-2">Error Loading Data</h3>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-xl hover:from-red-600 hover:to-pink-600 transition-all shadow-lg hover:shadow-xl font-medium"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Render detailed view if child is selected
   if (selectedChild) {
     return renderChildDetails(selectedChild);
@@ -914,119 +1060,127 @@ export default function ViewChildren() {
 
   // Main list view
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="min-h-screen bg-base-200">
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-5xl font-bold text-white mb-2 drop-shadow-lg">
+            <h1 className="text-4xl font-bold text-base-content mb-2">
               Children Records
             </h1>
-            <p className="text-white/80 text-lg font-medium">
+            <p className="text-base-content/70 text-lg">
               Manage vaccination records for all children
             </p>
           </div>
           <button
             onClick={() => navigate('/add-child')}
-            className="flex items-center gap-2 px-6 py-4 bg-white/20 backdrop-blur-lg text-white rounded-2xl hover:bg-white/30 transition-all shadow-lg hover:shadow-2xl font-medium border border-white/20"
+            className="btn btn-primary btn-lg"
           >
-            <FaPlus className="text-lg" />
+            <FaPlus />
             Add New Child
           </button>
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl p-6 mb-8 border border-white/20">
-          {/* Search Bar */}
-          <div className="relative mb-6">
-            <input
-              type="text"
-              placeholder="Search by name, phone number, or Sewa Darta Number..."
-              className="w-full px-6 py-4 pl-16 bg-white/50 backdrop-blur-sm border-0 rounded-2xl text-lg focus:outline-none focus:ring-4 focus:ring-purple-300 placeholder-gray-500 font-medium shadow-lg"
-              value={universalSearch}
-              onChange={(e) => {
-                setUniversalSearch(e.target.value);
-                if (e.target.value.trim()) {
-                  handleUniversalSearch(e.target.value);
-                } else {
-                  setSearchResults([]);
-                  setHasSearched(false);
-                }
-              }}
-            />
-            <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
-              {isSearching ? (
-                <div className="w-6 h-6 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin"></div>
-              ) : (
-                <FaSearch className="text-gray-400 text-xl" />
-              )}
-            </div>
-          </div>
-
-          {/* Filter Controls */}
-          <div className="flex justify-between items-center">
-            <button
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${showAdvancedFilters
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                  : 'bg-white/60 text-gray-700 hover:bg-white/80'
-                }`}
-            >
-              <FaFilter />
-              Advanced Filters
-            </button>
-
-            {(hasSearched || universalSearch || Object.values(advancedFilters).some(v => v)) && (
-              <button
-                onClick={clearAllFilters}
-                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all shadow-lg font-medium"
-              >
-                <FaTimesCircle />
-                Clear All
-              </button>
-            )}
-          </div>
-
-          {/* Advanced Filters Panel */}
-          {showAdvancedFilters && (
-            <div className="mt-6 pt-6 border-t border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4">
-              {[
-                { key: 'gender', label: 'Gender', options: [{ value: '', label: 'All Genders' }, { value: 'MALE', label: 'Male' }, { value: 'FEMALE', label: 'Female' }] },
-                { key: 'ward', label: 'Ward', options: [{ value: '', label: 'All Wards' }, ...Array.from({ length: 35 }, (_, i) => ({ value: i + 1, label: `Ward ${i + 1}` }))] },
-                { key: 'vaccinationStatus', label: 'Status', options: [{ value: '', label: 'All Status' }, { value: 'complete', label: 'Complete' }, { value: 'incomplete', label: 'Incomplete' }] }
-              ].map((filter) => (
-                <div key={filter.key}>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">{filter.label}</label>
-                  <select
-                    className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border-0 rounded-xl focus:outline-none focus:ring-4 focus:ring-purple-300 font-medium shadow-lg"
-                    value={advancedFilters[filter.key]}
-                    onChange={(e) => setAdvancedFilters({ ...advancedFilters, [filter.key]: e.target.value })}
-                  >
-                    {filter.options.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Created by me</label>
-                <div className="flex items-center bg-white/60 rounded-xl p-3 shadow-lg">
-                  <input
-                    type="checkbox"
-                    className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
-                    checked={advancedFilters.createdByMe}
-                    onChange={(e) => setAdvancedFilters({ ...advancedFilters, createdByMe: e.target.checked })}
-                  />
-                  <span className="ml-3 text-sm font-medium text-gray-700">Show only my records</span>
-                </div>
+        <div className="card bg-base-100 shadow-xl mb-6">
+          <div className="card-body">
+            {/* Search Bar */}
+            <div className="form-control mb-4">
+              <div className="input-group">
+                <span className="bg-base-200">
+                  {isSearching ? (
+                    <span className="loading loading-spinner loading-sm"></span>
+                  ) : (
+                    <FaSearch />
+                  )}
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search by name, phone number, or Sewa Darta Number..."
+                  className="input input-bordered flex-1"
+                  value={universalSearch}
+                  onChange={(e) => {
+                    setUniversalSearch(e.target.value);
+                    if (e.target.value.trim()) {
+                      handleUniversalSearch(e.target.value);
+                    } else {
+                      setSearchResults([]);
+                      setHasSearched(false);
+                    }
+                  }}
+                />
               </div>
             </div>
-          )}
+
+            {/* Filter Controls */}
+            <div className="flex justify-between items-center">
+              <button
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className={`btn ${showAdvancedFilters ? 'btn-primary' : 'btn-outline'}`}
+              >
+                <FaFilter />
+                Advanced Filters
+              </button>
+
+              {(hasSearched || universalSearch || Object.values(advancedFilters).some(v => v)) && (
+                <button
+                  onClick={clearAllFilters}
+                  className="btn btn-error"
+                >
+                  <FaTimesCircle />
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            {/* Advanced Filters Panel */}
+            {showAdvancedFilters && (
+              <div className="divider"></div>
+            )}
+            {showAdvancedFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {[
+                  { key: 'gender', label: 'Gender', options: [{ value: '', label: 'All Genders' }, { value: 'MALE', label: 'Male' }, { value: 'FEMALE', label: 'Female' }] },
+                  { key: 'ward', label: 'Ward', options: [{ value: '', label: 'All Wards' }, ...Array.from({ length: 35 }, (_, i) => ({ value: i + 1, label: `Ward ${i + 1}` }))] },
+                  { key: 'vaccinationStatus', label: 'Status', options: [{ value: '', label: 'All Status' }, { value: 'complete', label: 'Complete' }, { value: 'incomplete', label: 'Incomplete' }] }
+                ].map((filter) => (
+                  <div key={filter.key} className="form-control">
+                    <label className="label">
+                      <span className="label-text font-medium">{filter.label}</span>
+                    </label>
+                    <select
+                      className="select select-bordered"
+                      value={advancedFilters[filter.key]}
+                      onChange={(e) => setAdvancedFilters({ ...advancedFilters, [filter.key]: e.target.value })}
+                    >
+                      {filter.options.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-medium">Created by me</span>
+                  </label>
+                  <label className="cursor-pointer label bg-base-200 rounded-lg">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-primary"
+                      checked={advancedFilters.createdByMe}
+                      onChange={(e) => setAdvancedFilters({ ...advancedFilters, createdByMe: e.target.checked })}
+                    />
+                    <span className="label-text">Show only my records</span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Results Summary */}
-        <div className="mb-6 text-white/90 font-medium text-lg">
+        <div className="mb-4 text-base-content/70">
           {hasSearched ? (
             <span>Found {filteredChildren.length} result{filteredChildren.length !== 1 ? 's' : ''}</span>
           ) : (
@@ -1036,44 +1190,46 @@ export default function ViewChildren() {
 
         {/* Results */}
         {filteredChildren.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-12 max-w-md mx-auto">
-              <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <FaBaby className="text-white text-3xl" />
+          <div className="text-center py-12">
+            <div className="card bg-base-100 shadow-xl max-w-md mx-auto">
+              <div className="card-body text-center">
+                <FaBaby className="text-base-content/40 text-6xl mx-auto mb-4" />
+                <h3 className="card-title justify-center text-base-content mb-2">
+                  {hasSearched ? 'No results found' : 'No children records yet'}
+                </h3>
+                <p className="text-base-content/70 mb-6">
+                  {hasSearched
+                    ? 'Try adjusting your search terms or filters to find what you\'re looking for.'
+                    : 'Get started by adding your first child record to the system.'
+                  }
+                </p>
+                {!hasSearched && (
+                  <div className="card-actions justify-center">
+                    <button
+                      onClick={() => navigate('/add-child')}
+                      className="btn btn-primary"
+                    >
+                      <FaPlus />
+                      Add First Child
+                    </button>
+                  </div>
+                )}
               </div>
-              <h3 className="text-2xl font-bold text-white mb-4">
-                {hasSearched ? 'No results found' : 'No children records yet'}
-              </h3>
-              <p className="text-white/80 mb-8 font-medium">
-                {hasSearched
-                  ? 'Try adjusting your search terms or filters to find what you\'re looking for.'
-                  : 'Get started by adding your first child record to the system.'
-                }
-              </p>
-              {!hasSearched && (
-                <button
-                  onClick={() => navigate('/add-child')}
-                  className="flex items-center gap-2 px-6 py-3 bg-white/20 backdrop-blur-lg text-white rounded-2xl hover:bg-white/30 transition-all mx-auto shadow-lg hover:shadow-2xl font-medium border border-white/20"
-                >
-                  <FaPlus />
-                  Add First Child
-                </button>
-              )}
             </div>
           </div>
         ) : (
           <>
             {/* Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
               {currentChildren.map(child => renderChildCard(child))}
             </div>
 
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex justify-center">
-                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-lg rounded-2xl p-2 shadow-lg">
+                <div className="join">
                   <button
-                    className="px-4 py-3 rounded-xl text-white hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+                    className="join-item btn"
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                   >
@@ -1095,10 +1251,7 @@ export default function ViewChildren() {
                     return (
                       <button
                         key={pageNum}
-                        className={`px-4 py-3 rounded-xl transition-all font-medium ${currentPage === pageNum
-                            ? 'bg-white text-purple-600 shadow-lg'
-                            : 'text-white hover:bg-white/20'
-                          }`}
+                        className={`join-item btn ${currentPage === pageNum ? 'btn-primary' : ''}`}
                         onClick={() => setCurrentPage(pageNum)}
                       >
                         {pageNum}
@@ -1107,7 +1260,7 @@ export default function ViewChildren() {
                   })}
 
                   <button
-                    className="px-4 py-3 rounded-xl text-white hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+                    className="join-item btn"
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
                   >
@@ -1121,4 +1274,4 @@ export default function ViewChildren() {
       </div>
     </div>
   );
-}
+}      
