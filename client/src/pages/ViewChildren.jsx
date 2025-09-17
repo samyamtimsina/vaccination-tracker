@@ -513,9 +513,12 @@ export default function ViewChildren() {
   if (scheduleLoading || !vaccineSchedule) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-200">
-        <div className="text-center">
-          <FaSpinner className="animate-spin text-4xl text-primary mx-auto mb-3" />
-          <p className="text-base-content">Loading vaccination schedule...</p>
+        <div className="flex flex-col items-center space-y-4">
+          <FaSpinner className="animate-spin text-5xl text-primary" />
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-base-content mb-1">Loading Vaccination Schedule</h2>
+            <p className="text-base-content/60">Please wait while we load the data...</p>
+          </div>
         </div>
       </div>
     );
@@ -525,9 +528,12 @@ export default function ViewChildren() {
   if (loading || loadingVaccineTypes) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-200">
-        <div className="text-center">
-          <FaSpinner className="animate-spin text-4xl text-primary mx-auto mb-3" />
-          <p className="text-base-content">Loading children records...</p>
+        <div className="flex flex-col items-center space-y-4">
+          <FaSpinner className="animate-spin text-5xl text-primary" />
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-base-content mb-1">Loading Children Records</h2>
+            <p className="text-base-content/60">Please wait while we fetch the data...</p>
+          </div>
         </div>
       </div>
     );
@@ -536,20 +542,27 @@ export default function ViewChildren() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-base-200">
-        <div className="bg-base-100 p-6 rounded-xl shadow-lg border border-error/20 max-w-md mx-4">
-          <div className="text-center">
-            <h2 className="text-lg font-bold text-base-content mb-2">
-              Error Loading Data
-            </h2>
-            <p className="text-base-content text-sm">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-base-200 p-4">
+        <div className="bg-base-100 rounded-lg border border-error/20 shadow-sm max-w-md w-full">
+          <div className="p-6 text-center">
+            <div className="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FaExclamationTriangle className="text-2xl text-error" />
+            </div>
+            <h2 className="text-lg font-semibold text-base-content mb-2">Error Loading Data</h2>
+            <p className="text-base-content/70 text-sm">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="btn btn-primary btn-sm mt-4"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
-  // Render child card (styled like second code)
+  // Render child card
   const renderChildCard = (child) => {
     const age = calculateDetailedAge(child.birthDate);
     const hasWeightRecords = child.weightRecords && child.weightRecords.length > 0;
@@ -559,93 +572,99 @@ export default function ViewChildren() {
     return (
       <div
         key={child.id}
-        className="bg-base-100 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-base-200 overflow-hidden group cursor-pointer hover:scale-[1.02]"
+        className="bg-base-100 border border-base-300 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group hover:border-primary/30"
         onClick={() => setSelectedChild(child)}
       >
-        <div className="bg-gradient-to-r from-primary to-primary-focus text-primary-content p-4">
+        {/* Header */}
+        <div className="bg-base-200/50 px-4 py-3 border-b border-base-300">
           <div className="flex items-center justify-between mb-2">
-            <div className="bg-white/20 p-2 rounded-full">
-              <FaBaby className="text-xl" />
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                <FaBaby className="text-primary text-sm" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-base-content text-sm">
+                  {child.fullName} {child.lastName || ''}
+                </h3>
+                <p className="text-base-content/60 text-xs">{age.formatted}</p>
+              </div>
             </div>
-            <div
-              className={`px-3 py-1 rounded-full text-sm font-semibold ${child.purnaKhop
-                ? 'bg-green-500/30 text-green-100'
-                : 'bg-yellow-500/30 text-yellow-100'
-                } backdrop-blur-sm`}
-            >
-              {child.purnaKhop ? 'Vaccinated' : 'Pending'}
+            <div className={`px-2 py-1 rounded text-xs font-medium ${child.purnaKhop
+                ? 'bg-success/10 text-success'
+                : 'bg-warning/10 text-warning'
+              }`}>
+              {child.purnaKhop ? 'Complete' : 'Pending'}
             </div>
           </div>
-          <h3 className="text-xl font-bold mb-1">
-            {child.fullName} {child.lastName || ''}
-          </h3>
-          <p className="text-primary-content/80 text-sm">
-            {age.formatted}
-          </p>
         </div>
-        <div className="p-4 bg-base-100">
-          <div className="space-y-3 mb-4 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60 font-medium">
-                Birth (BS)
-              </span>
-              <span className="font-semibold text-base-content bg-base-200 px-2 py-1 rounded-md">
-                {safeAdToBs(child.birthDate)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60 font-medium">
-                Birth (AD)
-              </span>
-              <span className="font-semibold text-base-content bg-base-200 px-2 py-1 rounded-md">
-                {safeFormatDate(child.birthDate)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60 font-medium">Ward</span>
-              <span className="font-semibold text-base-content bg-base-200 px-2 py-1 rounded-md">
-                {child.wardNumber}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60 font-medium">Vaccinations</span>
-              <span className="font-semibold text-base-content bg-base-200 px-2 py-1 rounded-md">
-                {child.vaccinations ? child.vaccinations.length : 0}
-              </span>
-            </div>
-            {latestWeight && (
-              <div className="flex items-center justify-between">
-                <span className="text-base-content/60 font-medium flex items-center space-x-1">
-                  <FaWeight className="text-base" />
-                  <span>Latest Weight</span>
-                </span>
-                <span className="font-semibold text-base-content bg-base-200 px-2 py-1 rounded-md">
-                  {latestWeight.weight} kg
+
+        {/* Body */}
+        <div className="p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-base-content/60">Birth (BS)</span>
+                <span className="font-medium text-base-content bg-base-200 px-2 py-0.5 rounded">
+                  {safeAdToBs(child.birthDate)}
                 </span>
               </div>
-            )}
-            <div className="flex items-center justify-between text-xs pt-3 border-t border-base-200">
-              <span className="text-base-content/60 flex items-center space-x-1">
-                <FaUserMd className="text-base" />
-                <span
-                  className="hover:text-primary hover:underline cursor-pointer font-medium"
-                  onClick={(e) => { e.stopPropagation(); navigate(`/users/${child.createdBy.id}`); }}
-                >
-                  Created By: {child.createdBy.name}
+              <div className="flex justify-between items-center">
+                <span className="text-base-content/60">Ward</span>
+                <span className="font-medium text-base-content bg-base-200 px-2 py-0.5 rounded">
+                  {child.wardNumber}
                 </span>
-              </span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-base-content/60">Birth (AD)</span>
+                <span className="font-medium text-base-content bg-base-200 px-2 py-0.5 rounded">
+                  {safeFormatDate(child.birthDate)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-base-content/60">Vaccines</span>
+                <span className="font-medium text-base-content bg-base-200 px-2 py-0.5 rounded">
+                  {child.vaccinations ? child.vaccinations.length : 0}
+                </span>
+              </div>
             </div>
           </div>
-          <button className="w-full bg-primary/10 hover:bg-primary text-primary hover:text-primary-content py-2 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-2 border border-primary/20 group-hover:bg-primary group-hover:text-primary-content">
-            <FaEye />
-            <span>View Details</span>
+
+          {latestWeight && (
+            <div className="flex justify-between items-center pt-2 border-t border-base-300">
+              <span className="text-base-content/60 text-xs flex items-center space-x-1">
+                <FaWeight className="text-xs" />
+                <span>Latest Weight</span>
+              </span>
+              <span className="font-medium text-base-content bg-base-200 px-2 py-0.5 rounded text-xs">
+                {latestWeight.weight} kg
+              </span>
+            </div>
+          )}
+
+          <div className="pt-2 border-t border-base-300">
+            <p className="text-base-content/60 text-xs">
+              Created by{' '}
+              <span
+                className="font-medium text-primary hover:underline cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); navigate(`/users/${child.createdBy.id}`); }}
+              >
+                {child.createdBy.name}
+              </span>
+            </p>
+          </div>
+
+          <button className="w-full btn btn-sm btn-outline btn-primary group-hover:btn-primary">
+            <FaEye className="text-sm" />
+            View Details
           </button>
         </div>
       </div>
     );
   };
 
-  // Render detailed child view (styled like second code)
+  // Render detailed child view
   const renderChildDetails = (child) => {
     const age = calculateDetailedAge(child.birthDate);
     const vaccinationStats = getVaccinationStats(child);
@@ -658,23 +677,23 @@ export default function ViewChildren() {
     };
 
     return (
-      <div className="min-h-screen bg-gradient-to-b from-base-200 to-base-100 min-w-[20rem]">
-        <div className="bg-base-100 shadow-md border-b border-base-200">
+      <div className="min-h-screen bg-base-200">
+        {/* Top Navigation */}
+        <div className="bg-base-100 border-b border-base-300">
           <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
             <button
               onClick={() => setSelectedChild(null)}
-              className="inline-flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors font-semibold cursor-pointer group"
+              className="btn btn-ghost btn-sm"
             >
-              <FaChevronLeft className="text-base group-hover:-translate-x-1 transition-transform" />
-              <span>Back</span>
+              <FaChevronLeft />
+              Back to List
             </button>
-
             <button
               onClick={() => window.print()}
-              className="inline-flex items-center space-x-2 rounded-full bg-primary px-5 py-2.5 font-semibold text-primary-content transition-all duration-300 hover:bg-primary/90 hover:shadow-md hover:scale-105 cursor-pointer"
+              className="btn btn-primary btn-sm"
             >
-              <FaPrint className="text-lg" />
-              <span>Print</span>
+              <FaPrint />
+              Print
             </button>
           </div>
         </div>
@@ -693,36 +712,30 @@ export default function ViewChildren() {
         ) : (
           <div className="max-w-7xl mx-auto px-4 py-6">
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              {/* Left Sidebar */}
               <div className="xl:col-span-4 space-y-6">
                 {/* Child Basic Info */}
-                <div className="bg-base-100 rounded-2xl shadow-lg border border-base-200 overflow-hidden transform hover:scale-[1.01] transition-transform duration-300">
-                  <div className="bg-gradient-to-r from-primary to-primary-focus text-primary-content p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="bg-white/20 p-3 rounded-full">
-                        <FaBaby className="text-2xl" />
+                <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm">
+                  <div className="bg-primary text-primary-content px-6 py-4 rounded-t-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-primary-content/20 rounded-full flex items-center justify-center">
+                        <FaBaby className="text-xl" />
                       </div>
                       <div className="flex-1">
-                        <h1 className="text-2xl font-bold">
-                          {child.fullName}{' '}
-                          {child.lastName || ''}
+                        <h1 className="text-lg font-semibold">
+                          {child.fullName} {child.lastName || ''}
                         </h1>
-                        <p className="text-primary-content/80 text-base mt-1">
-                          {age.formatted}
-                        </p>
-                        <div className="flex items-center space-x-4 mt-3 text-sm">
-                          <span className="flex items-center space-x-1 bg-white/10 px-3 py-1 rounded-full">
-                            <FaMapMarkerAlt />
-                            <span>Ward {child.wardNumber}</span>
+                        <p className="text-primary-content/80 text-sm">{age.formatted}</p>
+                        <div className="flex items-center space-x-3 mt-2 text-xs">
+                          <span className="bg-primary-content/20 px-2 py-1 rounded">
+                            <FaMapMarkerAlt className="inline mr-1" />
+                            Ward {child.wardNumber}
                           </span>
-                          <span
-                            className={`px-3 py-1 rounded-full text-sm font-semibold ${child.purnaKhop
-                              ? 'bg-green-500/30 text-green-100'
-                              : 'bg-yellow-500/30 text-yellow-100'
-                              } backdrop-blur-sm`}
-                          >
-                            {child.purnaKhop
-                              ? 'Fully Vaccinated'
-                              : 'Incomplete'}
+                          <span className={`px-2 py-1 rounded ${child.purnaKhop
+                              ? 'bg-success/20 text-success-content'
+                              : 'bg-warning/20 text-warning-content'
+                            }`}>
+                            {child.purnaKhop ? 'Fully Vaccinated' : 'Incomplete'}
                           </span>
                         </div>
                       </div>
@@ -731,117 +744,91 @@ export default function ViewChildren() {
                 </div>
 
                 {/* Personal Information */}
-                <div className="bg-base-100 rounded-2xl shadow-lg border border-base-200 p-6 hover:shadow-xl transition-shadow duration-300">
-                  <h3 className="font-bold text-xl text-base-content mb-4 flex items-center space-x-2">
-                    <FaUser className="text-primary text-2xl" />
-                    <span>Personal Info</span>
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-base">
-                    <div className="bg-base-200/50 p-3 rounded-lg">
-                      <label className="text-sm font-medium text-base-content/60 block mb-1">
-                        Service Registration
-                      </label>
-                      <p className="font-semibold text-base-content">
-                        #{child.sewaDartaNumber}
-                      </p>
-                    </div>
+                <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm">
+                  <div className="px-6 py-4 border-b border-base-300">
+                    <h3 className="font-semibold text-base-content flex items-center space-x-2">
+                      <FaUser className="text-primary" />
+                      <span>Personal Information</span>
+                    </h3>
+                  </div>
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-base-content/60">Service Registration</label>
+                        <p className="font-medium text-base-content">#{child.sewaDartaNumber}</p>
+                      </div>
 
-                    <div className="bg-base-200/50 p-3 rounded-lg">
-                      <label className="text-sm font-medium text-base-content/60 block mb-1 flex items-center space-x-1">
-                        <FaVenusMars className="text-base" />
-                        <span>Gender</span>
-                      </label>
-                      <p className="font-semibold text-base-content">
-                        {child.gender}
-                      </p>
-                    </div>
-
-                    <div className="bg-base-200/50 p-3 rounded-lg">
-                      <label className="text-sm font-medium text-base-content/60 block mb-1">
-                        Parent Name
-                      </label>
-                      <p className="font-semibold text-base-content">
-                        {child.parentName}
-                      </p>
-                    </div>
-
-                    <div className="bg-base-200/50 p-3 rounded-lg">
-                      <label className="text-sm font-medium text-base-content/60 block mb-1">
-                        Tole
-                      </label>
-                      <p className="font-semibold text-base-content">
-                        {child.tole}
-                      </p>
-                    </div>
-
-                    {child.phoneNumber && (
-                      <div className="bg-base-200/50 p-3 rounded-lg">
-                        <label className="text-sm font-medium text-base-content/60 block mb-1">
-                          Phone
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-base-content/60 flex items-center space-x-1">
+                          <FaVenusMars />
+                          <span>Gender</span>
                         </label>
-                        <p className="font-semibold text-base-content">
-                          {child.phoneNumber}
+                        <p className="font-medium text-base-content">{child.gender}</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-base-content/60">Parent Name</label>
+                        <p className="font-medium text-base-content">{child.parentName}</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-base-content/60">Tole</label>
+                        <p className="font-medium text-base-content">{child.tole}</p>
+                      </div>
+
+                      {child.phoneNumber && (
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-base-content/60">Phone</label>
+                          <p className="font-medium text-base-content">{child.phoneNumber}</p>
+                        </div>
+                      )}
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-base-content/60">Municipality</label>
+                        <p className="font-medium text-base-content">
+                          {child.isFromOtherMunicipality ? 'Other' : 'Local'}
                         </p>
                       </div>
-                    )}
 
-                    <div className="bg-base-200/50 p-3 rounded-lg">
-                      <label className="text-sm font-medium text-base-content/60 block mb-1">
-                        Municipality
-                      </label>
-                      <p className="font-semibold text-base-content">
-                        {child.isFromOtherMunicipality
-                          ? 'Other'
-                          : 'Local'}
-                      </p>
-                    </div>
-
-                    <div className="bg-base-200/50 p-3 rounded-lg">
-                      <label className="text-sm font-medium text-base-content/60 block mb-1">
-                        Caste Code
-                      </label>
-                      <p className="font-semibold text-base-content">
-                        {child.casteCode}
-                      </p>
-                    </div>
-
-                    <div className="sm:col-span-2 bg-base-200/50 p-3 rounded-lg">
-                      <label className="text-sm font-medium text-base-content/60 block mb-1 flex items-center space-x-1">
-                        <FaBirthdayCake className="text-base" />
-                        <span>Birth Date</span>
-                      </label>
-                      <div className="flex space-x-4">
-                        <span className="font-semibold text-base-content">
-                          BS: {safeAdToBs(child.birthDate)}
-                        </span>
-                        <span className="font-semibold text-base-content">
-                          AD: {safeFormatDate(child.birthDate)}
-                        </span>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-base-content/60">Caste Code</label>
+                        <p className="font-medium text-base-content">{child.casteCode}</p>
                       </div>
-                    </div>
 
-                    <div className="sm:col-span-2 pt-4 border-t border-base-200">
-                      <label className="text-sm font-medium text-base-content/60 block mb-2 flex items-center space-x-1">
-                        <FaUserMd className="text-base" />
-                        <span>Record Info</span>
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="bg-base-200/50 p-3 rounded-lg">
-                          <span className="text-base-content/70 block mb-1">
-                            Created By:
+                      <div className="sm:col-span-2 space-y-1">
+                        <label className="text-xs font-medium text-base-content/60 flex items-center space-x-1">
+                          <FaBirthdayCake />
+                          <span>Birth Date</span>
+                        </label>
+                        <div className="flex space-x-4">
+                          <span className="font-medium text-base-content">
+                            BS: {safeAdToBs(child.birthDate)}
                           </span>
-                          <span
-                            className="font-semibold text-base-content hover:text-primary hover:underline cursor-pointer"
-                            onClick={() => navigate(`/users/${child.createdBy.id}`)}
-                          >
-                            {child.createdBy.name}
+                          <span className="font-medium text-base-content">
+                            AD: {safeFormatDate(child.birthDate)}
                           </span>
                         </div>
-                        <div className="bg-base-200/50 p-3 rounded-lg">
-                          <span className="text-base-content/70 block mb-1">Created On:</span>
-                          <span className="font-semibold text-base-content">
-                            {safeFormatDate(child.createdAt)}
-                          </span>
+                      </div>
+
+                      <div className="sm:col-span-2 pt-3 border-t border-base-300">
+                        <label className="text-xs font-medium text-base-content/60 flex items-center space-x-1 mb-2">
+                          <FaUserMd />
+                          <span>Record Information</span>
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <span className="text-xs text-base-content/60">Created By:</span>
+                            <p className="font-medium text-primary hover:underline cursor-pointer"
+                              onClick={() => navigate(`/users/${child.createdBy.id}`)}>
+                              {child.createdBy.name}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-xs text-base-content/60">Created On:</span>
+                            <p className="font-medium text-base-content">
+                              {safeFormatDate(child.createdAt)}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -849,153 +836,147 @@ export default function ViewChildren() {
                 </div>
 
                 {/* Vaccination Summary */}
-                <div className="bg-base-100 rounded-2xl shadow-lg border border-base-200 p-6 hover:shadow-xl transition-shadow duration-300">
-                  <h3 className="font-bold text-xl text-base-content mb-4 flex items-center space-x-2">
-                    <FaShieldAlt className="text-primary text-2xl" />
-                    <span>Vaccination Summary</span>
-                  </h3>
-                  <div className="flex items-center space-x-6 mb-6">
-                    <div className="relative w-24 h-24">
-                      <svg
-                        className="w-24 h-24 transform -rotate-90"
-                        viewBox="0 0 36 36"
-                      >
-                        <path
-                          className="text-base-200"
-                          stroke="currentColor"
-                          strokeWidth="3"
-                          fill="transparent"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                        <path
-                          className={
-                            vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount) * 100 === 100
-                              ? 'text-green-500'
+                <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm">
+                  <div className="px-6 py-4 border-b border-base-300">
+                    <h3 className="font-semibold text-base-content flex items-center space-x-2">
+                      <FaShieldAlt className="text-primary" />
+                      <span>Vaccination Summary</span>
+                    </h3>
+                  </div>
+                  <div className="p-6">
+                    <div className="flex items-center space-x-6 mb-6">
+                      <div className="relative w-20 h-20">
+                        <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                          <path
+                            className="text-base-300"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            fill="transparent"
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                          />
+                          <path
+                            className={
+                              vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount) * 100 === 100
+                                ? 'text-success'
+                                : 'text-primary'
+                            }
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeDasharray={`${(vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount)) * 100}, 100`}
+                            strokeLinecap="round"
+                            fill="transparent"
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className={`text-lg font-bold ${vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount) * 100 === 100
+                              ? 'text-success'
                               : 'text-primary'
-                          }
-                          stroke="currentColor"
-                          strokeWidth="3"
-                          strokeDasharray={`${(vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount)) * 100}, 100`}
-                          strokeLinecap="round"
-                          fill="transparent"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span
-                          className={`text-xl font-bold ${vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount) * 100 === 100 ? 'text-green-500' : 'text-primary'}`}
-                        >
-                          {Math.round((vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount)) * 100) || 0}%
-                        </span>
+                            }`}>
+                            {Math.round((vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount)) * 100) || 0}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-base-content/60 font-medium mb-1">Overall Progress</p>
+                        <p className="text-lg font-semibold text-base-content">
+                          {vaccinationStats.totalGiven} / {vaccinationStats.totalGiven + vaccinationStats.pendingCount} doses given
+                        </p>
                       </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-base text-base-content/70 font-medium mb-1">
-                        Overall Progress
-                      </p>
-                      <p className="text-xl font-bold text-base-content">
-                        {vaccinationStats.totalGiven} / {vaccinationStats.totalGiven + vaccinationStats.pendingCount} doses given
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div className="bg-green-50 rounded-lg p-4 shadow-inner">
-                      <p className="text-3xl font-bold text-green-600">
-                        {vaccinationStats.totalGiven}
-                      </p>
-                      <p className="text-sm text-base-content/80 mt-1">Complete</p>
-                    </div>
-                    <div className="bg-red-50 rounded-lg p-4 shadow-inner">
-                      <p className="text-3xl font-bold text-red-600">
-                        {vaccinationStats.overdueCount}
-                      </p>
-                      <p className="text-sm text-base-content/80 mt-1">Overdue</p>
-                    </div>
-                    <div className="bg-yellow-50 rounded-lg p-4 shadow-inner">
-                      <p className="text-3xl font-bold text-yellow-600">
-                        {vaccinationStats.pendingCount}
-                      </p>
-                      <p className="text-sm text-base-content/80 mt-1">Pending</p>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div className="bg-success/10 rounded-lg p-3">
+                        <p className="text-2xl font-bold text-success">{vaccinationStats.totalGiven}</p>
+                        <p className="text-xs text-base-content/70 mt-1">Complete</p>
+                      </div>
+                      <div className="bg-error/10 rounded-lg p-3">
+                        <p className="text-2xl font-bold text-error">{vaccinationStats.overdueCount}</p>
+                        <p className="text-xs text-base-content/70 mt-1">Overdue</p>
+                      </div>
+                      <div className="bg-warning/10 rounded-lg p-3">
+                        <p className="text-2xl font-bold text-warning">{vaccinationStats.pendingCount}</p>
+                        <p className="text-xs text-base-content/70 mt-1">Pending</p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Weight Records */}
                 {child.weightRecords && child.weightRecords.length > 0 && (
-                  <div className="bg-base-100 rounded-2xl shadow-lg border border-base-200 p-6 hover:shadow-xl transition-shadow duration-300">
-                    <h3 className="font-bold text-xl text-base-content mb-4 flex items-center space-x-2">
-                      <FaWeight className="text-primary text-2xl" />
-                      <span>Weight Records</span>
-                    </h3>
-
-                    <div className="space-y-4 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
-                      {child.weightRecords
-                        .sort((a, b) => new Date(b.date) - new Date(a.date))
-                        .map((record, index) => (
-                          <div key={record.id} className="bg-base-200/50 border border-base-200 rounded-xl p-4 hover:bg-base-200 transition-colors">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center space-x-3">
-                                <span className="text-2xl font-bold text-primary">
-                                  {record.weight} kg
-                                </span>
-                                {index === 0 && (
-                                  <span className="text-sm bg-primary/20 text-primary px-3 py-1 rounded-full font-medium">
-                                    Latest
+                  <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm">
+                    <div className="px-6 py-4 border-b border-base-300">
+                      <h3 className="font-semibold text-base-content flex items-center space-x-2">
+                        <FaWeight className="text-primary" />
+                        <span>Weight Records</span>
+                      </h3>
+                    </div>
+                    <div className="p-6">
+                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                        {child.weightRecords
+                          .sort((a, b) => new Date(b.date) - new Date(a.date))
+                          .map((record, index) => (
+                            <div key={record.id} className="bg-base-200/50 border border-base-300 rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center space-x-3">
+                                  <span className="text-xl font-bold text-primary">{record.weight} kg</span>
+                                  {index === 0 && (
+                                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                                      Latest
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-right text-xs text-base-content/60">
+                                  <div>BS: {safeAdToBs(record.date)}</div>
+                                  <div>AD: {safeFormatDate(record.date)}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between text-xs text-base-content/60">
+                                <div className="flex items-center space-x-2">
+                                  <FaUserMd />
+                                  <span
+                                    className="hover:text-primary hover:underline cursor-pointer font-medium"
+                                    onClick={() => navigate(`/users/${record.createdBy.id}`)}
+                                  >
+                                    Recorded by {record.createdBy.name}
                                   </span>
-                                )}
-                              </div>
-                              <div className="text-right text-sm text-base-content/70">
-                                <div>BS: {safeAdToBs(record.date)}</div>
-                                <div>AD: {safeFormatDate(record.date)}</div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-between text-sm text-base-content/60">
-                              <div className="flex items-center space-x-2">
-                                <FaUserMd className="text-base" />
-                                <span
-                                  className="hover:text-primary hover:underline cursor-pointer font-medium"
-                                  onClick={() => navigate(`/users/${record.createdBy.id}`)}
-                                >
-                                  Recorded By: {record.createdBy.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <FaClock className="text-base" />
-                                <span>Recorded On {safeFormatDate(record.createdAt)}</span>
-                                <button className='btn btn-primary btn-sm rounded-full' onClick={handleButtonClick}>Show Graph</button>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                  <div className="flex items-center space-x-1">
+                                    <FaClock />
+                                    <span>On {safeFormatDate(record.createdAt)}</span>
+                                  </div>
+                                  <button className="btn btn-primary btn-xs" onClick={handleButtonClick}>
+                                    Show Graph
+                                  </button>
+                                </div>
                               </div>
                             </div>
-
-                          </div>
-
-                        ))}
+                          ))}
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Vaccination Records */}
+              {/* Vaccination Records - Main Content */}
               <div className="xl:col-span-8">
-                <div className="bg-base-100 rounded-2xl shadow-lg border border-base-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                  <div className="bg-gradient-to-r from-primary to-primary-focus text-primary-content px-6 py-4">
+                <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm">
+                  <div className="bg-primary text-primary-content px-6 py-4 rounded-t-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h2 className="text-xl font-bold flex items-center space-x-2">
-                          <FaSyringe className="text-2xl" />
+                        <h2 className="text-lg font-semibold flex items-center space-x-2">
+                          <FaSyringe />
                           <span>Vaccination Records</span>
                         </h2>
-                        <p className="text-primary-content/80 text-sm mt-1">
-                          Track and manage vaccinations
-                        </p>
+                        <p className="text-primary-content/80 text-sm mt-1">Complete vaccination history and schedule</p>
                       </div>
-                      <div className="flex items-center space-x-6 text-sm">
+                      <div className="flex items-center space-x-4 text-sm">
                         <div className="flex items-center space-x-1">
-                          <div className="w-3 h-3 bg-white rounded-full"></div>
-                          <span>Given</span>
+                          <div className="w-3 h-3 bg-primary-content rounded-full"></div>
+                          <span>Completed</span>
                         </div>
                         <div className="flex items-center space-x-1">
-                          <div className="w-3 h-3 bg-white/30 rounded-full"></div>
+                          <div className="w-3 h-3 bg-primary-content/30 rounded-full"></div>
                           <span>Pending</span>
                         </div>
                       </div>
@@ -1004,239 +985,218 @@ export default function ViewChildren() {
 
                   <div className="p-6">
                     <div className="columns-1 lg:columns-2 gap-6">
-                      {Object.entries(vaccinationTemplate).map(
-                        ([vaccineTypeName, vaccineData]) => {
-                          const completedCount = vaccineData.doses.filter(
-                            (dose) => dose.status === "completed"
-                          ).length;
-                          const totalRequired = vaccineData.doses.length;
-                          const completionPercentage = Math.round(
-                            (completedCount / totalRequired) * 100
-                          );
+                      {Object.entries(vaccinationTemplate).map(([vaccineTypeName, vaccineData]) => {
+                        const primaryDoses = vaccineData.doses.filter(d => d.scheduleInfo.isPrimary);
+                        const boosterDoses = vaccineData.doses.filter(d => d.scheduleInfo.isBooster);
+                        const primaryCompleted = primaryDoses.filter(d => d.status === 'completed').length;
+                        const boosterCompleted = boosterDoses.filter(d => d.status === 'completed').length;
+                        const primaryTotal = primaryDoses.length;
+                        const boosterTotal = boosterDoses.length;
+                        const totalRequired = primaryTotal + boosterTotal;
+                        const completedCount = primaryCompleted + boosterCompleted;
+                        const completionPercentage = totalRequired > 0 ? Math.round((completedCount / totalRequired) * 100) : 0;
 
-                          return (
-                            <div
-                              key={vaccineTypeName}
-                              className="mb-6 break-inside-avoid bg-base-100 rounded-2xl shadow-lg border border-base-300 hover:shadow-xl transition-all"
-                            >
-                              {/* Vaccine Type Header */}
-                              <div className="px-4 py-2 bg-primary/10 border-b border-base-200 rounded-t-2xl flex items-center justify-between">
-                                <h4 className="font-bold text-lg text-base-content">
-                                  {vaccineTypeName}
-                                </h4>
-                                <div className="flex items-center space-x-3">
-                                  <span
-                                    className={`px-3 py-1 rounded-full text-sm font-medium ${completedCount === totalRequired
-                                        ? "bg-green-100 text-green-800"
-                                        : completedCount > 0
-                                          ? "bg-yellow-100 text-yellow-800"
-                                          : "bg-gray-100 text-gray-800"
+                        return (
+                          <div
+                            key={vaccineTypeName}
+                            className="mb-6 break-inside-avoid bg-base-100 rounded-lg border-2 border-primary/20 hover:border-primary/40 transition-colors shadow-sm"
+                          >
+                            {/* Vaccine Type Header */}
+                            <div className="px-4 py-3 bg-base-200/50 border-b border-base-300 rounded-t-lg flex items-center justify-between">
+                              <h4 className="font-semibold text-base-content">{vaccineTypeName}</h4>
+                              <div className="flex items-center space-x-2">
+                                {primaryTotal > 0 && (
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${primaryCompleted === primaryTotal
+                                      ? "bg-success/10 text-success"
+                                      : primaryCompleted > 0
+                                        ? "bg-warning/10 text-warning"
+                                        : "bg-base-200 text-base-content/60"
+                                    }`}>
+                                    Primary: {primaryCompleted}/{primaryTotal}
+                                  </span>
+                                )}
+                                {boosterTotal > 0 && (
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${boosterCompleted === boosterTotal
+                                      ? "bg-success/10 text-success"
+                                      : boosterCompleted > 0
+                                        ? "bg-warning/10 text-warning"
+                                        : "bg-base-200 text-base-content/60"
+                                    }`}>
+                                    Booster: {boosterCompleted}/{boosterTotal}
+                                  </span>
+                                )}
+                                <span className="text-xs font-semibold text-base-content">
+                                  {completionPercentage}%
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Progress bar */}
+                            <div className="px-4 pt-3">
+                              <div className="w-full bg-base-300 rounded-full h-1.5 mb-4">
+                                <div
+                                  className={`h-1.5 rounded-full transition-all duration-300 ${completionPercentage === 100 ? "bg-success" : "bg-primary"
+                                    }`}
+                                  style={{ width: `${completionPercentage}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Dose list */}
+                            <div className="p-4 space-y-3">
+                              {vaccineData.doses.map((dose, index) => {
+                                const isGiven = dose.actualVaccination !== undefined;
+                                const doseType = dose.scheduleInfo.isPrimary
+                                  ? "Primary"
+                                  : dose.scheduleInfo.isBooster
+                                    ? "Catchup"
+                                    : "";
+
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`rounded-lg p-4 border transition-colors ${dose.scheduleInfo.isPrimary
+                                        ? "border-l-4 border-l-blue-400 bg-blue-50/30 border-blue-200"
+                                        : dose.scheduleInfo.isBooster
+                                          ? "border-l-4 border-l-purple-400 bg-purple-50/30 border-purple-200"
+                                          : "border-base-300 bg-base-50"
                                       }`}
                                   >
-                                    {completedCount}/{totalRequired}
-                                  </span>
-                                  <span className="text-sm font-medium text-base-content">
-                                    {completionPercentage}%
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Progress bar */}
-                              <div className="px-4 pt-4">
-                                <div className="w-full bg-base-200 rounded-full h-2 mb-4">
-                                  <div
-                                    className={`h-2 rounded-full transition-all duration-500 ${completionPercentage === 100
-                                        ? "bg-green-500"
-                                        : "bg-primary"
-                                      }`}
-                                    style={{ width: `${completionPercentage}%` }}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Dose list */}
-                              <div className="p-4 space-y-3">
-                                {vaccineData.doses.map((dose, index) => {
-                                  const isGiven = dose.actualVaccination !== undefined;
-                                  const doseType = dose.scheduleInfo.isPrimary
-                                    ? "Primary"
-                                    : dose.scheduleInfo.isBooster
-                                      ? "Catchup"
-                                      : "";
-
-                                  return (
-                                    <div
-                                      key={index}
-                                      className={`rounded-xl p-4 space-y-3 border shadow-sm transition-colors ${dose.scheduleInfo.isPrimary
-                                          ? "border-l-4 border-blue-500 bg-blue-50/50"
-                                          : dose.scheduleInfo.isBooster
-                                            ? "border-l-4 border-purple-500 bg-purple-50/50"
-                                            : "border border-base-200 bg-base-100"
-                                        }`}
-                                    >
-                                      {/* Dose header */}
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-3">
-                                          <div
-                                            className={`w-3 h-3 rounded-full ${isGiven ? "bg-green-500" : "bg-base-content/20"
-                                              }`}
-                                          />
-                                          <span className="font-semibold text-base">
-                                            Dose {dose.doseNumber}
+                                    {/* Dose header */}
+                                    <div className="flex items-center justify-between mb-3">
+                                      <div className="flex items-center space-x-3">
+                                        <div className={`w-3 h-3 rounded-full ${isGiven ? "bg-success" : "bg-base-content/20"
+                                          }`} />
+                                        <span className="font-semibold text-base-content">
+                                          Dose {dose.doseNumber}
+                                        </span>
+                                        {doseType && (
+                                          <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${dose.scheduleInfo.isPrimary
+                                              ? "bg-blue-100 text-blue-800"
+                                              : "bg-purple-100 text-purple-800"
+                                            }`}>
+                                            {doseType}
                                           </span>
-                                          {doseType && (
-                                            <span
-                                              className={`px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide ${dose.scheduleInfo.isPrimary
-                                                  ? "bg-blue-500 text-white"
-                                                  : "bg-purple-500 text-white"
-                                                }`}
-                                            >
-                                              {doseType}
-                                            </span>
-                                          )}
-                                          <span className="text-base-content/60 bg-base-200 px-3 py-1 rounded-full text-sm">
-                                            {getRecommendedAgeDisplay(dose.scheduleInfo)}
-                                          </span>
-                                        </div>
-                                        {isGiven && (
-                                          <FaCheckCircle className="text-green-500 text-xl" />
                                         )}
+                                        <span className="text-base-content/60 bg-base-200 px-2 py-1 rounded text-xs">
+                                          {getRecommendedAgeDisplay(dose.scheduleInfo)}
+                                        </span>
                                       </div>
+                                      {isGiven && (
+                                        <FaCheckCircle className="text-success text-lg" />
+                                      )}
+                                    </div>
 
-                                      {/* Given vs Due sections */}
-                                      {isGiven ? (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                          <div className="space-y-2">
-                                            <div className="font-medium text-base-content bg-base-200/50 p-2 rounded-md">
-                                              Given On BS: {safeAdToBs(dose.dateGiven)}
-                                            </div>
-                                            <div className="text-base-content/70 bg-base-200/50 p-2 rounded-md">
-                                              Given On AD: {safeFormatDate(dose.dateGiven)}
-                                            </div>
-                                            {dose.actualVaccination?.type && (
-                                              <div className="mt-2">
-                                                <span className="px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800">
-                                                  {dose.actualVaccination.type}
-                                                </span>
-                                              </div>
-                                            )}
+                                    {/* Given vs Due sections */}
+                                    {isGiven ? (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                        <div className="space-y-2">
+                                          <div className="font-medium text-base-content bg-base-200/50 p-2 rounded">
+                                            Given On BS: {safeAdToBs(dose.dateGiven)}
                                           </div>
-                                          <div className="space-y-2">
-                                            {/* Created By / Given By */}
-                                            <div className="bg-base-200/50 p-2 rounded-md space-y-1">
-                                              <div className="flex items-center space-x-2 text-base-content/70">
-                                                <FaUserMd className="text-base" />
-                                                <span
-                                                  className="hover:text-primary hover:underline cursor-pointer font-medium"
-                                                  onClick={() =>
-                                                    navigate(
-                                                      `/users/${dose.actualVaccination.createdBy.id}`
-                                                    )
-                                                  }
-                                                >
-                                                  Created By: {dose.createdBy}
-                                                </span>
-                                              </div>
-                                              <div className="flex items-center space-x-2 text-base-content/70">
-                                                <FaUserMd className="text-base" />
-                                                <span
-                                                  className="hover:text-primary hover:underline cursor-pointer font-medium"
-                                                  onClick={() =>
-                                                    navigate(
-                                                      `/users/${dose.actualVaccination.administeredBy.id}`
-                                                    )
-                                                  }
-                                                >
-                                                  Given By: {dose.administeredBy}
-                                                </span>
-                                              </div>
+                                          <div className="text-base-content/70 bg-base-200/50 p-2 rounded">
+                                            Given On AD: {safeFormatDate(dose.dateGiven)}
+                                          </div>
+                                          {dose.actualVaccination?.type && (
+                                            <div className="mt-2">
+                                              <span className="px-2 py-1 rounded text-xs font-medium bg-info/10 text-info">
+                                                {dose.actualVaccination.type}
+                                              </span>
                                             </div>
-
-                                            {/* Recorded On */}
-                                            <div className="flex items-center space-x-2 text-base-content/70 bg-base-200/50 p-2 rounded-md">
-                                              <FaClock className="text-base" />
-                                              <span>
-                                                Recorded:{" "}
-                                                {safeFormatDate(
-                                                  dose.actualVaccination.createdAt
-                                                )}
+                                          )}
+                                        </div>
+                                        <div className="space-y-2">
+                                          <div className="bg-base-200/50 p-2 rounded space-y-1">
+                                            <div className="flex items-center space-x-2 text-base-content/70">
+                                              <FaUserMd className="text-xs" />
+                                              <span
+                                                className="hover:text-primary hover:underline cursor-pointer font-medium"
+                                                onClick={() => navigate(`/users/${dose.actualVaccination.createdBy.id}`)}
+                                              >
+                                                Created By: {dose.createdBy}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center space-x-2 text-base-content/70">
+                                              <FaUserMd className="text-xs" />
+                                              <span
+                                                className="hover:text-primary hover:underline cursor-pointer font-medium"
+                                                onClick={() => navigate(`/users/${dose.actualVaccination.administeredBy.id}`)}
+                                              >
+                                                Given By: {dose.administeredBy}
                                               </span>
                                             </div>
                                           </div>
-
-                                          {dose.actualVaccination.notes && (
-                                            <div className="md:col-span-2 mt-3 p-3 bg-base-200 rounded-xl border-l-4 border-primary">
-                                              <div className="text-sm text-base-content/70 mb-1 font-medium">
-                                                Remarks
-                                              </div>
-                                              <div className="text-base text-base-content">
-                                                {dose.actualVaccination.notes}
-                                              </div>
-                                            </div>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <div className="p-3 bg-base-200 rounded-xl">
-                                          {dose.dueDate ? (
-                                            <div className="space-y-2">
-                                              <div
-                                                className={`font-medium ${dose.status === "missed"
-                                                    ? "text-purple-600"
-                                                    : dose.overdueDays
-                                                      ? "text-red-600"
-                                                      : "text-yellow-600"
-                                                  } bg-white/50 p-2 rounded-md`}
-                                              >
-                                                Due On BS: {safeAdToBs(dose.dueDate)}
-                                              </div>
-                                              <div
-                                                className={`text-base-content/70 ${dose.status === "missed"
-                                                    ? "text-purple-600"
-                                                    : dose.overdueDays
-                                                      ? "text-red-600"
-                                                      : "text-yellow-600"
-                                                  } bg-white/50 p-2 rounded-md`}
-                                              >
-                                                Due On AD: {safeFormatDate(dose.dueDate)}
-                                              </div>
-                                              {dose.status === "missed" ? (
-                                                <span className="badge badge-secondary badge-lg px-4 py-3">
-                                                  Missed (Overdue by {dose.overdueDays} days)
-                                                </span>
-                                              ) : dose.overdueDays ? (
-                                                <span className="badge badge-error badge-lg px-4 py-3">
-                                                  Overdue by {dose.overdueDays} days
-                                                </span>
-                                              ) : dose.daysUntilDue ? (
-                                                <span className="badge badge-warning badge-lg px-4 py-3">
-                                                  Due in {dose.daysUntilDue} days
-                                                </span>
-                                              ) : (
-                                                <span className="badge badge-info badge-lg px-4 py-3">
-                                                  Upcoming
-                                                </span>
-                                              )}
-                                            </div>
-                                          ) : (
-                                            <span className="text-base-content/50 italic text-base block text-center">
-                                              Not Administered
+                                          <div className="flex items-center space-x-2 text-base-content/70 bg-base-200/50 p-2 rounded">
+                                            <FaClock className="text-xs" />
+                                            <span>
+                                              Recorded: {safeFormatDate(dose.actualVaccination.createdAt)}
                                             </span>
-                                          )}
+                                          </div>
                                         </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
+
+                                        {dose.actualVaccination.notes && (
+                                          <div className="md:col-span-2 mt-3 p-3 bg-base-200/50 rounded-lg border-l-4 border-primary">
+                                            <div className="text-xs text-base-content/60 mb-1 font-medium">Remarks</div>
+                                            <div className="text-sm text-base-content">
+                                              {dose.actualVaccination.notes}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="p-3 bg-base-200/50 rounded-lg">
+                                        {dose.dueDate ? (
+                                          <div className="space-y-2">
+                                            <div className={`font-medium p-2 rounded ${dose.status === "missed"
+                                                ? "text-secondary bg-secondary/10"
+                                                : dose.overdueDays
+                                                  ? "text-error bg-error/10"
+                                                  : "text-warning bg-warning/10"
+                                              }`}>
+                                              Due On BS: {safeAdToBs(dose.dueDate)}
+                                            </div>
+                                            <div className={`text-base-content/70 p-2 rounded ${dose.status === "missed"
+                                                ? "text-secondary bg-secondary/10"
+                                                : dose.overdueDays
+                                                  ? "text-error bg-error/10"
+                                                  : "text-warning bg-warning/10"
+                                              }`}>
+                                              Due On AD: {safeFormatDate(dose.dueDate)}
+                                            </div>
+                                            {dose.status === "missed" ? (
+                                              <span className="badge badge-secondary">
+                                                Missed (Overdue by {dose.overdueDays} days)
+                                              </span>
+                                            ) : dose.overdueDays ? (
+                                              <span className="badge badge-error">
+                                                Overdue by {dose.overdueDays} days
+                                              </span>
+                                            ) : dose.daysUntilDue ? (
+                                              <span className="badge badge-warning">
+                                                Due in {dose.daysUntilDue} days
+                                              </span>
+                                            ) : (
+                                              <span className="badge badge-info">Upcoming</span>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <span className="text-base-content/50 italic text-center block">
+                                            Not Administered
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          );
-                        }
-                      )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
         )}
@@ -1244,9 +1204,9 @@ export default function ViewChildren() {
     );
   };
 
-  // Main view (styled like second code)
+  // Main view
   return (
-    <div className="min-h-screen bg-gradient-to-b from-base-200 to-base-100 min-w-[20rem]">
+    <div className="min-h-screen bg-base-200">
       {showPrintComponent && selectedChild && (
         <VaccinationCardOverlay
           child={selectedChild}
@@ -1258,36 +1218,41 @@ export default function ViewChildren() {
         renderChildDetails(selectedChild)
       ) : (
         <div>
-          <div className="bg-base-100 shadow-md border-b border-base-200">
+          {/* Header */}
+          <div className="bg-base-100 border-b border-base-300 shadow-sm">
             <div className="max-w-7xl mx-auto px-6 py-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
                 <div>
-                  <h1 className="text-3xl font-bold text-base-content mb-1">
-                    Children Records
-                  </h1>
-                  <p className="text-base-content/70 text-base">
-                    Manage and track vaccination records for all children
-                  </p>
+                  <h1 className="text-2xl font-bold text-base-content mb-1">Children Records</h1>
+                  <p className="text-base-content/70">Manage and track vaccination records for all children</p>
                 </div>
                 <div className="flex items-center space-x-4">
-                  <button
-                    onClick={() => changeLanguage('en')}
-                    className={`text-base font-medium px-3 py-1 rounded-md transition-colors ${i18n.language === 'en' ? 'bg-primary text-primary-content' : 'text-base-content/60 hover:bg-base-200'}`}
-                  >
-                    English
-                  </button>
-                  <span className="text-base-content/30">|</span>
-                  <button
-                    onClick={() => changeLanguage('ne')}
-                    className={`text-base font-medium px-3 py-1 rounded-md transition-colors ${i18n.language === 'ne' ? 'bg-primary text-primary-content' : 'text-base-content/60 hover:bg-base-200'}`}
-                  >
-                    नेपाली
-                  </button>
+                  <div className="flex items-center bg-base-200 rounded-lg p-1">
+                    <button
+                      onClick={() => changeLanguage('en')}
+                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${i18n.language === 'en'
+                          ? 'bg-base-100 text-base-content shadow-sm'
+                          : 'text-base-content/60 hover:text-base-content'
+                        }`}
+                    >
+                      English
+                    </button>
+                    <button
+                      onClick={() => changeLanguage('ne')}
+                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${i18n.language === 'ne'
+                          ? 'bg-base-100 text-base-content shadow-sm'
+                          : 'text-base-content/60 hover:text-base-content'
+                        }`}
+                    >
+                      नेपाली
+                    </button>
+                  </div>
                   <button
                     onClick={() => navigate('/add-child')}
-                    className="inline-flex items-center space-x-2 bg-primary hover:bg-primary/90 text-primary-content px-5 py-3 rounded-full font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 cursor-pointer">
+                    className="btn btn-primary"
+                  >
                     <FaPlus />
-                    <span>Add Child</span>
+                    Add Child
                   </button>
                 </div>
               </div>
@@ -1295,14 +1260,15 @@ export default function ViewChildren() {
           </div>
 
           <div className="max-w-7xl mx-auto px-6 py-8">
+            {/* Search and Stats */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
               <div className="lg:col-span-2">
                 <div className="relative">
-                  <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-base-content/50 text-xl" />
+                  <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-base-content/50" />
                   <input
                     type="text"
                     placeholder="Search by name, phone number, or sewa darta number..."
-                    className="w-full pl-12 pr-4 py-4 bg-base-100 border border-base-200 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm text-base-content placeholder:text-base-content/60 text-base"
+                    className="input input-bordered w-full pl-12 bg-base-100"
                     value={universalSearch}
                     onChange={(e) => {
                       setUniversalSearch(e.target.value);
@@ -1312,30 +1278,28 @@ export default function ViewChildren() {
                 </div>
               </div>
 
-              <div className="bg-base-100 rounded-2xl p-5 shadow-md border border-base-200 hover:shadow-lg transition-shadow">
-                <div className="flex items-center space-x-4">
-                  <div className="bg-primary/10 p-3 rounded-full">
-                    <FaBaby className="text-primary text-2xl" />
+              <div className="bg-base-100 border border-base-300 rounded-lg p-4 shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <FaBaby className="text-primary" />
                   </div>
                   <div>
-                    <p className="text-3xl font-bold text-base-content">
-                      {childrenArray.length}
-                    </p>
-                    <p className="text-base text-base-content/70">Total Children</p>
+                    <p className="text-2xl font-bold text-base-content">{childrenArray.length}</p>
+                    <p className="text-sm text-base-content/70">Total Children</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-base-100 rounded-2xl p-5 shadow-md border border-base-200 hover:shadow-lg transition-shadow">
-                <div className="flex items-center space-x-4">
-                  <div className="bg-green-100 p-3 rounded-full">
-                    <FaCheckCircle className="text-green-600 text-2xl" />
+              <div className="bg-base-100 border border-base-300 rounded-lg p-4 shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-success/10 rounded-full flex items-center justify-center">
+                    <FaCheckCircle className="text-success" />
                   </div>
                   <div>
-                    <p className="text-3xl font-bold text-base-content">
+                    <p className="text-2xl font-bold text-base-content">
                       {childrenArray.filter((child) => child.purnaKhop).length}
                     </p>
-                    <p className="text-base text-base-content/70">Fully Vaccinated</p>
+                    <p className="text-sm text-base-content/70">Fully Vaccinated</p>
                   </div>
                 </div>
               </div>
@@ -1344,20 +1308,17 @@ export default function ViewChildren() {
             {/* Advanced Filters Toggle */}
             <div className="flex items-center justify-between mb-6">
               <button
-                className="btn btn-ghost gap-2 text-base font-medium hover:bg-base-200 rounded-full px-5 py-2.5"
+                className="btn btn-ghost btn-sm"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
               >
-                <FaFilter className="text-lg" />
+                <FaFilter />
                 Advanced Filters
-                {showAdvancedFilters ? <FaChevronUp className="text-lg" /> : <FaChevronDown className="text-lg" />}
+                {showAdvancedFilters ? <FaChevronUp /> : <FaChevronDown />}
               </button>
 
               {(universalSearch || Object.values(advancedFilters).some(val => val !== '' && val !== false)) && (
-                <button
-                  className="btn btn-ghost btn-error gap-2 text-base font-medium hover:bg-error/10 rounded-full px-5 py-2.5"
-                  onClick={clearAllFilters}
-                >
-                  <FaTimesCircle className="text-lg" />
+                <button className="btn btn-ghost btn-sm text-error" onClick={clearAllFilters}>
+                  <FaTimesCircle />
                   Clear Filters
                 </button>
               )}
@@ -1365,14 +1326,13 @@ export default function ViewChildren() {
 
             {/* Advanced Filters */}
             {showAdvancedFilters && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 p-6 bg-base-100 rounded-2xl border border-base-200 shadow-md">
-                {/* Gender Filter */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 p-6 bg-base-100 border border-base-300 rounded-lg shadow-sm">
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold text-base">Gender</span>
+                    <span className="label-text font-medium">Gender</span>
                   </label>
                   <select
-                    className="select select-bordered rounded-full text-base"
+                    className="select select-bordered"
                     value={advancedFilters.gender}
                     onChange={(e) => setAdvancedFilters({ ...advancedFilters, gender: e.target.value })}
                   >
@@ -1382,13 +1342,12 @@ export default function ViewChildren() {
                   </select>
                 </div>
 
-                {/* Ward Filter */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold text-base">Ward Number</span>
+                    <span className="label-text font-medium">Ward Number</span>
                   </label>
                   <select
-                    className="select select-bordered rounded-full text-base"
+                    className="select select-bordered"
                     value={advancedFilters.ward}
                     onChange={(e) => setAdvancedFilters({ ...advancedFilters, ward: e.target.value })}
                   >
@@ -1399,13 +1358,12 @@ export default function ViewChildren() {
                   </select>
                 </div>
 
-                {/* Vaccination Status */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold text-base">Vaccination Status</span>
+                    <span className="label-text font-medium">Vaccination Status</span>
                   </label>
                   <select
-                    className="select select-bordered rounded-full text-base"
+                    className="select select-bordered"
                     value={advancedFilters.vaccinationStatus}
                     onChange={(e) => setAdvancedFilters({ ...advancedFilters, vaccinationStatus: e.target.value })}
                   >
@@ -1415,31 +1373,33 @@ export default function ViewChildren() {
                   </select>
                 </div>
 
-                {/* Created By Me */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold text-base">Created By</span>
+                    <span className="label-text font-medium">Created By</span>
                   </label>
-                  <label className="label cursor-pointer justify-start gap-3">
+                  <label className="label cursor-pointer justify-start">
                     <input
                       type="checkbox"
-                      className="checkbox checkbox-primary rounded-full"
+                      className="checkbox checkbox-primary mr-3"
                       checked={advancedFilters.createdByMe}
                       onChange={(e) => setAdvancedFilters({ ...advancedFilters, createdByMe: e.target.checked })}
                     />
-                    <span className="label-text text-base">Created by Me</span>
+                    <span className="label-text">Created by Me</span>
                   </label>
                 </div>
               </div>
             )}
 
+            {/* Children Grid or Empty State */}
             {filteredChildren.length === 0 ? (
-              <div className="bg-base-100 rounded-2xl shadow-md border border-base-200 p-12 text-center">
-                <FaBaby className="text-6xl text-base-content/20 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-base-content mb-2">
+              <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm p-12 text-center">
+                <div className="w-16 h-16 bg-base-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FaBaby className="text-2xl text-base-content/40" />
+                </div>
+                <h2 className="text-xl font-semibold text-base-content mb-2">
                   {hasSearched ? 'No children found' : 'No children records yet'}
                 </h2>
-                <p className="text-base-content/70 text-base mb-6 max-w-md mx-auto">
+                <p className="text-base-content/70 mb-6 max-w-md mx-auto">
                   {hasSearched
                     ? 'Try adjusting your search criteria or filters to find what you\'re looking for.'
                     : 'Get started by adding your first child record to track their vaccination progress.'}
@@ -1447,7 +1407,7 @@ export default function ViewChildren() {
                 {!hasSearched && (
                   <button
                     onClick={() => navigate('/add-child')}
-                    className="bg-primary hover:bg-primary/90 text-primary-content px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:shadow-lg"
+                    className="btn btn-primary"
                   >
                     Add First Child
                   </button>
@@ -1463,19 +1423,17 @@ export default function ViewChildren() {
                     <button
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
-                      className="btn btn-primary rounded-full px-6 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
+                      className="btn btn-outline btn-primary disabled:opacity-50"
                     >
                       Previous
                     </button>
-                    <span className="text-base-content text-base font-medium bg-base-100 px-6 py-3 rounded-full shadow-sm">
+                    <span className="text-base-content font-medium bg-base-100 border border-base-300 px-4 py-2 rounded-lg">
                       Page {currentPage} of {totalPages}
                     </span>
                     <button
-                      onClick={() =>
-                        setCurrentPage((p) => Math.min(totalPages, p + 1))
-                      }
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
-                      className="btn btn-primary rounded-full px-6 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
+                      className="btn btn-outline btn-primary disabled:opacity-50"
                     >
                       Next
                     </button>
