@@ -638,7 +638,7 @@ export const updateChild = async (req, res) => {
     await prisma.$transaction(async (tx) => {
       // --- Update demographic data ---
       const isSameWard = existingChild.wardNumber === currentUser.wardId;
-      if (isSameWard || currentUser.role === 'SUPER_ADMIN') {
+      if (isSameWard || currentUser.role === 'SUPER_ADMIN', 'WARD_OFFICER') {
         const updateData = {
           fullName: `${firstName || ''} ${lastName || ''}`.trim(),
           ...(demographicData.birthDate ? { birthDate: parseBsDateString(demographicData.birthDate) } : {}),
