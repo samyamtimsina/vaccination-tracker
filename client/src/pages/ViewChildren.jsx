@@ -22,12 +22,6 @@ import {
   FaUserMd,
   FaCalendarAlt,
   FaExclamationTriangle,
-  FaCalendarCheck,
-  FaBell,
-  FaIdCard,
-  FaHome,
-  FaEnvelope,
-  FaInfoCircle,
   FaHistory,
   FaFilter,
   FaTimesCircle,
@@ -75,6 +69,7 @@ export default function ViewChildren() {
   const [expandedSections, setExpandedSections] = useState({});
 
   const { childrenData, error, loading, fetchChildren } = useChildContext();
+  console.log('childrenData from the useChildContext in ViewChildren', childrenData);
   const { vaccineSchedule, loading: scheduleLoading } = useVaccineScheduleContext();
   console.log('vaccineSchedule', vaccineSchedule);
 
@@ -157,6 +152,19 @@ export default function ViewChildren() {
       }
     } catch (error) {
       console.error('Direct search failed:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+  const handleViewDetails = async (child) => {
+    try {
+      setIsSearching(true);
+      const response = await axiosClient.get(`/api/child/${child.sewaDartaNumber}`);
+      if (response.data) {
+        setSelectedChild(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch child details:', error);
     } finally {
       setIsSearching(false);
     }
@@ -573,7 +581,7 @@ export default function ViewChildren() {
       <div
         key={child.id}
         className="bg-base-100 border border-base-300 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group hover:border-primary/30"
-        onClick={() => setSelectedChild(child)}
+        onClick={() => handleViewDetails(child)}
       >
         {/* Header */}
         <div className="bg-base-200/50 px-4 py-3 border-b border-base-300">
@@ -590,8 +598,8 @@ export default function ViewChildren() {
               </div>
             </div>
             <div className={`px-2 py-1 rounded text-xs font-medium ${child.purnaKhop
-                ? 'bg-success/10 text-success'
-                : 'bg-warning/10 text-warning'
+              ? 'bg-success/10 text-success'
+              : 'bg-warning/10 text-warning'
               }`}>
               {child.purnaKhop ? 'Complete' : 'Pending'}
             </div>
@@ -731,12 +739,15 @@ export default function ViewChildren() {
                             <FaMapMarkerAlt className="inline mr-1" />
                             Ward {child.wardNumber}
                           </span>
-                          <span className={`px-2 py-1 rounded ${child.purnaKhop
-                              ? 'bg-success/20 text-success-content'
-                              : 'bg-warning/20 text-warning-content'
-                            }`}>
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-semibold ${child.purnaKhop
+                              ? 'bg-green-600 text-white'
+                              : 'bg-yellow-500 text-white'
+                              }`}
+                          >
                             {child.purnaKhop ? 'Fully Vaccinated' : 'Incomplete'}
                           </span>
+
                         </div>
                       </div>
                     </div>
@@ -870,8 +881,8 @@ export default function ViewChildren() {
                         </svg>
                         <div className="absolute inset-0 flex items-center justify-center">
                           <span className={`text-lg font-bold ${vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount) * 100 === 100
-                              ? 'text-success'
-                              : 'text-primary'
+                            ? 'text-success'
+                            : 'text-primary'
                             }`}>
                             {Math.round((vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount)) * 100) || 0}%
                           </span>
@@ -902,6 +913,7 @@ export default function ViewChildren() {
                 </div>
 
                 {/* Weight Records */}
+                {/* Weight Records */}
                 {child.weightRecords && child.weightRecords.length > 0 && (
                   <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm">
                     <div className="px-6 py-4 border-b border-base-300">
@@ -911,27 +923,32 @@ export default function ViewChildren() {
                       </h3>
                     </div>
                     <div className="p-6">
-                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                      <div className="space-y-4 max-h-80 overflow-y-auto">
                         {child.weightRecords
                           .sort((a, b) => new Date(b.date) - new Date(a.date))
                           .map((record, index) => (
-                            <div key={record.id} className="bg-base-200/50 border border-base-300 rounded-lg p-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center space-x-3">
-                                  <span className="text-xl font-bold text-primary">{record.weight} kg</span>
+                            <div
+                              key={record.id}
+                              className="bg-base-200/50 border border-base-300 rounded-lg p-4 space-y-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-lg font-bold text-primary">
+                                    {record.weight} kg
+                                  </span>
                                   {index === 0 && (
-                                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
                                       Latest
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-right text-xs text-base-content/60">
+                                <div className="text-right text-sm text-base-content/70 leading-snug">
                                   <div>BS: {safeAdToBs(record.date)}</div>
                                   <div>AD: {safeFormatDate(record.date)}</div>
                                 </div>
                               </div>
-                              <div className="flex items-center justify-between text-xs text-base-content/60">
-                                <div className="flex items-center space-x-2">
+                              <div className="flex flex-wrap items-center justify-between text-sm text-base-content/70 gap-2">
+                                <div className="flex items-center gap-2">
                                   <FaUserMd />
                                   <span
                                     className="hover:text-primary hover:underline cursor-pointer font-medium"
@@ -940,12 +957,15 @@ export default function ViewChildren() {
                                     Recorded by {record.createdBy.name}
                                   </span>
                                 </div>
-                                <div className="flex items-center space-x-3">
-                                  <div className="flex items-center space-x-1">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-1">
                                     <FaClock />
-                                    <span>On {safeFormatDate(record.createdAt)}</span>
+                                    <span>{safeFormatDate(record.createdAt)}</span>
                                   </div>
-                                  <button className="btn btn-primary btn-xs" onClick={handleButtonClick}>
+                                  <button
+                                    className="btn btn-primary btn-xs whitespace-nowrap"
+                                    onClick={handleButtonClick}
+                                  >
                                     Show Graph
                                   </button>
                                 </div>
@@ -956,6 +976,7 @@ export default function ViewChildren() {
                     </div>
                   </div>
                 )}
+
               </div>
 
               {/* Vaccination Records - Main Content */}
@@ -1002,34 +1023,32 @@ export default function ViewChildren() {
                             className="mb-6 break-inside-avoid bg-base-100 rounded-lg border-2 border-primary/20 hover:border-primary/40 transition-colors shadow-sm"
                           >
                             {/* Vaccine Type Header */}
-                            <div className="px-4 py-3 bg-base-200/50 border-b border-base-300 rounded-t-lg flex items-center justify-between">
-                              <h4 className="font-semibold text-base-content">{vaccineTypeName}</h4>
+                            {/* Vaccine Type Header */}
+                            <div
+                              className={`px-4 py-3 border-b border-base-300 rounded-t-lg flex items-center justify-between
+    ${completionPercentage === 100
+                                  ? "bg-green-600 text-white" // complete
+                                  : completionPercentage > 0
+                                    ? "bg-yellow-500 text-black" // in progress
+                                    : "bg-red-600 text-white"    // not started
+                                }`}
+                            >
+                              <h4 className="font-semibold">{vaccineTypeName}</h4>
                               <div className="flex items-center space-x-2">
                                 {primaryTotal > 0 && (
-                                  <span className={`px-2 py-1 rounded text-xs font-medium ${primaryCompleted === primaryTotal
-                                      ? "bg-success/10 text-success"
-                                      : primaryCompleted > 0
-                                        ? "bg-warning/10 text-warning"
-                                        : "bg-base-200 text-base-content/60"
-                                    }`}>
+                                  <span className="px-2 py-1 rounded text-xs font-medium bg-white/30 text-black">
                                     Primary: {primaryCompleted}/{primaryTotal}
                                   </span>
                                 )}
                                 {boosterTotal > 0 && (
-                                  <span className={`px-2 py-1 rounded text-xs font-medium ${boosterCompleted === boosterTotal
-                                      ? "bg-success/10 text-success"
-                                      : boosterCompleted > 0
-                                        ? "bg-warning/10 text-warning"
-                                        : "bg-base-200 text-base-content/60"
-                                    }`}>
+                                  <span className="px-2 py-1 rounded text-xs font-medium bg-white/30 text-black">
                                     Booster: {boosterCompleted}/{boosterTotal}
                                   </span>
                                 )}
-                                <span className="text-xs font-semibold text-base-content">
-                                  {completionPercentage}%
-                                </span>
+                                <span className="text-xs font-semibold">{completionPercentage}%</span>
                               </div>
                             </div>
+
 
                             {/* Progress bar */}
                             <div className="px-4 pt-3">
@@ -1056,10 +1075,10 @@ export default function ViewChildren() {
                                   <div
                                     key={index}
                                     className={`rounded-lg p-4 border transition-colors ${dose.scheduleInfo.isPrimary
-                                        ? "border-l-4 border-l-blue-400 bg-blue-50/30 border-blue-200"
-                                        : dose.scheduleInfo.isBooster
-                                          ? "border-l-4 border-l-purple-400 bg-purple-50/30 border-purple-200"
-                                          : "border-base-300 bg-base-50"
+                                      ? "border-l-4 border-l-blue-400 bg-blue-50/30 border-blue-200"
+                                      : dose.scheduleInfo.isBooster
+                                        ? "border-l-4 border-l-purple-400 bg-purple-50/30 border-purple-200"
+                                        : "border-base-300 bg-base-50"
                                       }`}
                                   >
                                     {/* Dose header */}
@@ -1072,8 +1091,8 @@ export default function ViewChildren() {
                                         </span>
                                         {doseType && (
                                           <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${dose.scheduleInfo.isPrimary
-                                              ? "bg-blue-100 text-blue-800"
-                                              : "bg-purple-100 text-purple-800"
+                                            ? "bg-blue-100 text-blue-800"
+                                            : "bg-purple-100 text-purple-800"
                                             }`}>
                                             {doseType}
                                           </span>
@@ -1148,18 +1167,18 @@ export default function ViewChildren() {
                                         {dose.dueDate ? (
                                           <div className="space-y-2">
                                             <div className={`font-medium p-2 rounded ${dose.status === "missed"
-                                                ? "text-secondary bg-secondary/10"
-                                                : dose.overdueDays
-                                                  ? "text-error bg-error/10"
-                                                  : "text-warning bg-warning/10"
+                                              ? "text-secondary bg-secondary/10"
+                                              : dose.overdueDays
+                                                ? "text-error bg-error/10"
+                                                : "text-warning bg-warning/10"
                                               }`}>
                                               Due On BS: {safeAdToBs(dose.dueDate)}
                                             </div>
                                             <div className={`text-base-content/70 p-2 rounded ${dose.status === "missed"
-                                                ? "text-secondary bg-secondary/10"
-                                                : dose.overdueDays
-                                                  ? "text-error bg-error/10"
-                                                  : "text-warning bg-warning/10"
+                                              ? "text-secondary bg-secondary/10"
+                                              : dose.overdueDays
+                                                ? "text-error bg-error/10"
+                                                : "text-warning bg-warning/10"
                                               }`}>
                                               Due On AD: {safeFormatDate(dose.dueDate)}
                                             </div>
@@ -1214,7 +1233,11 @@ export default function ViewChildren() {
         />
       )}
 
-      {selectedChild ? (
+      {isSearching ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <FaSpinner className="animate-spin text-5xl text-primary" />
+        </div>
+      ) : selectedChild ? (
         renderChildDetails(selectedChild)
       ) : (
         <div>
@@ -1231,8 +1254,8 @@ export default function ViewChildren() {
                     <button
                       onClick={() => changeLanguage('en')}
                       className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${i18n.language === 'en'
-                          ? 'bg-base-100 text-base-content shadow-sm'
-                          : 'text-base-content/60 hover:text-base-content'
+                        ? 'bg-base-100 text-base-content shadow-sm'
+                        : 'text-base-content/60 hover:text-base-content'
                         }`}
                     >
                       English
@@ -1240,8 +1263,8 @@ export default function ViewChildren() {
                     <button
                       onClick={() => changeLanguage('ne')}
                       className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${i18n.language === 'ne'
-                          ? 'bg-base-100 text-base-content shadow-sm'
-                          : 'text-base-content/60 hover:text-base-content'
+                        ? 'bg-base-100 text-base-content shadow-sm'
+                        : 'text-base-content/60 hover:text-base-content'
                         }`}
                     >
                       नेपाली
@@ -1446,4 +1469,4 @@ export default function ViewChildren() {
       )}
     </div>
   );
-}
+}        

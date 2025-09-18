@@ -272,41 +272,41 @@ export const getAllChildren = async (req, res) => {
           isFromOtherMunicipality: true,
           casteCode: true,
           createdAt: true,
-          _count: { select: { vaccinations: true } },
-          weightRecords: {
-            select: {
-              id: true,
-              createdAt: true,
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-              date: true,
-              weight: true,
-            },
-            orderBy: { date: 'desc' },
-            take: 1,
-          },
-          vaccinations: {
-            select: {
-              id: true,
-              createdAt: true,
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-              vaccineType: true,
-              dateGiven: true,
-              doseNumber: true,
-            },
-          },
-          dueVaccines: {
-            select: {
-              id: true,
-              vaccineTypeId: true,
-              doseNumber: true,
-              dueDate: true,
-              isCompleted: true,
-              isCatchUp: true,
-              catchUpLocked: true,
-            },
-          },
+          // _count: { select: { vaccinations: true } },
+          // weightRecords: {
+          //   select: {
+          //     id: true,
+          //     createdAt: true,
+          //     createdBy: { select: { id: true, name: true } },
+          //     administeredBy: { select: { id: true, name: true } },
+          //     date: true,
+          //     weight: true,
+          //   },
+          //   orderBy: { date: 'desc' },
+          //   take: 1,
+          // },
+          // vaccinations: {
+          //   select: {
+          //     id: true,
+          //     createdAt: true,
+          //     createdBy: { select: { id: true, name: true } },
+          //     administeredBy: { select: { id: true, name: true } },
+          //     vaccineType: true,
+          //     dateGiven: true,
+          //     doseNumber: true,
+          //   },
+          // },
+          // dueVaccines: {
+          //   select: {
+          //     id: true,
+          //     vaccineTypeId: true,
+          //     doseNumber: true,
+          //     dueDate: true,
+          //     isCompleted: true,
+          //     isCatchUp: true,
+          //     catchUpLocked: true,
+          //   },
+          // },
           createdBy: { select: { id: true, name: true } },
           verifiedBy: { select: { id: true, name: true } },
         },
@@ -363,41 +363,41 @@ export const getWardChildren = async (req, res) => {
           isFromOtherMunicipality: true,
           casteCode: true,
           createdAt: true,
-          _count: { select: { vaccinations: true } },
-          weightRecords: {
-            select: {
-              id: true,
-              createdAt: true,
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-              date: true,
-              weight: true,
-            },
-            orderBy: { date: 'desc' },
-            take: 1,
-          },
-          vaccinations: {
-            select: {
-              id: true,
-              createdAt: true,
-              createdBy: { select: { id: true, name: true } },
-              administeredBy: { select: { id: true, name: true } },
-              vaccineType: true,
-              dateGiven: true,
-              doseNumber: true,
-            },
-          },
-          dueVaccines: {
-            select: {
-              id: true,
-              vaccineTypeId: true,
-              doseNumber: true,
-              dueDate: true,
-              isCompleted: true,
-              isCatchUp: true,
-              catchUpLocked: true,
-            },
-          },
+          // _count: { select: { vaccinations: true } },
+          // weightRecords: {
+          //   select: {
+          //     id: true,
+          //     createdAt: true,
+          //     createdBy: { select: { id: true, name: true } },
+          //     administeredBy: { select: { id: true, name: true } },
+          //     date: true,
+          //     weight: true,
+          //   },
+          //   orderBy: { date: 'desc' },
+          //   take: 1,
+          // },
+          // vaccinations: {
+          //   select: {
+          //     id: true,
+          //     createdAt: true,
+          //     createdBy: { select: { id: true, name: true } },
+          //     administeredBy: { select: { id: true, name: true } },
+          //     vaccineType: true,
+          //     dateGiven: true,
+          //     doseNumber: true,
+          //   },
+          // },
+          // dueVaccines: {
+          //   select: {
+          //     id: true,
+          //     vaccineTypeId: true,
+          //     doseNumber: true,
+          //     dueDate: true,
+          //     isCompleted: true,
+          //     isCatchUp: true,
+          //     catchUpLocked: true,
+          //   },
+          // },
           createdBy: { select: { id: true, name: true } },
           verifiedBy: { select: { id: true, name: true } },
         },
@@ -489,6 +489,7 @@ export const getChild = async (req, res) => {
     const filteredChild = { ...filterChildData(currentUser, child), whatsLeft };
 
     res.status(200).json(filteredChild);
+
   } catch (error) {
     console.error('Error fetching single child:', error);
     res.status(500).json({ error: 'Failed to retrieve child data', details: error.message });
@@ -541,13 +542,13 @@ export const searchChildren = async (req, res) => {
           casteCode: true,
           createdBy: { select: { id: true, name: true } },
           verifiedBy: { select: { id: true, name: true } },
-          _count: { select: { vaccinations: true } },
-          weightRecords: {
-            select: { weight: true, date: true },
-            orderBy: { date: 'desc' },
-            take: 1,
-          },
-          dueVaccines: true, // Kept as per original, but can remove if not needed for search results
+          // _count: { select: { vaccinations: true } },
+          // weightRecords: {
+          //   select: { weight: true, date: true },
+          //   orderBy: { date: 'desc' },
+          //   take: 1,
+          // },
+          // dueVaccines: true, // Kept as per original, but can remove if not needed for search results
         },
       }),
     ]);
@@ -572,17 +573,17 @@ async function getLatestSchedule() {
   return scheduleVersion;
 }
 
-// Map vaccine name from frontend to DB ID
-async function mapVaccineNamesToIds(vaccineNames) {
-  const vaccineTypes = await prisma.vaccineType.findMany();
-  const nameToId = new Map(vaccineTypes.map((vt) => [vt.name, vt.id]));
-  const result = {};
-  for (const name of vaccineNames) {
-    const id = nameToId.get(name);
-    if (id) result[name] = id;
-  }
-  return result;
-}
+// // Map vaccine name from frontend to DB ID
+// async function mapVaccineNamesToIds(vaccineNames) {
+//   const vaccineTypes = await prisma.vaccineType.findMany();
+//   const nameToId = new Map(vaccineTypes.map((vt) => [vt.name, vt.id]));
+//   const result = {};
+//   for (const name of vaccineNames) {
+//     const id = nameToId.get(name);
+//     if (id) result[name] = id;
+//   }
+//   return result;
+// }
 
 // Prepare vaccination update/create data
 async function prepareVaccinationUpdateData(childId, vaccinations, administeredById) {

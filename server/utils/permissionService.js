@@ -98,22 +98,27 @@ export const checkPermission = (user, action, resource, dataToUpdate = {}) => {
  * @returns {object} - The filtered child object.
  */
 export const filterChildData = (user, child) => {
+    console.log('=== DATA FILTERING DEBUG ===');
     const { role, wardId } = user;
     const childWardId = child.wardNumber;
+    console.log('User role:', role);
+    console.log('User wardId:', wardId);
+    console.log('Child wardId:', childWardId);
 
-    // SUPER_ADMIN and same-ward WARD_OFFICER can see full data.
-    if (role === 'SUPER_ADMIN' || (role === 'WARD_OFFICER' && wardId === childWardId)) {
-        return child;
-    }
+    // SUPER_ADMIN gets full access
+    if (role === 'SUPER_ADMIN') return child;
 
-    // ADMIN and WARD_OFFICER viewing a different ward see limited data.
-    const limitedData = {};
+    // WARD_OFFICER from same ward gets full access
+    if (role === 'WARD_OFFICER' && wardId === childWardId) return child;
+
+
+    // Everyone else or different ward sees limited fields
+    const limitedChild = {};
     for (const field of LIMITED_VIEW_FIELDS) {
         if (child.hasOwnProperty(field)) {
-            limitedData[field] = child[field];
+            limitedChild[field] = child[field];
         }
     }
 
-    return limitedData;
-}
-
+    return limitedChild;
+};

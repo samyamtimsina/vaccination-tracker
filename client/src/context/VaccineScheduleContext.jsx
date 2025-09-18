@@ -25,7 +25,6 @@ export const VaccineScheduleProvider = ({ children }) => {
                 }, {});
 
                 setvaccineSchedule({ doses: dosesByVaccine });
-                console.log('Fetched vaccine schedule:', vaccineSchedule);
                 setLoading(false);
             } catch (err) {
                 console.error('Failed to fetch vaccine schedule', err);

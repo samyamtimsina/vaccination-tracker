@@ -142,12 +142,16 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
 
     const vaccineDoses = doses.map((dose, index) => {
       const statusInfo = getVaccineStatus(dose, childAge);
+      const isBoosterFlag =
+        typeof dose.isBooster !== 'undefined'
+          ? dose.isBooster
+          : (typeof dose.isPrimary !== 'undefined' ? !dose.isPrimary : false);
       return {
         doseIndex: index,
-        dose: dose.doseNumber, // Use doseNumber instead of dose
-        doseInfo: dose``,
+        dose: dose.doseNumber,
+        doseInfo: dose,
         ...statusInfo,
-        doseType: dose.isBooster ? 'booster' : 'current'
+        doseType: isBoosterFlag ? 'booster' : 'current'
       };
     });
 
@@ -169,6 +173,7 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
 };
 
 // VaccineCard Component
+// VaccineCard Component (patched for EditChild)
 const VaccineCard = ({
   vaccineName,
   dose,
@@ -179,54 +184,83 @@ const VaccineCard = ({
   showRemarks,
   toggleRemarks,
   theme,
-  t
+  t,
 }) => {
-  const isAccessible = dose.status !== 'NOT_YET_ELIGIBLE';
+  // Watch the live date for this vaccine dose
+  const watchedDate = useWatch({
+    control,
+    name: `vaccines.${vaccineName}.${dose.doseIndex}.date`,
+  });
+
   const remarksKey = `${vaccineName}-${dose.doseIndex}`;
   const showRemark = showRemarks[remarksKey] || false;
 
-  // Helper function to format recommended age text
-  const getRecommendedAgeText = (doseInfo) => {
-    if (doseInfo.recommendedAtDays !== null && doseInfo.recommendedAtDays !== undefined) {
-      return t('vaccine_card.days', { count: doseInfo.recommendedAtDays });
-    } else if (doseInfo.recommendedAtWeeks !== null && doseInfo.recommendedAtWeeks !== undefined) {
-      return t('vaccine_card.weeks', { count: doseInfo.recommendedAtWeeks });
-    } else if (doseInfo.recommendedAtMonths !== null && doseInfo.recommendedAtMonths !== undefined) {
-      return t('vaccine_card.months', { count: doseInfo.recommendedAtMonths });
-    } else if (doseInfo.recommendedAtYears !== null && doseInfo.recommendedAtYears !== undefined) {
-      return t('vaccine_card.years', { count: doseInfo.recommendedAtYears });
+  // ✅ If user has entered or already has a date, mark as completed
+  const isCompleted = !!watchedDate;
+
+  const displayStatus = isCompleted
+    ? {
+      ...dose,
+      status: "COMPLETED",
+      color: "text-green-700",
+      bgColor: "bg-green-50",
+      borderColor: "border-green-300",
     }
-    return t('vaccine_card.birth');
+    : dose;
+
+  // Helper function for recommended age label
+  const getRecommendedAgeText = (doseInfo) => {
+    if (doseInfo.recommendedAtDays != null) {
+      return t("vaccine_card.days", { count: doseInfo.recommendedAtDays });
+    } else if (doseInfo.recommendedAtWeeks != null) {
+      return t("vaccine_card.weeks", { count: doseInfo.recommendedAtWeeks });
+    } else if (doseInfo.recommendedAtMonths != null) {
+      return t("vaccine_card.months", { count: doseInfo.recommendedAtMonths });
+    } else if (doseInfo.recommendedAtYears != null) {
+      return t("vaccine_card.years", { count: doseInfo.recommendedAtYears });
+    }
+    return t("vaccine_card.birth");
   };
 
   return (
-    <div className={`p-4 border rounded-lg transition-all ${dose.bgColor} ${dose.borderColor} border-l-4`}>
+    <div
+      className={`p-4 border rounded-lg transition-all ${displayStatus.bgColor} ${displayStatus.borderColor} border-l-4`}
+    >
       <div className="space-y-3">
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h4 className={`font-medium ${dose.color}`}>
-              {vaccineName} - {t('vaccine_card.dose', { dose: dose.dose })}
+            <h4 className={`font-medium ${displayStatus.color}`}>
+              {vaccineName} - {t("vaccine_card.dose", { dose: displayStatus.dose })}
             </h4>
             <p className="text-xs text-gray-600 mt-1">
-              {t('vaccine_card.recommended_at')} {getRecommendedAgeText(dose.doseInfo)}
+              {t("vaccine_card.recommended_at")}{" "}
+              {getRecommendedAgeText(displayStatus.doseInfo)}
             </p>
           </div>
           <div className="flex flex-col items-end space-y-1">
-            <span className={`badge ${dose.status === 'SEVERELY_OVERDUE'
-              ? 'badge-error'
-              : dose.status === 'OVERDUE'
-                ? 'badge-warning'
-                : dose.status === 'DUE_NOW'
-                  ? 'badge-info'
-                  : dose.status === 'ACCESSIBLE'
-                    ? 'badge-success'
-                    : 'badge-neutral'
-              } text-xs`}>
-              {t(`vaccine_card.status.${dose.status.toLowerCase()}`)}
+            <span
+              className={`badge ${displayStatus.status === "SEVERELY_OVERDUE"
+                ? "badge-error"
+                : displayStatus.status === "OVERDUE"
+                  ? "badge-warning"
+                  : displayStatus.status === "DUE_NOW"
+                    ? "badge-info"
+                    : displayStatus.status === "ACCESSIBLE"
+                      ? "badge-success"
+                      : displayStatus.status === "COMPLETED"
+                        ? "badge-success"
+                        : "badge-neutral"
+                } text-xs`}
+            >
+              {displayStatus.status === "COMPLETED"
+                ? t("vaccine_card.status.completed", "Completed")
+                : t(`vaccine_card.status.${displayStatus.status.toLowerCase()}`)}
             </span>
-            {dose.doseType === 'booster' && (
-              <span className="badge badge-outline badge-xs">{t('vaccine_card.booster')}</span>
+            {displayStatus.doseType === "booster" && (
+              <span className="badge badge-outline badge-xs">
+                {t("vaccine_card.booster")}
+              </span>
             )}
           </div>
         </div>
@@ -234,30 +268,32 @@ const VaccineCard = ({
         {/* Date Input */}
         <div>
           <Controller
-            name={`vaccines.${vaccineName}.${dose.doseIndex}.date`}
+            name={`vaccines.${vaccineName}.${displayStatus.doseIndex}.date`}
             control={control}
             render={({ field }) => (
               <div className="relative">
-                {isAccessible ? (
+                {dose.status !== "NOT_YET_ELIGIBLE" ? (
                   <>
                     <NepaliDatePicker
                       className="w-full"
                       inputClassName="input input-bordered input-sm w-full pr-8"
-                      value={field.value || ''}
+                      value={field.value || ""}
                       onChange={(value) => field.onChange(value)}
                       language="ne"
                       theme={theme}
-                      placeholder={t('vaccine_card.date_placeholder')}
+                      placeholder={t("vaccine_card.date_placeholder")}
                     />
                     {field.value && (
                       <button
                         type="button"
-                        onClick={() => setValue(
-                          `vaccines.${vaccineName}.${dose.doseIndex}.date`,
-                          ''
-                        )}
+                        onClick={() =>
+                          setValue(
+                            `vaccines.${vaccineName}.${displayStatus.doseIndex}.date`,
+                            ""
+                          )
+                        }
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
-                        title={t('vaccine_card.clear_date_title')}
+                        title={t("vaccine_card.clear_date_title")}
                       >
                         ✕
                       </button>
@@ -270,8 +306,8 @@ const VaccineCard = ({
                     value=""
                     disabled
                     readOnly
-                    placeholder={t('vaccine_card.unavailable_placeholder', {
-                      age: getRecommendedAgeText(dose.doseInfo)
+                    placeholder={t("vaccine_card.unavailable_placeholder", {
+                      age: getRecommendedAgeText(displayStatus.doseInfo),
                     })}
                   />
                 )}
@@ -281,18 +317,21 @@ const VaccineCard = ({
         </div>
 
         {/* Remarks Section */}
-        {isAccessible && (
+        {dose.status !== "NOT_YET_ELIGIBLE" && (
           <div className="pt-2 border-t border-gray-200">
             <button
               type="button"
-              onClick={() => toggleRemarks(vaccineName, dose.doseIndex)}
+              onClick={() => toggleRemarks(vaccineName, displayStatus.doseIndex)}
               className="btn btn-ghost btn-xs w-full justify-between p-2"
             >
               <span className="flex items-center text-xs">
                 <FaClipboardList className="w-3 h-3 mr-1" />
-                {t('vaccine_card.remarks')}
+                {t("vaccine_card.remarks")}
               </span>
-              <span className={`text-xs transform transition-transform ${showRemark ? 'rotate-180' : ''}`}>
+              <span
+                className={`text-xs transform transition-transform ${showRemark ? "rotate-180" : ""
+                  }`}
+              >
                 ▼
               </span>
             </button>
@@ -300,9 +339,11 @@ const VaccineCard = ({
             {showRemark && (
               <div className="mt-2">
                 <textarea
-                  {...register(`vaccines.${vaccineName}.${dose.doseIndex}.remarks`)}
+                  {...register(
+                    `vaccines.${vaccineName}.${displayStatus.doseIndex}.remarks`
+                  )}
                   className="textarea textarea-bordered textarea-xs w-full"
-                  placeholder={t('vaccine_card.remarks_placeholder')}
+                  placeholder={t("vaccine_card.remarks_placeholder")}
                   rows={2}
                 />
               </div>
@@ -313,6 +354,8 @@ const VaccineCard = ({
     </div>
   );
 };
+
+
 
 // Vaccine Section Component
 const VaccineSection = ({
@@ -535,6 +578,7 @@ export default function EditChild() {
       try {
         const res = await axiosClient.get(`/api/child/${selectedChild.sewaDartaNumber}`);
         const childData = res.data;
+        console.log('childData fetched:', childData);
 
         const fullProfile = !!childData.parentName;
         setIsFullProfile(fullProfile);
@@ -583,7 +627,7 @@ export default function EditChild() {
         });
 
         childData.vaccinations.forEach((vac) => {
-          const vaccineName = vaccineTypeIdToName[vac.vaccineTypeId];
+          const vaccineName = vaccineTypeIdToName[vac.vaccineType.id]
           if (!vaccineName) {
             console.warn(`Vaccine type ID ${vac.vaccineTypeId} not found in mapping`);
             return;
