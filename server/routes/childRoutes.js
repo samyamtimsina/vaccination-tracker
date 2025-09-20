@@ -7,6 +7,7 @@ import {
   getChild,
   getWardChildren,
   searchChildren,
+  searchWardChildren,
   updateChild,
   // generateMockData, // Import the new function
 } from '../controllers/childController.js';
@@ -23,6 +24,7 @@ router.get(
   getAllChildren,
 );
 router.get('/search', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'), searchChildren);
+router.get('/search-ward', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'), searchWardChildren);
 
 router.get(
   '/ward',

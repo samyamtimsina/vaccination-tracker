@@ -5,35 +5,21 @@ import {
   FaChevronLeft,
   FaBaby,
   FaEye,
-  FaBirthdayCake,
   FaUser,
-  FaPhone,
   FaMapMarkerAlt,
   FaShieldAlt,
   FaSyringe,
   FaPrint,
   FaCheckCircle,
   FaPlus,
-  FaSearch,
-  FaStickyNote,
-  FaVenusMars,
   FaWeight,
   FaClock,
   FaUserMd,
-  FaCalendarAlt,
   FaExclamationTriangle,
-  FaHistory,
-  FaFilter,
   FaTimesCircle,
   FaChartLine,
-  FaChevronDown,
-  FaChevronUp,
-  FaStar,
-  FaHeart,
-  FaAward,
 } from 'react-icons/fa';
 import {
-  safeCalculateAge,
   safeFormatDate,
   safeFormatDateYYMMDD,
 } from '../utils/date.js';
@@ -42,7 +28,7 @@ import VaccinationCardOverlay from '../components/print';
 import { useChildContext } from '../context/ChildContext';
 import { useVaccineScheduleContext } from '../context/VaccineScheduleContext';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 export default function ViewChildren() {
   const navigate = useNavigate();
@@ -50,23 +36,28 @@ export default function ViewChildren() {
   const { t, i18n } = useTranslation('viewChildren');
 
   // All hooks declared at the top
+  const [expandedDoses, setExpandedDoses] = useState({});
   const [selectedChild, setSelectedChild] = useState(null);
-  const [universalSearch, setUniversalSearch] = useState('');
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [advancedFilters, setAdvancedFilters] = useState({
-    gender: '',
-    ward: '',
-    createdByMe: false,
-    vaccinationStatus: '',
-  });
   const [showPrintComponent, setShowPrintComponent] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [vaccineTypes, setVaccineTypes] = useState([]);
   const [loadingVaccineTypes, setLoadingVaccineTypes] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
-  const [hasSearched, setHasSearched] = useState(false);
   const [expandedSections, setExpandedSections] = useState({});
+
+  // Primary compact search functionality
+  const [filters, setFilters] = useState({
+    name: '',
+
+    serviceRegistrationNumber: '',
+    phoneNumber: '',
+    createdByMe: false,
+    gender: '',
+    isComplete: false,
+  });
+  const [searchResults, setSearchResults] = useState([]);
+  const [isLoadingSearch, setIsLoadingSearch] = useState(false);
+  const [hasActiveFilters, setHasActiveFilters] = useState(false);
 
   const { childrenData, error, loading, fetchChildren } = useChildContext();
   console.log('childrenData from the useChildContext in ViewChildren', childrenData);
@@ -74,6 +65,7 @@ export default function ViewChildren() {
   console.log('vaccineSchedule', vaccineSchedule);
 
   const itemsPerPage = 12;
+  const resultsPerPage = 10;
 
   // Function to change language
   const changeLanguage = (lng) => {
@@ -142,6 +134,56 @@ export default function ViewChildren() {
     }
   }, [sewaDartaNumber, selectedChild]);
 
+  // Check if filters are active
+  useEffect(() => {
+    const hasFilters = filters.name || filters.serviceRegistrationNumber || filters.phoneNumber || filters.gender || filters.wardNumber || filters.isComplete || filters.createdByMe;
+    setHasActiveFilters(hasFilters);
+  }, [filters]);
+
+  // Primary search functionality - debounced search
+  useEffect(() => {
+    const delayDebounce = setTimeout(async () => {
+      if (!hasActiveFilters) {
+        setSearchResults([]);
+        return;
+      }
+
+      setIsLoadingSearch(true);
+      try {
+        const res = await axiosClient.get('/api/child/search-ward', {
+          params: {
+            name: filters.name,
+            phoneNumber: filters.phoneNumber,
+            sewaDartaNumber: filters.serviceRegistrationNumber,
+            gender: filters.gender,
+            createdByMe: filters.createdByMe,
+            isComplete: filters.isComplete,
+          },
+        });
+
+        let results = [];
+        if (Array.isArray(res.data)) {
+          results = res.data;
+        } else if (res.data && Array.isArray(res.data.children)) {
+          results = res.data.children;
+        } else if (res.data && Array.isArray(res.data.data)) {
+          results = res.data.data;
+        } else if (res.data && Array.isArray(res.data.items)) {
+          results = res.data.items;
+        }
+
+        setSearchResults(results);
+      } catch (err) {
+        console.error('Search failed:', err);
+        setSearchResults([]);
+      } finally {
+        setIsLoadingSearch(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(delayDebounce);
+  }, [filters, hasActiveFilters]);
+
   // Handle direct search by sewaDartaNumber
   const handleDirectSearch = async (number) => {
     try {
@@ -156,6 +198,7 @@ export default function ViewChildren() {
       setIsSearching(false);
     }
   };
+
   const handleViewDetails = async (child) => {
     try {
       setIsSearching(true);
@@ -170,101 +213,32 @@ export default function ViewChildren() {
     }
   };
 
+  // Handle child select from search results - always fetch complete data
+  const handleChildSelect = (child) => {
+    if (!child) return;
+    handleViewDetails(child);
+  };
+
   // Extract children array
   const childrenArray = useMemo(() => {
     if (!childrenData) return [];
     if (Array.isArray(childrenData)) return childrenData;
     if (childrenData.children && Array.isArray(childrenData.children)) {
-      console.log('childrenData.children from the extract children array function in around like 170', childrenData.children)
       return childrenData.children;
     }
     return [];
   }, [childrenData]);
 
-  // Universal search handler
-  const handleUniversalSearch = async (searchTerm) => {
-    if (!searchTerm.trim()) {
-      setSearchResults([]);
-      setHasSearched(false);
-      return;
-    }
-
-    setIsSearching(true);
-    setHasSearched(true);
-
-    try {
-      if (/^\d+$/.test(searchTerm.trim())) {
-        try {
-          const response = await axiosClient.get(`/api/child/${searchTerm.trim()}`);
-          if (response.data) {
-            setSearchResults([response.data]);
-            setIsSearching(false);
-            return;
-          }
-        } catch (error) {
-          // Fall through to general search if direct search fails
-        }
-      }
-
-      const response = await axiosClient.get('/api/child/search', {
-        params: {
-          name: searchTerm,
-          phoneNumber: searchTerm,
-          sewaDartaNumber: searchTerm,
-        },
-      });
-
-      let results = [];
-      if (Array.isArray(response.data)) {
-        results = response.data;
-      } else if (response.data?.children) {
-        results = response.data.children;
-      }
-
-      setSearchResults(results);
-    } catch (error) {
-      console.error('Search failed:', error);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  // Advanced filter handler
-  const applyAdvancedFilters = (children) => {
-    return children.filter(child => {
-      if (advancedFilters.gender && child.gender !== advancedFilters.gender) {
-        return false;
-      }
-      if (advancedFilters.ward && child.wardNumber !== parseInt(advancedFilters.ward)) {
-        return false;
-      }
-      if (advancedFilters.vaccinationStatus === 'complete' && !child.purnaKhop) {
-        return false;
-      }
-      if (advancedFilters.vaccinationStatus === 'incomplete' && child.purnaKhop) {
-        return false;
-      }
-      return true;
-    });
-  };
-
-  // Get filtered children
+  console.log('selected child', selectedChild)
+  // Get filtered children - use search results if searching, otherwise show all
   const filteredChildren = useMemo(() => {
-    let children = [];
-
-    if (hasSearched) {
-      children = searchResults;
-    } else {
-      children = childrenArray;
+    if (hasActiveFilters) {
+      return searchResults;
     }
+    return childrenArray;
+  }, [childrenArray, searchResults, hasActiveFilters]);
 
-    children = applyAdvancedFilters(children);
-
-    return children;
-  }, [childrenArray, searchResults, hasSearched, advancedFilters]);
-
-  // Pagination
+  // Fix pagination - convert to 0-based for backend compatibility
   const currentChildren = useMemo(() => {
     const indexOfLast = currentPage * itemsPerPage;
     const indexOfFirst = indexOfLast - itemsPerPage;
@@ -272,6 +246,29 @@ export default function ViewChildren() {
   }, [filteredChildren, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredChildren.length / itemsPerPage);
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setFilters({
+      name: '',
+      serviceRegistrationNumber: '',
+      phoneNumber: '',
+      wardNumber: '',
+      createdByMe: false,
+      gender: '',
+      isComplete: false,
+    });
+    setSearchResults([]);
+    setCurrentPage(1);
+  };
+
+  // Toggle section expansion
+  const toggleSection = (sectionKey) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
+  };
 
   // Organize vaccines by type
   const organizeVaccinesByType = (child) => {
@@ -340,7 +337,7 @@ export default function ViewChildren() {
     return result;
   };
 
-  // NEW FUNCTION: Create vaccination template
+  // Create vaccination template
   const createVaccinationTemplate = (child) => {
     if (!vaccineSchedule?.doses) return {};
 
@@ -371,9 +368,9 @@ export default function ViewChildren() {
           } else if (scheduleDose.maxAgeWeeks !== null) {
             maxAgeDays = scheduleDose.maxAgeWeeks * 7;
           } else if (scheduleDose.maxAgeMonths !== null) {
-            maxAgeDays = scheduleDose.maxAgeMonths * 30.4375; // average days per month
+            maxAgeDays = scheduleDose.maxAgeMonths * 30.4375;
           } else if (scheduleDose.maxAgeYears !== null) {
-            maxAgeDays = scheduleDose.maxAgeYears * 365.25; // average days per year
+            maxAgeDays = scheduleDose.maxAgeYears * 365.25;
           }
 
           // Calculate status
@@ -422,13 +419,11 @@ export default function ViewChildren() {
             status,
             statusColor,
             statusIcon,
-            // Helper properties
             dateGiven: actualVaccination?.dateGiven || null,
             dueDate: dueVaccine?.dueDate || null,
             administeredBy: actualVaccination?.administeredBy?.name || null,
             createdBy: actualVaccination?.createdBy?.name || null,
-
-            isCatchUp: dueVaccine?.isCatchUp || scheduleDose.isBooster || false, // Map isBooster to isCatchUp
+            isCatchUp: dueVaccine?.isCatchUp || scheduleDose.isBooster || false,
             overdueDays: dueVaccine && new Date(dueVaccine.dueDate) < new Date()
               ? Math.floor((new Date() - new Date(dueVaccine.dueDate)) / (1000 * 60 * 60 * 24))
               : null,
@@ -443,7 +438,7 @@ export default function ViewChildren() {
     return vaccinationTemplate;
   };
 
-  // NEW FUNCTION: Get recommended age display
+  // Get recommended age display
   const getRecommendedAgeDisplay = (scheduleInfo) => {
     if (scheduleInfo.recommendedAtDays !== null) {
       return scheduleInfo.recommendedAtDays === 0 ? 'At birth' : `${scheduleInfo.recommendedAtDays} days`;
@@ -460,73 +455,82 @@ export default function ViewChildren() {
     return 'Schedule TBD';
   };
 
-  // NEW FUNCTION: Get max age display
-  const getMaxAgeDisplay = (scheduleInfo) => {
-    if (scheduleInfo.maxAgeDays !== null) {
-      return `${scheduleInfo.maxAgeDays} days`;
-    }
-    if (scheduleInfo.maxAgeWeeks !== null) {
-      return `${scheduleInfo.maxAgeWeeks} weeks`;
-    }
-    if (scheduleInfo.maxAgeMonths !== null) {
-      return `${scheduleInfo.maxAgeMonths} months`;
-    }
-    if (scheduleInfo.maxAgeYears !== null) {
-      return `${scheduleInfo.maxAgeYears} years`;
-    }
-    return 'No limit';
-  };
-
-  // Get vaccination stats
+  // Get vaccination stats - FIXED: Count both primary and catchup vaccines separately
   const getVaccinationStats = (child) => {
-    const totalVaccinations = child._count?.vaccinations || 0;
-    const dueVaccines = child.dueVaccines || [];
-    const overdueCount = dueVaccines.filter(v =>
-      !v.isCompleted && new Date(v.dueDate) < new Date()
-    ).length;
-    const pendingCount = dueVaccines.filter(v => !v.isCompleted).length;
+    const vaccinationTemplate = createVaccinationTemplate(child);
+
+    // Count primary doses
+    let totalPrimaryDoses = 0;
+    let completedPrimaryDoses = 0;
+    let pendingPrimaryDoses = 0;
+    let overduePrimaryDoses = 0;
+
+    // Count catchup/booster doses
+    let totalCatchupDoses = 0;
+    let completedCatchupDoses = 0;
+    let pendingCatchupDoses = 0;
+    let overdueCatchupDoses = 0;
+
+    Object.values(vaccinationTemplate).forEach(vaccineData => {
+      vaccineData.doses.forEach(dose => {
+        if (dose.scheduleInfo.isPrimary) { // Primary doses
+          totalPrimaryDoses++;
+          if (dose.status === 'completed') {
+            completedPrimaryDoses++;
+          } else if (dose.status === 'overdue' || dose.status === 'missed') {
+            overduePrimaryDoses++;
+            pendingPrimaryDoses++;
+          } else if (dose.status === 'due' || dose.status === 'pending') {
+            pendingPrimaryDoses++;
+          }
+        } else if (dose.scheduleInfo.isBooster || dose.isCatchUp) { // Catchup/booster doses
+          totalCatchupDoses++;
+          if (dose.status === 'completed') {
+            completedCatchupDoses++;
+          } else if (dose.status === 'overdue' || dose.status === 'missed') {
+            overdueCatchupDoses++;
+            pendingCatchupDoses++;
+          } else if (dose.status === 'due' || dose.status === 'pending') {
+            pendingCatchupDoses++;
+          }
+        }
+      });
+    });
+
+    const totalGiven = completedPrimaryDoses + completedCatchupDoses;
+    const totalRequired = totalPrimaryDoses + totalCatchupDoses;
+    const totalPending = pendingPrimaryDoses + pendingCatchupDoses;
+    const totalOverdue = overduePrimaryDoses + overdueCatchupDoses;
 
     return {
-      totalGiven: totalVaccinations,
-      overdueCount,
-      pendingCount,
-      whatsLeft: child.whatsLeft || 0,
-      isFullyVaccinated: child.purnaKhop
+      totalGiven,
+      totalRequired,
+      totalPending,
+      totalOverdue,
+      primaryStats: {
+        total: totalPrimaryDoses,
+        completed: completedPrimaryDoses,
+        pending: pendingPrimaryDoses,
+        overdue: overduePrimaryDoses
+      },
+      catchupStats: {
+        total: totalCatchupDoses,
+        completed: completedCatchupDoses,
+        pending: pendingCatchupDoses,
+        overdue: overdueCatchupDoses
+      },
+      isFullyVaccinated: completedPrimaryDoses === totalPrimaryDoses
     };
-  };
-
-  // Clear all filters
-  const clearAllFilters = () => {
-    setUniversalSearch('');
-    setAdvancedFilters({
-      gender: '',
-      ward: '',
-      createdByMe: false,
-      vaccinationStatus: '',
-    });
-    setSearchResults([]);
-    setHasSearched(false);
-    setCurrentPage(1);
-  };
-
-  // Toggle section expansion
-  const toggleSection = (sectionKey) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [sectionKey]: !prev[sectionKey]
-    }));
   };
 
   // Loading state for schedule
   if (scheduleLoading || !vaccineSchedule) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-200">
-        <div className="flex flex-col items-center space-y-4">
-          <FaSpinner className="animate-spin text-5xl text-primary" />
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-base-content mb-1">Loading Vaccination Schedule</h2>
-            <p className="text-base-content/60">Please wait while we load the data...</p>
-          </div>
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-4xl text-primary mb-4" />
+          <h2 className="text-xl font-semibold text-base-content">Loading Vaccination Schedule</h2>
+          <p className="text-base-content/60 mt-2">Please wait while we load the data...</p>
         </div>
       </div>
     );
@@ -536,12 +540,10 @@ export default function ViewChildren() {
   if (loading || loadingVaccineTypes) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-200">
-        <div className="flex flex-col items-center space-y-4">
-          <FaSpinner className="animate-spin text-5xl text-primary" />
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-base-content mb-1">Loading Children Records</h2>
-            <p className="text-base-content/60">Please wait while we fetch the data...</p>
-          </div>
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-4xl text-primary mb-4" />
+          <h2 className="text-xl font-semibold text-base-content">Loading Children Records</h2>
+          <p className="text-base-content/60 mt-2">Please wait while we fetch the data...</p>
         </div>
       </div>
     );
@@ -551,20 +553,16 @@ export default function ViewChildren() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-200 p-4">
-        <div className="bg-base-100 rounded-lg border border-error/20 shadow-sm max-w-md w-full">
-          <div className="p-6 text-center">
-            <div className="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FaExclamationTriangle className="text-2xl text-error" />
-            </div>
-            <h2 className="text-lg font-semibold text-base-content mb-2">Error Loading Data</h2>
-            <p className="text-base-content/70 text-sm">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="btn btn-primary btn-sm mt-4"
-            >
-              Try Again
-            </button>
-          </div>
+        <div className="bg-base-100 rounded-lg shadow-lg max-w-md w-full p-8 text-center">
+          <FaExclamationTriangle className="text-4xl text-error mb-4 mx-auto" />
+          <h2 className="text-xl font-semibold text-base-content mb-2">Error Loading Data</h2>
+          <p className="text-base-content/70 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="btn btn-primary"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -580,79 +578,64 @@ export default function ViewChildren() {
     return (
       <div
         key={child.id}
-        className="bg-base-100 border border-base-300 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group hover:border-primary/30"
-        onClick={() => handleViewDetails(child)}
+        className="bg-base-100 border border-base-300 rounded-lg shadow-sm hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+        onClick={() => handleChildSelect(child)}
       >
         {/* Header */}
-        <div className="bg-base-200/50 px-4 py-3 border-b border-base-300">
-          <div className="flex items-center justify-between mb-2">
+        <div className="bg-base-200/30 px-4 py-3 border-b border-base-300 rounded-t-lg">
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                 <FaBaby className="text-primary text-sm" />
               </div>
               <div>
-                <h3 className="font-semibold text-base-content text-sm">
+                <h3 className="font-semibold text-base-content">
                   {child.fullName} {child.lastName || ''}
                 </h3>
-                <p className="text-base-content/60 text-xs">{age.formatted}</p>
+                <p className="text-base-content/60 text-sm">{age.formatted}</p>
               </div>
             </div>
-            <div className={`px-2 py-1 rounded text-xs font-medium ${child.purnaKhop
-              ? 'bg-success/10 text-success'
-              : 'bg-warning/10 text-warning'
-              }`}>
+            <span className={`badge ${child.purnaKhop ? 'badge-success' : 'badge-warning'}`}>
               {child.purnaKhop ? 'Complete' : 'Pending'}
-            </div>
+            </span>
           </div>
         </div>
 
         {/* Body */}
         <div className="p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-base-content/60">Birth (BS)</span>
-                <span className="font-medium text-base-content bg-base-200 px-2 py-0.5 rounded">
-                  {safeAdToBs(child.birthDate)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-base-content/60">Ward</span>
-                <span className="font-medium text-base-content bg-base-200 px-2 py-0.5 rounded">
-                  {child.wardNumber}
-                </span>
-              </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <span className="text-base-content/60">Birth (BS):</span>
+              <p className="font-medium">{safeAdToBs(child.birthDate)}</p>
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-base-content/60">Birth (AD)</span>
-                <span className="font-medium text-base-content bg-base-200 px-2 py-0.5 rounded">
-                  {safeFormatDate(child.birthDate)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-base-content/60">Vaccines</span>
-                <span className="font-medium text-base-content bg-base-200 px-2 py-0.5 rounded">
-                  {child.vaccinations ? child.vaccinations.length : 0}
-                </span>
-              </div>
+            <div>
+              <span className="text-base-content/60">Ward:</span>
+              <p className="font-medium">{child.wardNumber}</p>
+            </div>
+            <div>
+              <span className="text-base-content/60">Birth (AD):</span>
+              <p className="font-medium">{safeFormatDate(child.birthDate)}</p>
+            </div>
+            <div>
+              <span className="text-base-content/60">Vaccines:</span>
+              <p className="font-medium">{child._count?.vaccinations ? child._count.vaccinations : 0}</p>
             </div>
           </div>
 
           {latestWeight && (
-            <div className="flex justify-between items-center pt-2 border-t border-base-300">
-              <span className="text-base-content/60 text-xs flex items-center space-x-1">
-                <FaWeight className="text-xs" />
-                <span>Latest Weight</span>
-              </span>
-              <span className="font-medium text-base-content bg-base-200 px-2 py-0.5 rounded text-xs">
-                {latestWeight.weight} kg
-              </span>
+            <div className="pt-3 border-t border-base-300">
+              <div className="flex justify-between items-center">
+                <span className="text-base-content/60 text-sm flex items-center">
+                  <FaWeight className="mr-1" />
+                  Latest Weight
+                </span>
+                <span className="font-medium">{latestWeight.weight} kg</span>
+              </div>
             </div>
           )}
 
-          <div className="pt-2 border-t border-base-300">
-            <p className="text-base-content/60 text-xs">
+          <div className="pt-3 border-t border-base-300">
+            <p className="text-base-content/60 text-sm">
               Created by{' '}
               <span
                 className="font-medium text-primary hover:underline cursor-pointer"
@@ -663,8 +646,8 @@ export default function ViewChildren() {
             </p>
           </div>
 
-          <button className="w-full btn btn-sm btn-outline btn-primary group-hover:btn-primary">
-            <FaEye className="text-sm" />
+          <button className="w-full btn btn-primary btn-sm">
+            <FaEye />
             View Details
           </button>
         </div>
@@ -672,556 +655,398 @@ export default function ViewChildren() {
     );
   };
 
-  // Render detailed child view
+  const toggleDose = (type, doseNumber) => {
+    const key = `${type}-${doseNumber}`;
+    setExpandedDoses(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   const renderChildDetails = (child) => {
     const age = calculateDetailedAge(child.birthDate);
     const vaccinationStats = getVaccinationStats(child);
-    const vaccinesByType = organizeVaccinesByType(child);
     const vaccinationTemplate = createVaccinationTemplate(child);
 
-    const handleButtonClick = () => {
-      console.log('selectedChild:', child);
-      navigate('/graph', { state: { childrenData: child } });
+    const goToProfile = (userId) => {
+      if (!userId) return;
+      navigate(`/profile/${userId}`);
     };
 
     return (
       <div className="min-h-screen bg-base-200">
         {/* Top Navigation */}
-        <div className="bg-base-100 border-b border-base-300">
+        <div className="bg-base-100 border-b border-base-300 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <button
-              onClick={() => setSelectedChild(null)}
-              className="btn btn-ghost btn-sm"
-            >
-              <FaChevronLeft />
-              Back to List
+            <button onClick={() => setSelectedChild(null)} className="btn btn-ghost">
+              <FaChevronLeft /> Back to List
             </button>
-            <button
-              onClick={() => window.print()}
-              className="btn btn-primary btn-sm"
-            >
-              <FaPrint />
-              Print
+            <h1 className="text-xl font-semibold">Child Details</h1>
+            <button onClick={() => window.print()} className="btn btn-primary">
+              <FaPrint /> Print
             </button>
           </div>
         </div>
 
-        {showPrintComponent ? (
-          <VaccinationCardOverlay
-            data={{
-              ...child,
-              birthDate: adToBs(safeFormatDateYYMMDD(child.birthDate)),
-              vaccinations: child.vaccinations.map((vaccine) => ({
-                ...vaccine,
-                dateGiven: adToBs(safeFormatDateYYMMDD(vaccine.dateGiven)),
-              })),
-            }}
-          />
-        ) : (
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              {/* Left Sidebar */}
-              <div className="xl:col-span-4 space-y-6">
-                {/* Child Basic Info */}
-                <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm">
-                  <div className="bg-primary text-primary-content px-6 py-4 rounded-t-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-primary-content/20 rounded-full flex items-center justify-center">
-                        <FaBaby className="text-xl" />
-                      </div>
-                      <div className="flex-1">
-                        <h1 className="text-lg font-semibold">
-                          {child.fullName} {child.lastName || ''}
-                        </h1>
-                        <p className="text-primary-content/80 text-sm">{age.formatted}</p>
-                        <div className="flex items-center space-x-3 mt-2 text-xs">
-                          <span className="bg-primary-content/20 px-2 py-1 rounded">
-                            <FaMapMarkerAlt className="inline mr-1" />
-                            Ward {child.wardNumber}
-                          </span>
-                          <span
-                            className={`px-2 py-1 rounded text-xs font-semibold ${child.purnaKhop
-                              ? 'bg-green-600 text-white'
-                              : 'bg-yellow-500 text-white'
-                              }`}
-                          >
-                            {child.purnaKhop ? 'Fully Vaccinated' : 'Incomplete'}
-                          </span>
-
-                        </div>
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+            {/* Left Sidebar */}
+            <div className="xl:col-span-4 space-y-6 print:hidden">
+              {/* Basic Info */}
+              <div className="bg-base-100 rounded-lg shadow-sm border border-base-300">
+                <div className="bg-primary text-primary-content px-6 py-4 rounded-t-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-primary-content/20 rounded-full flex items-center justify-center">
+                      <FaBaby className="text-xl" />
+                    </div>
+                    <div>
+                      <h1 className="text-xl font-semibold">
+                        {child.fullName} {child.lastName || ""}
+                      </h1>
+                      <p className="text-primary-content/80">{age.formatted}</p>
+                      <div className="flex items-center space-x-3 mt-2 text-sm">
+                        <span className="bg-primary-content/20 px-2 py-1 rounded">
+                          <FaMapMarkerAlt className="inline mr-1" /> Ward {child.wardNumber}
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded ${child.purnaKhop
+                            ? "bg-success text-success-content"
+                            : "bg-warning text-warning-content"
+                            }`}
+                        >
+                          {child.purnaKhop ? "Fully Vaccinated" : "Incomplete"}
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                {/* Personal Information */}
-                <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm">
-                  <div className="px-6 py-4 border-b border-base-300">
-                    <h3 className="font-semibold text-base-content flex items-center space-x-2">
-                      <FaUser className="text-primary" />
-                      <span>Personal Information</span>
-                    </h3>
-                  </div>
-                  <div className="p-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-base-content/60">Service Registration</label>
-                        <p className="font-medium text-base-content">#{child.sewaDartaNumber}</p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-base-content/60 flex items-center space-x-1">
-                          <FaVenusMars />
-                          <span>Gender</span>
-                        </label>
-                        <p className="font-medium text-base-content">{child.gender}</p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-base-content/60">Parent Name</label>
-                        <p className="font-medium text-base-content">{child.parentName}</p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-base-content/60">Tole</label>
-                        <p className="font-medium text-base-content">{child.tole}</p>
-                      </div>
-
-                      {child.phoneNumber && (
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-base-content/60">Phone</label>
-                          <p className="font-medium text-base-content">{child.phoneNumber}</p>
-                        </div>
-                      )}
-
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-base-content/60">Municipality</label>
-                        <p className="font-medium text-base-content">
-                          {child.isFromOtherMunicipality ? 'Other' : 'Local'}
-                        </p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-base-content/60">Caste Code</label>
-                        <p className="font-medium text-base-content">{child.casteCode}</p>
-                      </div>
-
-                      <div className="sm:col-span-2 space-y-1">
-                        <label className="text-xs font-medium text-base-content/60 flex items-center space-x-1">
-                          <FaBirthdayCake />
-                          <span>Birth Date</span>
-                        </label>
-                        <div className="flex space-x-4">
-                          <span className="font-medium text-base-content">
-                            BS: {safeAdToBs(child.birthDate)}
-                          </span>
-                          <span className="font-medium text-base-content">
-                            AD: {safeFormatDate(child.birthDate)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="sm:col-span-2 pt-3 border-t border-base-300">
-                        <label className="text-xs font-medium text-base-content/60 flex items-center space-x-1 mb-2">
-                          <FaUserMd />
-                          <span>Record Information</span>
-                        </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <span className="text-xs text-base-content/60">Created By:</span>
-                            <p className="font-medium text-primary hover:underline cursor-pointer"
-                              onClick={() => navigate(`/users/${child.createdBy.id}`)}>
-                              {child.createdBy.name}
-                            </p>
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-xs text-base-content/60">Created On:</span>
-                            <p className="font-medium text-base-content">
-                              {safeFormatDate(child.createdAt)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Vaccination Summary */}
-                <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm">
-                  <div className="px-6 py-4 border-b border-base-300">
-                    <h3 className="font-semibold text-base-content flex items-center space-x-2">
-                      <FaShieldAlt className="text-primary" />
-                      <span>Vaccination Summary</span>
-                    </h3>
-                  </div>
-                  <div className="p-6">
-                    <div className="flex items-center space-x-6 mb-6">
-                      <div className="relative w-20 h-20">
-                        <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
-                          <path
-                            className="text-base-300"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            fill="transparent"
-                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                          />
-                          <path
-                            className={
-                              vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount) * 100 === 100
-                                ? 'text-success'
-                                : 'text-primary'
-                            }
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeDasharray={`${(vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount)) * 100}, 100`}
-                            strokeLinecap="round"
-                            fill="transparent"
-                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className={`text-lg font-bold ${vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount) * 100 === 100
-                            ? 'text-success'
-                            : 'text-primary'
-                            }`}>
-                            {Math.round((vaccinationStats.totalGiven / (vaccinationStats.totalGiven + vaccinationStats.pendingCount)) * 100) || 0}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-base-content/60 font-medium mb-1">Overall Progress</p>
-                        <p className="text-lg font-semibold text-base-content">
-                          {vaccinationStats.totalGiven} / {vaccinationStats.totalGiven + vaccinationStats.pendingCount} doses given
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div className="bg-success/10 rounded-lg p-3">
-                        <p className="text-2xl font-bold text-success">{vaccinationStats.totalGiven}</p>
-                        <p className="text-xs text-base-content/70 mt-1">Complete</p>
-                      </div>
-                      <div className="bg-error/10 rounded-lg p-3">
-                        <p className="text-2xl font-bold text-error">{vaccinationStats.overdueCount}</p>
-                        <p className="text-xs text-base-content/70 mt-1">Overdue</p>
-                      </div>
-                      <div className="bg-warning/10 rounded-lg p-3">
-                        <p className="text-2xl font-bold text-warning">{vaccinationStats.pendingCount}</p>
-                        <p className="text-xs text-base-content/70 mt-1">Pending</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Weight Records */}
-                {/* Weight Records */}
-                {child.weightRecords && child.weightRecords.length > 0 && (
-                  <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm">
-                    <div className="px-6 py-4 border-b border-base-300">
-                      <h3 className="font-semibold text-base-content flex items-center space-x-2">
-                        <FaWeight className="text-primary" />
-                        <span>Weight Records</span>
-                      </h3>
-                    </div>
-                    <div className="p-6">
-                      <div className="space-y-4 max-h-80 overflow-y-auto">
-                        {child.weightRecords
-                          .sort((a, b) => new Date(b.date) - new Date(a.date))
-                          .map((record, index) => (
-                            <div
-                              key={record.id}
-                              className="bg-base-200/50 border border-base-300 rounded-lg p-4 space-y-3"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-lg font-bold text-primary">
-                                    {record.weight} kg
-                                  </span>
-                                  {index === 0 && (
-                                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                                      Latest
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-right text-sm text-base-content/70 leading-snug">
-                                  <div>BS: {safeAdToBs(record.date)}</div>
-                                  <div>AD: {safeFormatDate(record.date)}</div>
-                                </div>
-                              </div>
-                              <div className="flex flex-wrap items-center justify-between text-sm text-base-content/70 gap-2">
-                                <div className="flex items-center gap-2">
-                                  <FaUserMd />
-                                  <span
-                                    className="hover:text-primary hover:underline cursor-pointer font-medium"
-                                    onClick={() => navigate(`/users/${record.createdBy.id}`)}
-                                  >
-                                    Recorded by {record.createdBy.name}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center gap-1">
-                                    <FaClock />
-                                    <span>{safeFormatDate(record.createdAt)}</span>
-                                  </div>
-                                  <button
-                                    className="btn btn-primary btn-xs whitespace-nowrap"
-                                    onClick={handleButtonClick}
-                                  >
-                                    Show Graph
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
               </div>
 
-              {/* Vaccination Records - Main Content */}
-              <div className="xl:col-span-8">
-                <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm">
-                  <div className="bg-primary text-primary-content px-6 py-4 rounded-t-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-lg font-semibold flex items-center space-x-2">
-                          <FaSyringe />
-                          <span>Vaccination Records</span>
-                        </h2>
-                        <p className="text-primary-content/80 text-sm mt-1">Complete vaccination history and schedule</p>
-                      </div>
-                      <div className="flex items-center space-x-4 text-sm">
-                        <div className="flex items-center space-x-1">
-                          <div className="w-3 h-3 bg-primary-content rounded-full"></div>
-                          <span>Completed</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <div className="w-3 h-3 bg-primary-content/30 rounded-full"></div>
-                          <span>Pending</span>
-                        </div>
-                      </div>
+              {/* Personal Info */}
+              <div className="bg-base-100 rounded-lg shadow-sm border border-base-300">
+                <div className="px-6 py-4 border-b border-base-300">
+                  <h3 className="font-semibold text-base-content flex items-center">
+                    <FaUser className="text-primary mr-2" /> Personal Information
+                  </h3>
+                </div>
+                <div className="p-6 space-y-4 text-sm">
+                  <div>
+                    <label className="text-xs text-base-content/60">Service Registration</label>
+                    <div className="font-medium">#{child.sewaDartaNumber}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-base-content/60">Birth Date</label>
+                    <div className="flex space-x-3">
+                      <span>BS: {safeAdToBs(child.birthDate)}</span>
+                      <span>AD: {safeFormatDate(child.birthDate)}</span>
                     </div>
                   </div>
+                  <div>
+                    <label className="text-xs text-base-content/60">Created By</label>
+                    <div>
+                      <button
+                        onClick={() => navigate(`/profile/${child.createdBy.id}`)}
+                        className="text-primary hover:underline"
+                      >
+                        {child.createdBy.name}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                  <div className="p-6">
-                    <div className="columns-1 lg:columns-2 gap-6">
-                      {Object.entries(vaccinationTemplate).map(([vaccineTypeName, vaccineData]) => {
-                        const primaryDoses = vaccineData.doses.filter(d => d.scheduleInfo.isPrimary);
-                        const boosterDoses = vaccineData.doses.filter(d => d.scheduleInfo.isBooster);
-                        const primaryCompleted = primaryDoses.filter(d => d.status === 'completed').length;
-                        const boosterCompleted = boosterDoses.filter(d => d.status === 'completed').length;
-                        const primaryTotal = primaryDoses.length;
-                        const boosterTotal = boosterDoses.length;
-                        const totalRequired = primaryTotal + boosterTotal;
-                        const completedCount = primaryCompleted + boosterCompleted;
-                        const completionPercentage = totalRequired > 0 ? Math.round((completedCount / totalRequired) * 100) : 0;
+              {/* Vaccination Summary */}
+              <div className="bg-base-100 rounded-lg shadow-sm border border-base-300">
+                <div className="px-6 py-4 border-b border-base-300">
+                  <h3 className="font-semibold text-base-content flex items-center">
+                    <FaShieldAlt className="text-primary mr-2" /> Vaccination Summary
+                  </h3>
+                </div>
+                <div className="p-6 text-sm grid grid-cols-2 gap-3">
+                  <div className="bg-success/10 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-success">
+                      {vaccinationStats.primaryStats.completed}
+                    </p>
+                    <p className="text-xs">Primary Complete</p>
+                  </div>
+                  <div className="bg-error/10 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-error">
+                      {vaccinationStats.primaryStats.overdue}
+                    </p>
+                    <p className="text-xs">Primary Overdue</p>
+                  </div>
+                  <div className="bg-warning/10 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-warning">
+                      {vaccinationStats.primaryStats.pending}
+                    </p>
+                    <p className="text-xs">Primary Pending</p>
+                  </div>
+                  <div className="bg-info/10 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-info">
+                      {vaccinationStats.catchupStats.completed}
+                    </p>
+                    <p className="text-xs">Catchup Complete</p>
+                  </div>
+                </div>
+              </div>
 
-                        return (
-                          <div
-                            key={vaccineTypeName}
-                            className="mb-6 break-inside-avoid bg-base-100 rounded-lg border-2 border-primary/20 hover:border-primary/40 transition-colors shadow-sm"
-                          >
-                            {/* Vaccine Type Header */}
-                            {/* Vaccine Type Header */}
-                            <div
-                              className={`px-4 py-3 border-b border-base-300 rounded-t-lg flex items-center justify-between
-    ${completionPercentage === 100
-                                  ? "bg-green-600 text-white" // complete
-                                  : completionPercentage > 0
-                                    ? "bg-yellow-500 text-black" // in progress
-                                    : "bg-red-600 text-white"    // not started
-                                }`}
-                            >
-                              <h4 className="font-semibold">{vaccineTypeName}</h4>
-                              <div className="flex items-center space-x-2">
-                                {primaryTotal > 0 && (
-                                  <span className="px-2 py-1 rounded text-xs font-medium bg-white/30 text-black">
-                                    Primary: {primaryCompleted}/{primaryTotal}
-                                  </span>
-                                )}
-                                {boosterTotal > 0 && (
-                                  <span className="px-2 py-1 rounded text-xs font-medium bg-white/30 text-black">
-                                    Booster: {boosterCompleted}/{boosterTotal}
-                                  </span>
-                                )}
-                                <span className="text-xs font-semibold">{completionPercentage}%</span>
-                              </div>
+              {/* Weight Records */}
+              {child.weightRecords?.length > 0 && (
+                <div className="bg-base-100 rounded-lg shadow-sm border border-base-300">
+                  <div className="px-6 py-4 border-b border-base-300">
+                    <h3 className="font-semibold text-base-content flex items-center">
+                      <FaWeight className="text-primary mr-2" /> Weight Records
+                    </h3>
+                  </div>
+                  <div className="p-6 max-h-80 overflow-y-auto space-y-3">
+                    {child.weightRecords
+                      .sort((a, b) => new Date(b.date) - new Date(a.date))
+                      .map((rec, idx) => (
+                        <div key={rec.id} className="bg-base-200/50 rounded-lg p-3 flex justify-between">
+                          <div>
+                            <div className="font-bold text-lg">
+                              {rec.weight} kg{" "}
+                              {idx === 0 && <span className="badge badge-primary badge-sm">Latest</span>}
                             </div>
-
-
-                            {/* Progress bar */}
-                            <div className="px-4 pt-3">
-                              <div className="w-full bg-base-300 rounded-full h-1.5 mb-4">
-                                <div
-                                  className={`h-1.5 rounded-full transition-all duration-300 ${completionPercentage === 100 ? "bg-success" : "bg-primary"
-                                    }`}
-                                  style={{ width: `${completionPercentage}%` }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Dose list */}
-                            <div className="p-4 space-y-3">
-                              {vaccineData.doses.map((dose, index) => {
-                                const isGiven = dose.actualVaccination !== undefined;
-                                const doseType = dose.scheduleInfo.isPrimary
-                                  ? "Primary"
-                                  : dose.scheduleInfo.isBooster
-                                    ? "Catchup"
-                                    : "";
-
-                                return (
-                                  <div
-                                    key={index}
-                                    className={`rounded-lg p-4 border transition-colors ${dose.scheduleInfo.isPrimary
-                                      ? "border-l-4 border-l-blue-400 bg-blue-50/30 border-blue-200"
-                                      : dose.scheduleInfo.isBooster
-                                        ? "border-l-4 border-l-purple-400 bg-purple-50/30 border-purple-200"
-                                        : "border-base-300 bg-base-50"
-                                      }`}
-                                  >
-                                    {/* Dose header */}
-                                    <div className="flex items-center justify-between mb-3">
-                                      <div className="flex items-center space-x-3">
-                                        <div className={`w-3 h-3 rounded-full ${isGiven ? "bg-success" : "bg-base-content/20"
-                                          }`} />
-                                        <span className="font-semibold text-base-content">
-                                          Dose {dose.doseNumber}
-                                        </span>
-                                        {doseType && (
-                                          <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${dose.scheduleInfo.isPrimary
-                                            ? "bg-blue-100 text-blue-800"
-                                            : "bg-purple-100 text-purple-800"
-                                            }`}>
-                                            {doseType}
-                                          </span>
-                                        )}
-                                        <span className="text-base-content/60 bg-base-200 px-2 py-1 rounded text-xs">
-                                          {getRecommendedAgeDisplay(dose.scheduleInfo)}
-                                        </span>
-                                      </div>
-                                      {isGiven && (
-                                        <FaCheckCircle className="text-success text-lg" />
-                                      )}
-                                    </div>
-
-                                    {/* Given vs Due sections */}
-                                    {isGiven ? (
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                        <div className="space-y-2">
-                                          <div className="font-medium text-base-content bg-base-200/50 p-2 rounded">
-                                            Given On BS: {safeAdToBs(dose.dateGiven)}
-                                          </div>
-                                          <div className="text-base-content/70 bg-base-200/50 p-2 rounded">
-                                            Given On AD: {safeFormatDate(dose.dateGiven)}
-                                          </div>
-                                          {dose.actualVaccination?.type && (
-                                            <div className="mt-2">
-                                              <span className="px-2 py-1 rounded text-xs font-medium bg-info/10 text-info">
-                                                {dose.actualVaccination.type}
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-                                        <div className="space-y-2">
-                                          <div className="bg-base-200/50 p-2 rounded space-y-1">
-                                            <div className="flex items-center space-x-2 text-base-content/70">
-                                              <FaUserMd className="text-xs" />
-                                              <span
-                                                className="hover:text-primary hover:underline cursor-pointer font-medium"
-                                                onClick={() => navigate(`/users/${dose.actualVaccination.createdBy.id}`)}
-                                              >
-                                                Created By: {dose.createdBy}
-                                              </span>
-                                            </div>
-                                            <div className="flex items-center space-x-2 text-base-content/70">
-                                              <FaUserMd className="text-xs" />
-                                              <span
-                                                className="hover:text-primary hover:underline cursor-pointer font-medium"
-                                                onClick={() => navigate(`/users/${dose.actualVaccination.administeredBy.id}`)}
-                                              >
-                                                Given By: {dose.administeredBy}
-                                              </span>
-                                            </div>
-                                          </div>
-                                          <div className="flex items-center space-x-2 text-base-content/70 bg-base-200/50 p-2 rounded">
-                                            <FaClock className="text-xs" />
-                                            <span>
-                                              Recorded: {safeFormatDate(dose.actualVaccination.createdAt)}
-                                            </span>
-                                          </div>
-                                        </div>
-
-                                        {dose.actualVaccination.notes && (
-                                          <div className="md:col-span-2 mt-3 p-3 bg-base-200/50 rounded-lg border-l-4 border-primary">
-                                            <div className="text-xs text-base-content/60 mb-1 font-medium">Remarks</div>
-                                            <div className="text-sm text-base-content">
-                                              {dose.actualVaccination.notes}
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <div className="p-3 bg-base-200/50 rounded-lg">
-                                        {dose.dueDate ? (
-                                          <div className="space-y-2">
-                                            <div className={`font-medium p-2 rounded ${dose.status === "missed"
-                                              ? "text-secondary bg-secondary/10"
-                                              : dose.overdueDays
-                                                ? "text-error bg-error/10"
-                                                : "text-warning bg-warning/10"
-                                              }`}>
-                                              Due On BS: {safeAdToBs(dose.dueDate)}
-                                            </div>
-                                            <div className={`text-base-content/70 p-2 rounded ${dose.status === "missed"
-                                              ? "text-secondary bg-secondary/10"
-                                              : dose.overdueDays
-                                                ? "text-error bg-error/10"
-                                                : "text-warning bg-warning/10"
-                                              }`}>
-                                              Due On AD: {safeFormatDate(dose.dueDate)}
-                                            </div>
-                                            {dose.status === "missed" ? (
-                                              <span className="badge badge-secondary">
-                                                Missed (Overdue by {dose.overdueDays} days)
-                                              </span>
-                                            ) : dose.overdueDays ? (
-                                              <span className="badge badge-error">
-                                                Overdue by {dose.overdueDays} days
-                                              </span>
-                                            ) : dose.daysUntilDue ? (
-                                              <span className="badge badge-warning">
-                                                Due in {dose.daysUntilDue} days
-                                              </span>
-                                            ) : (
-                                              <span className="badge badge-info">Upcoming</span>
-                                            )}
-                                          </div>
-                                        ) : (
-                                          <span className="text-base-content/50 italic text-center block">
-                                            Not Administered
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                            <div className="text-sm text-base-content/70">
+                              Recorded: {safeFormatDate(rec.createdAt)}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                          <button
+                            className="btn btn-xs btn-primary"
+                            onClick={() => navigate("/graph", { state: { childrenData: child } })}
+                          >
+                            <FaChartLine /> Show Graph
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Vaccination Records */}
+            <div className="xl:col-span-8">
+              <div className="bg-base-100 rounded-lg shadow-sm border border-base-300">
+                <div className="bg-primary text-primary-content px-6 py-4 rounded-t-lg">
+                  <h2 className="text-lg font-semibold flex items-center">
+                    <FaSyringe className="mr-2" /> Vaccination Records
+                  </h2>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* === Print Compact Header === */}
+                  <div className="print:block hidden text-xs mb-6">
+                    <table className="w-full border text-xs">
+                      <tbody>
+                        <tr>
+                          <td className="border px-2 py-1 font-semibold">Child</td>
+                          <td className="border px-2 py-1">{child.fullName} {child.lastName || ""}</td>
+                          <td className="border px-2 py-1 font-semibold">Age</td>
+                          <td className="border px-2 py-1">{age.formatted}</td>
+                        </tr>
+                        <tr>
+                          <td className="border px-2 py-1 font-semibold">Parent</td>
+                          <td className="border px-2 py-1">{child.parentName}</td>
+                          <td className="border px-2 py-1 font-semibold">Ward</td>
+                          <td className="border px-2 py-1">{child.wardNumber}</td>
+                        </tr>
+                        <tr>
+                          <td className="border px-2 py-1 font-semibold">Birth</td>
+                          <td className="border px-2 py-1">
+                            BS: {safeAdToBs(child.birthDate)} | AD: {safeFormatDate(child.birthDate)}
+                          </td>
+                          <td className="border px-2 py-1 font-semibold">Weight</td>
+                          <td className="border px-2 py-1">
+                            {child.weightRecords?.[0]?.weight
+                              ? `${child.weightRecords[0].weight} kg`
+                              : "-"}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* === Print Vaccination Tables === */}
+                  <div className="hidden print:block space-y-6 text-sm">
+                    {Object.entries(vaccinationTemplate).map(([vType, vData]) => (
+                      <div key={vType} className="break-inside-avoid">
+                        <h3 className="font-semibold text-lg mb-2 border-b pb-1">{vType}</h3>
+                        <table className="w-full border text-xs">
+                          <thead className="bg-base-200">
+                            <tr>
+                              <th className="border px-2 py-1">Dose</th>
+                              <th className="border px-2 py-1">Type</th>
+                              <th className="border px-2 py-1">Status</th>
+                              <th className="border px-2 py-1">Date (BS)</th>
+                              <th className="border px-2 py-1">Date (AD)</th>
+                              <th className="border px-2 py-1">Given By</th>
+                              <th className="border px-2 py-1">Remarks</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {vData.doses.map((dose) => {
+                              const isGiven = !!dose.actualVaccination;
+                              let statusDisplay;
+                              if (isGiven) {
+                                statusDisplay = <><FaCheckCircle className="text-success inline" /> Given</>;
+                              } else if (dose.status === "missed") {
+                                statusDisplay = <><FaExclamationTriangle className="text-error inline" /> Missed {dose.overdueDays && `(by ${dose.overdueDays} days)`}</>;
+                              } else if (dose.status === "overdue") {
+                                statusDisplay = <><FaExclamationTriangle className="text-error inline" /> Overdue {dose.overdueDays && `(${dose.overdueDays} days)`}</>;
+                              } else if (dose.status === "due") {
+                                statusDisplay = <><FaClock className="text-warning inline" /> Due {dose.daysUntilDue && `(in ${dose.daysUntilDue} days)`}</>;
+                              } else {
+                                statusDisplay = "Pending";
+                              }
+
+                              return (
+                                <tr key={`${vType}-${dose.doseNumber}`}>
+                                  <td className="border px-2 py-1">Dose {dose.doseNumber}</td>
+                                  <td className="border px-2 py-1">{dose.scheduleInfo.isPrimary ? "Primary" : "Catchup"}</td>
+                                  <td className="border px-2 py-1">{statusDisplay}</td>
+                                  <td className="border px-2 py-1">{isGiven ? safeAdToBs(dose.dateGiven) : dose.dueDate ? safeAdToBs(dose.dueDate) : "-"}</td>
+                                  <td className="border px-2 py-1">{isGiven ? safeFormatDate(dose.dateGiven) : dose.dueDate ? safeFormatDate(dose.dueDate) : "-"}</td>
+                                  <td className="border px-2 py-1">{dose.actualVaccination?.administeredBy?.name || "-"}</td>
+                                  <td className="border px-2 py-1">{dose.actualVaccination?.notes || dose.dueVaccine?.notes || "-"}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* === Onscreen Vaccination === */}
+                  <div className="print:hidden space-y-8">
+                    {Object.entries(vaccinationTemplate).map(([vType, vData]) => {
+                      const primaryDoses = vData.doses.filter((d) => d.scheduleInfo.isPrimary);
+                      const catchupDoses = vData.doses.filter((d) => d.scheduleInfo.isBooster || d.isCatchUp);
+                      const primaryCompleted = primaryDoses.filter((d) => d.status === "completed").length;
+                      const catchupCompleted = catchupDoses.filter((d) => d.status === "completed").length;
+
+                      return (
+                        <div key={vType} className="rounded-xl border shadow-md overflow-hidden">
+                          <div className="px-4 py-3 flex items-center justify-between bg-primary/10 border-l-4 border-primary">
+                            <h4 className="font-semibold text-lg text-primary">{vType}</h4>
+                            <div className="text-xs flex space-x-2">
+                              <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                                Primary: {primaryCompleted}/{primaryDoses.length}
+                              </span>
+                              <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 font-medium">
+                                Catchup: {catchupCompleted}/{catchupDoses.length}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="p-4 space-y-4">
+                            {vData.doses.map((dose) => {
+                              const key = `${vType}-${dose.doseNumber}`;
+                              const isGiven = !!dose.actualVaccination;
+                              let icon = <FaClock className="text-warning" />;
+                              if (isGiven) icon = <FaCheckCircle className="text-success" />;
+                              else if (dose.status === "overdue" || dose.status === "missed") icon = <FaExclamationTriangle className="text-error" />;
+
+                              return (
+                                <div key={key} className="bg-base-100 border rounded-lg p-4 hover:shadow-sm transition">
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center space-x-3">
+                                      {icon}
+                                      <div>
+                                        <div className="font-medium">
+                                          Dose {dose.doseNumber} ({dose.scheduleInfo.isPrimary ? "Primary" : "Catchup"})
+                                        </div>
+                                        <div className="text-sm text-base-content/70">
+                                          {isGiven
+                                            ? `Given: ${safeFormatDate(dose.dateGiven)}`
+                                            : dose.dueDate
+                                              ? `Due: ${safeFormatDate(dose.dueDate)}`
+                                              : "Pending"}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <button
+                                      className="btn btn-outline btn-xs"
+                                      onClick={() => toggleDose(vType, dose.doseNumber)}
+                                    >
+                                      {expandedDoses[key] ? "Hide" : "Details"}
+                                    </button>
+                                  </div>
+
+                                  {expandedDoses[key] && (
+                                    <div className="mt-3 text-sm grid grid-cols-1 md:grid-cols-2 gap-4 bg-base-200/40 p-3 rounded-lg">
+                                      {isGiven ? (
+                                        <>
+                                          <div>
+                                            <p><strong>BS:</strong> {safeAdToBs(dose.dateGiven)}</p>
+                                            <p><strong>AD:</strong> {safeFormatDate(dose.dateGiven)}</p>
+                                            <p><strong>Given By:</strong>{" "}
+                                              {dose.actualVaccination?.administeredBy?.id ? (
+                                                <button
+                                                  onClick={() => goToProfile(dose.actualVaccination.administeredBy.id)}
+                                                  className="text-primary hover:underline"
+                                                >
+                                                  {dose.actualVaccination.administeredBy.name}
+                                                </button>
+                                              ) : "-"}
+                                            </p>
+                                            <p><strong>Created By:</strong>{" "}
+                                              {dose.actualVaccination?.createdBy?.id ? (
+                                                <button
+                                                  onClick={() => goToProfile(dose.actualVaccination.createdBy.id)}
+                                                  className="text-primary hover:underline"
+                                                >
+                                                  {dose.actualVaccination.createdBy.name}
+                                                </button>
+                                              ) : "-"}
+                                            </p>
+                                          </div>
+                                          <div>
+                                            <p><strong>Recorded:</strong>{" "}
+                                              {dose.actualVaccination?.createdAt ? safeFormatDate(dose.actualVaccination.createdAt) : "-"}
+                                            </p>
+                                            {dose.actualVaccination?.notes && (
+                                              <p><strong>Remarks:</strong> {dose.actualVaccination.notes}</p>
+                                            )}
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div>
+                                            <p><strong>Due BS:</strong> {dose.dueDate ? safeAdToBs(dose.dueDate) : "-"}</p>
+                                            <p><strong>Due AD:</strong> {dose.dueDate ? safeFormatDate(dose.dueDate) : "-"}</p>
+                                            {dose.overdueDays !== null && (
+                                              <p className="text-error"><strong>Overdue by:</strong> {dose.overdueDays} days</p>
+                                            )}
+                                            {dose.daysUntilDue !== null && (
+                                              <p className="text-warning"><strong>Due in:</strong> {dose.daysUntilDue} days</p>
+                                            )}
+                                            <p><strong>Status:</strong> {dose.status}</p>
+                                          </div>
+                                          {dose.dueVaccine?.notes && (
+                                            <div><strong>Remarks:</strong> {dose.dueVaccine.notes}</div>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
     );
   };
+
+
+
 
   // Main view
   return (
@@ -1235,37 +1060,34 @@ export default function ViewChildren() {
 
       {isSearching ? (
         <div className="flex items-center justify-center min-h-screen">
-          <FaSpinner className="animate-spin text-5xl text-primary" />
+          <div className="text-center">
+            <FaSpinner className="animate-spin text-4xl text-primary mb-4" />
+            <p className="text-base-content/60">Searching...</p>
+          </div>
         </div>
       ) : selectedChild ? (
         renderChildDetails(selectedChild)
       ) : (
         <div>
           {/* Header */}
-          <div className="bg-base-100 border-b border-base-300 shadow-sm">
+          <div className="bg-base-100 border-b border-base-300">
             <div className="max-w-7xl mx-auto px-6 py-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
                 <div>
-                  <h1 className="text-2xl font-bold text-base-content mb-1">Children Records</h1>
+                  <h1 className="text-2xl font-bold text-base-content">Children Records</h1>
                   <p className="text-base-content/70">Manage and track vaccination records for all children</p>
                 </div>
                 <div className="flex items-center space-x-4">
-                  <div className="flex items-center bg-base-200 rounded-lg p-1">
+                  <div className="join">
                     <button
                       onClick={() => changeLanguage('en')}
-                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${i18n.language === 'en'
-                        ? 'bg-base-100 text-base-content shadow-sm'
-                        : 'text-base-content/60 hover:text-base-content'
-                        }`}
+                      className={`btn btn-sm join-item ${i18n.language === 'en' ? 'btn-primary' : 'btn-outline'}`}
                     >
                       English
                     </button>
                     <button
                       onClick={() => changeLanguage('ne')}
-                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${i18n.language === 'ne'
-                        ? 'bg-base-100 text-base-content shadow-sm'
-                        : 'text-base-content/60 hover:text-base-content'
-                        }`}
+                      className={`btn btn-sm join-item ${i18n.language === 'ne' ? 'btn-primary' : 'btn-outline'}`}
                     >
                       नेपाली
                     </button>
@@ -1283,155 +1105,140 @@ export default function ViewChildren() {
           </div>
 
           <div className="max-w-7xl mx-auto px-6 py-8">
-            {/* Search and Stats */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-              <div className="lg:col-span-2">
-                <div className="relative">
-                  <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-base-content/50" />
+            {/* Compact Primary Search Section */}
+            <div className="bg-base-100 shadow-sm rounded-lg border border-base-300 p-4 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="form-control">
                   <input
                     type="text"
-                    placeholder="Search by name, phone number, or sewa darta number..."
-                    className="input input-bordered w-full pl-12 bg-base-100"
-                    value={universalSearch}
-                    onChange={(e) => {
-                      setUniversalSearch(e.target.value);
-                      handleUniversalSearch(e.target.value);
-                    }}
+                    value={filters.name}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, name: e.target.value }))}
+                    className="input input-bordered input-sm w-full"
+                    placeholder="Search by name..."
                   />
+                </div>
+                <div className="form-control">
+                  <input
+                    type="text"
+                    value={filters.serviceRegistrationNumber}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, serviceRegistrationNumber: e.target.value }))}
+                    className="input input-bordered input-sm w-full"
+                    placeholder="Service registration no..."
+                  />
+                </div>
+                <div className="form-control">
+                  <input
+                    type="text"
+                    value={filters.phoneNumber}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, phoneNumber: e.target.value }))}
+                    className="input input-bordered input-sm w-full"
+                    placeholder="Phone number..."
+                  />
+                </div>
+                <div className="form-control">
+                  <select
+                    value={filters.gender}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, gender: e.target.value }))}
+                    className="select select-bordered select-sm w-full"
+                  >
+                    <option value="">All Genders</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="bg-base-100 border border-base-300 rounded-lg p-4 shadow-sm">
+
+
+              {hasActiveFilters && (
+                <div className="flex justify-between items-center mt-4 pt-4 border-t border-base-300">
+                  <span className="text-sm text-base-content/70">
+                    {isLoadingSearch ? (
+                      <span className="flex items-center">
+                        <span className="loading loading-spinner loading-sm mr-2"></span>
+                        Searching...
+                      </span>
+                    ) : (
+                      `Found ${filteredChildren.length} result${filteredChildren.length !== 1 ? 's' : ''}`
+                    )}
+                  </span>
+                  <button
+                    onClick={clearAllFilters}
+                    className="btn btn-ghost btn-xs text-error"
+                  >
+                    <FaTimesCircle />
+                    Clear All
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+              <div className="bg-base-100 rounded-lg p-4 shadow-sm border border-base-300">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                     <FaBaby className="text-primary" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-base-content">{childrenArray.length}</p>
-                    <p className="text-sm text-base-content/70">Total Children</p>
+                    <p className="text-2xl font-bold text-base-content">{filteredChildren.length}</p>
+                    <p className="text-sm text-base-content/70">
+                      {hasActiveFilters ? 'Search Results' : 'Total Children'}
+                    </p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-base-100 border border-base-300 rounded-lg p-4 shadow-sm">
+              <div className="bg-base-100 rounded-lg p-4 shadow-sm border border-base-300">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-success/10 rounded-full flex items-center justify-center">
                     <FaCheckCircle className="text-success" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-base-content">
-                      {childrenArray.filter((child) => child.purnaKhop).length}
+                      {filteredChildren.filter((child) => child.purnaKhop).length}
                     </p>
                     <p className="text-sm text-base-content/70">Fully Vaccinated</p>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Advanced Filters Toggle */}
-            <div className="flex items-center justify-between mb-6">
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              >
-                <FaFilter />
-                Advanced Filters
-                {showAdvancedFilters ? <FaChevronUp /> : <FaChevronDown />}
-              </button>
-
-              {(universalSearch || Object.values(advancedFilters).some(val => val !== '' && val !== false)) && (
-                <button className="btn btn-ghost btn-sm text-error" onClick={clearAllFilters}>
-                  <FaTimesCircle />
-                  Clear Filters
-                </button>
-              )}
-            </div>
-
-            {/* Advanced Filters */}
-            {showAdvancedFilters && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 p-6 bg-base-100 border border-base-300 rounded-lg shadow-sm">
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-medium">Gender</span>
-                  </label>
-                  <select
-                    className="select select-bordered"
-                    value={advancedFilters.gender}
-                    onChange={(e) => setAdvancedFilters({ ...advancedFilters, gender: e.target.value })}
-                  >
-                    <option value="">All Genders</option>
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                  </select>
-                </div>
-
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-medium">Ward Number</span>
-                  </label>
-                  <select
-                    className="select select-bordered"
-                    value={advancedFilters.ward}
-                    onChange={(e) => setAdvancedFilters({ ...advancedFilters, ward: e.target.value })}
-                  >
-                    <option value="">All Wards</option>
-                    {Array.from({ length: 32 }, (_, i) => i + 1).map(ward => (
-                      <option key={ward} value={ward}>Ward {ward}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-medium">Vaccination Status</span>
-                  </label>
-                  <select
-                    className="select select-bordered"
-                    value={advancedFilters.vaccinationStatus}
-                    onChange={(e) => setAdvancedFilters({ ...advancedFilters, vaccinationStatus: e.target.value })}
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="complete">Complete</option>
-                    <option value="incomplete">Incomplete</option>
-                  </select>
-                </div>
-
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-medium">Created By</span>
-                  </label>
-                  <label className="label cursor-pointer justify-start">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary mr-3"
-                      checked={advancedFilters.createdByMe}
-                      onChange={(e) => setAdvancedFilters({ ...advancedFilters, createdByMe: e.target.checked })}
-                    />
-                    <span className="label-text">Created by Me</span>
-                  </label>
+              <div className="bg-base-100 rounded-lg p-4 shadow-sm border border-base-300">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-warning/10 rounded-full flex items-center justify-center">
+                    <FaExclamationTriangle className="text-warning" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-base-content">
+                      {filteredChildren.filter((child) => !child.purnaKhop).length}
+                    </p>
+                    <p className="text-sm text-base-content/70">Incomplete</p>
+                  </div>
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Children Grid or Empty State */}
             {filteredChildren.length === 0 ? (
-              <div className="bg-base-100 border border-base-300 rounded-lg shadow-sm p-12 text-center">
+              <div className="bg-base-100 rounded-lg shadow-sm border border-base-300 p-12 text-center">
                 <div className="w-16 h-16 bg-base-200 rounded-full flex items-center justify-center mx-auto mb-4">
                   <FaBaby className="text-2xl text-base-content/40" />
                 </div>
                 <h2 className="text-xl font-semibold text-base-content mb-2">
-                  {hasSearched ? 'No children found' : 'No children records yet'}
+                  {hasActiveFilters ? 'No children found' : 'No children records yet'}
                 </h2>
                 <p className="text-base-content/70 mb-6 max-w-md mx-auto">
-                  {hasSearched
-                    ? 'Try adjusting your search criteria or filters to find what you\'re looking for.'
+                  {hasActiveFilters
+                    ? 'Try adjusting your search criteria to find what you\'re looking for.'
                     : 'Get started by adding your first child record to track their vaccination progress.'}
                 </p>
-                {!hasSearched && (
+                {!hasActiveFilters && (
                   <button
                     onClick={() => navigate('/add-child')}
                     className="btn btn-primary"
                   >
+                    <FaPlus />
                     Add First Child
                   </button>
                 )}
@@ -1448,10 +1255,11 @@ export default function ViewChildren() {
                       disabled={currentPage === 1}
                       className="btn btn-outline btn-primary disabled:opacity-50"
                     >
+                      <FaChevronLeft />
                       Previous
                     </button>
-                    <span className="text-base-content font-medium bg-base-100 border border-base-300 px-4 py-2 rounded-lg">
-                      Page {currentPage} of {totalPages}
+                    <span className="text-base-content font-medium bg-base-100 px-4 py-2 rounded-lg border border-base-300">
+                      Page {currentPage} of {totalPages} ({filteredChildren.length} total)
                     </span>
                     <button
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
@@ -1459,6 +1267,7 @@ export default function ViewChildren() {
                       className="btn btn-outline btn-primary disabled:opacity-50"
                     >
                       Next
+                      <FaChevronLeft className="rotate-180" />
                     </button>
                   </div>
                 )}
@@ -1469,4 +1278,4 @@ export default function ViewChildren() {
       )}
     </div>
   );
-}        
+}

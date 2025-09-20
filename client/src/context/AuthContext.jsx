@@ -13,6 +13,8 @@ export function AuthProvider({ children }) {
       try {
         const response = await axiosClient.get('/api/users/me', { withCredentials: true });
         setUser(response.data.user);
+        console.log('Auth check response:', response.data.user);
+        console.log('logged in user', user)
       } catch (error) {
         // If access token expired, try refreshing
         try {
@@ -52,6 +54,7 @@ export function AuthProvider({ children }) {
         { withCredentials: true },
       );
       setUser(response.data.user);
+
       return response.data;
     } catch (error) {
       console.error('Login failed:', error);

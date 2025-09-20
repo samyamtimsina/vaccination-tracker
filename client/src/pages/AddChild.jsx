@@ -28,6 +28,7 @@ import { createChildSchema } from '../schemas/childSchema.js';
 
 import { useChildContext } from '../context/ChildContext';
 import { useVaccineScheduleContext } from '../context/VaccineScheduleContext';
+import { useAuth } from '../context/AuthContext';
 
 import { useTheme } from '../context/ThemeContext';
 import { calculateAge } from '../../helpers/calculateAge.jsx';
@@ -129,7 +130,7 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
       const statusInfo = getVaccineStatus(dose, childAge);
       return {
         doseIndex: index,
-        dose: dose.doseNumber, // Use doseNumber instead of dose
+        dose: dose.doseNumber,
         doseInfo: dose,
         ...statusInfo,
         doseType: dose.isBooster ? 'booster' : 'current'
@@ -152,7 +153,6 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
 
   return categories;
 };
-
 
 // Vaccine Card Component
 // Updated VaccineCard Component with proper dose display
@@ -225,16 +225,16 @@ const VaccineCard = ({
           <div className="flex flex-col items-end space-y-1">
             <span
               className={`badge ${displayStatus.status === "SEVERELY_OVERDUE"
-                  ? "badge-error"
-                  : displayStatus.status === "OVERDUE"
-                    ? "badge-warning"
-                    : displayStatus.status === "DUE_NOW"
-                      ? "badge-info"
-                      : displayStatus.status === "ACCESSIBLE"
+                ? "badge-error"
+                : displayStatus.status === "OVERDUE"
+                  ? "badge-warning"
+                  : displayStatus.status === "DUE_NOW"
+                    ? "badge-info"
+                    : displayStatus.status === "ACCESSIBLE"
+                      ? "badge-success"
+                      : displayStatus.status === "COMPLETED"
                         ? "badge-success"
-                        : displayStatus.status === "COMPLETED"
-                          ? "badge-success"
-                          : "badge-neutral"
+                        : "badge-neutral"
                 } text-xs`}
             >
               {displayStatus.status === "COMPLETED"
@@ -427,6 +427,7 @@ export default function AddChild() {
   const { t, i18n } = useTranslation('addChild');
   const { theme } = useTheme();
   const { addChildToState } = useChildContext();
+  const { user: currentUser } = useAuth();
   const {
     register,
     handleSubmit,
@@ -465,7 +466,6 @@ export default function AddChild() {
   });
   const [activeTab, setActiveTab] = useState('CURRENT');
 
-
   // Fetch health workers
   useEffect(() => {
     const fetchHealthWorkers = async () => {
@@ -478,6 +478,14 @@ export default function AddChild() {
     };
     fetchHealthWorkers();
   }, []);
+
+  // Set ward number automatically for non-superadmin users
+  useEffect(() => {
+    // If user is not superadmin and has a ward number, set it automatically
+    if (currentUser?.role !== 'SUPER_ADMIN' && currentUser?.wardNumber) {
+      setValue('wardNumber', currentUser.wardNumber.toString());
+    }
+  }, [currentUser, setValue]);
 
   // Use useFieldArray to manage the weightRecords array
   const { fields, append, remove } = useFieldArray({
@@ -496,6 +504,7 @@ export default function AddChild() {
       [section]: !prev[section]
     }));
   };
+
   const onSubmit = async (data) => {
     console.log('Form data before submission:', data);
     try {
@@ -549,9 +558,9 @@ export default function AddChild() {
     }
   };
 
-
   const onErrors = (errors) => {
     const errorMessage = getFirstErrorMessage(errors);
+    console.log('Validation errors:', errors);
     toast.error(t('toast.validation_error', { message: errorMessage }));
   };
 
@@ -570,6 +579,16 @@ export default function AddChild() {
   }, [age, gender, birthDate]);
 
   const totalVaccines = Object.values(categorizedVaccines).reduce((sum, cat) => sum + cat.count, 0);
+
+  // Caste code options
+  const casteCodeOptions = [
+    { value: 1, label: 'Code 1: Dalit' },
+    { value: 2, label: 'Code 2: Pahad Janajati (Hill Indigenous Nationalities)' },
+    { value: 3, label: 'Code 3: Madheshi' },
+    { value: 4, label: 'Code 4: Muslim' },
+    { value: 5, label: 'Code 5: Brahmin/Chhetri' },
+    { value: 6, label: 'Code 6: Other (Anya)' }
+  ];
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -712,25 +731,35 @@ export default function AddChild() {
                   )}
                 </div>
 
-                <div>
-                  <label className="label">
-                    <span className="label-text text-base font-medium">
-                      {t('personalInfo.form.wardNumber.label')}{' '}
-                      <span className="text-error">*</span>
-                    </span>
-                  </label>
+                {/* Conditionally show ward number field only for SUPER_ADMIN users */}
+                {currentUser?.role === 'SUPER_ADMIN' ? (
+                  <div>
+                    <label className="label">
+                      <span className="label-text text-base font-medium">
+                        {t('personalInfo.form.wardNumber.label')}{' '}
+                        <span className="text-error">*</span>
+                      </span>
+                    </label>
+                    <input
+                      {...register('wardNumber')}
+                      className={`input input-bordered w-full ${errors.wardNumber ? 'input-error' : ''
+                        }`}
+                      placeholder={t('personalInfo.form.wardNumber.placeholder')}
+                    />
+                    {errors.wardNumber && (
+                      <p className="text-error text-sm mt-1">
+                        {t('personalInfo.form.wardNumber.required')}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  // Hidden input for non-superadmins with their ward number
                   <input
+                    type="hidden"
                     {...register('wardNumber')}
-                    className={`input input-bordered w-full ${errors.wardNumber ? 'input-error' : ''
-                      }`}
-                    placeholder={t('personalInfo.form.wardNumber.placeholder')}
+                    value={currentUser?.wardNumber || ''}
                   />
-                  {errors.wardNumber && (
-                    <p className="text-error text-sm mt-1">
-                      {t('personalInfo.form.wardNumber.required')}
-                    </p>
-                  )}
-                </div>
+                )}
 
                 <div>
                   <label className="label">
@@ -739,13 +768,17 @@ export default function AddChild() {
                       <span className="text-error">*</span>
                     </span>
                   </label>
-                  <input
-                    type="number"
+                  <select
                     {...register('casteCode')}
-                    className={`input input-bordered w-full ${errors.casteCode ? 'input-error' : ''
-                      }`}
-                    placeholder={t('personalInfo.form.casteCode.placeholder')}
-                  />
+                    className={`select select-bordered w-full ${errors.casteCode ? 'select-error' : ''}`}
+                  >
+                    <option value="" disabled>{t('personalInfo.form.casteCode.placeholder')}</option>
+                    {casteCodeOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                   {errors.casteCode && (
                     <p className="text-error text-sm mt-1">
                       {t('personalInfo.form.casteCode.required')}
@@ -942,7 +975,7 @@ export default function AddChild() {
                           </span>
                         </label>
                         <input
-                          type="text"  // instead of "number"
+                          type="text"
                           {...register(`weightRecords.${index}.weight`, {
                             validate: (val) => {
                               if (val === "" || !/^\d+(\.\d{1,2})?$/.test(val)) {
@@ -1083,7 +1116,6 @@ export default function AddChild() {
                   ))}
                 </>
               )}
-
 
               {/* Summary for completed vaccines */}
               {birthDate &&

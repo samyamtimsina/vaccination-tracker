@@ -87,7 +87,11 @@ export const createChildSchema = z.object({
   lastName: z.string().optional().nullable(),
   parentName: z.string().min(1, 'अभिभावकको नाम आवश्यक छ'),
   tole: z.string().min(1, 'टोल आवश्यक छ'),
-  wardNumber: numericString,
+  wardNumber: z
+    .union([numericString, z.literal(''), z.null()])
+    .optional()
+    .transform((val) => (val === '' ? null : val)),
+
   casteCode: numericString,
   birthDate: dateSchema,
   isFromOtherMunicipality: z.boolean().default(false),

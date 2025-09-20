@@ -103,6 +103,7 @@ export async function prepareChildDueVaccines(birthDateBs, scheduleVersionId = n
 }
 // --- Full createChild controller
 export const createChild = async (req, res) => {
+  console.log('req.user', req.user)
   try {
     const validationResult = createChildSchema.safeParse(req.body);
     if (!validationResult.success)
@@ -118,7 +119,9 @@ export const createChild = async (req, res) => {
         data: {
           isFromOtherMunicipality: validatedData.isFromOtherMunicipality || false,
           fullName: `${validatedData.firstName} ${validatedData.lastName}` || '',
-          wardNumber: parseInt(validatedData.wardNumber, 10),
+          wardNumber:
+            validatedData.wardNumber ??
+            parseInt(req.user.wardId, 10),
           parentName: validatedData.parentName || '',
           tole: validatedData.tole || '',
           phoneNumber: validatedData.phoneNumber || '',
@@ -272,7 +275,7 @@ export const getAllChildren = async (req, res) => {
           isFromOtherMunicipality: true,
           casteCode: true,
           createdAt: true,
-          // _count: { select: { vaccinations: true } },
+          _count: { select: { vaccinations: true } },
           // weightRecords: {
           //   select: {
           //     id: true,
@@ -363,7 +366,7 @@ export const getWardChildren = async (req, res) => {
           isFromOtherMunicipality: true,
           casteCode: true,
           createdAt: true,
-          // _count: { select: { vaccinations: true } },
+          _count: { select: { vaccinations: true } },
           // weightRecords: {
           //   select: {
           //     id: true,
@@ -542,7 +545,7 @@ export const searchChildren = async (req, res) => {
           casteCode: true,
           createdBy: { select: { id: true, name: true } },
           verifiedBy: { select: { id: true, name: true } },
-          // _count: { select: { vaccinations: true } },
+          _count: { select: { vaccinations: true } },
           // weightRecords: {
           //   select: { weight: true, date: true },
           //   orderBy: { date: 'desc' },
@@ -557,6 +560,59 @@ export const searchChildren = async (req, res) => {
   } catch (error) {
     console.error('Error searching children:', error);
     res.status(500).json({ error: 'Failed to perform search', details: error.message });
+  }
+};
+
+//Search ward children
+// Search ward children (strictly by user's ward)
+export const searchWardChildren = async (req, res) => {
+  try {
+    const { name, phoneNumber, sewaDartaNumber, gender, createdByMe } = req.query;
+    const currentUser = req.user;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    // Always restrict to the ward of the logged-in user
+    const whereClause = { wardNumber: currentUser.wardId };
+
+    if (name) whereClause.fullName = { contains: name, mode: 'insensitive' };
+    if (phoneNumber) whereClause.phoneNumber = { contains: phoneNumber, mode: 'insensitive' };
+    if (sewaDartaNumber) whereClause.sewaDartaNumber = parseInt(sewaDartaNumber, 10);
+    if (gender) whereClause.gender = gender.toUpperCase();
+    if (createdByMe === 'true') whereClause.createdById = currentUser.id;
+
+    const [total, children] = await Promise.all([
+      prisma.child.count({ where: whereClause }),
+      prisma.child.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          sewaDartaNumber: true,
+          fullName: true,
+          wardNumber: true,
+          birthDate: true,
+          purnaKhop: true,
+          gender: true,
+          parentName: true,
+          tole: true,
+          phoneNumber: true,
+          isFromOtherMunicipality: true,
+          casteCode: true,
+          createdBy: { select: { id: true, name: true } },
+          verifiedBy: { select: { id: true, name: true } },
+          _count: { select: { vaccinations: true } },
+        },
+      }),
+    ]);
+
+    res.status(200).json({ children, total, page, limit });
+  } catch (error) {
+    console.error('Error searching ward children:', error);
+    res.status(500).json({ error: 'Failed to perform ward search', details: error.message });
   }
 };
 
