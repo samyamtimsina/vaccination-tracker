@@ -420,30 +420,21 @@ export const getWardChildren = async (req, res) => {
 };
 
 // Get single child (by ID or Sewa Darta Number) -- returns the SAME data shape as getAllChildren
+// Get single child (by ID or Sewa Darta Number)
 export const getChild = async (req, res) => {
   try {
     const { id } = req.params;
     const currentUser = req.user;
     const isNumber = /^\d+$/.test(id);
 
+    // Step 1: fetch all data in a single, efficient query
     const child = await prisma.child.findUnique({
       where: isNumber ? { sewaDartaNumber: parseInt(id, 10) } : { id },
-      select: {
-        id: true,
-        sewaDartaNumber: true,
-        fullName: true,
-        wardNumber: true,
-        birthDate: true,
-        purnaKhop: true,
-        gender: true,
-        parentName: true,
-        tole: true,
-        phoneNumber: true,
-        isFromOtherMunicipality: true,
-        casteCode: true,
-        createdAt: true,
-        _count: { select: { vaccinations: true } },
+      include: {
+        createdBy: { select: { id: true, name: true } },
+        verifiedBy: { select: { id: true, name: true } },
         weightRecords: {
+          orderBy: { date: "desc" },
           select: {
             id: true,
             createdAt: true,
@@ -452,7 +443,6 @@ export const getChild = async (req, res) => {
             date: true,
             weight: true,
           },
-          orderBy: { date: 'desc' },
         },
         vaccinations: {
           select: {
@@ -476,28 +466,41 @@ export const getChild = async (req, res) => {
             catchUpLocked: true,
           },
         },
-        createdBy: { select: { id: true, name: true } },
-        verifiedBy: { select: { id: true, name: true } },
       },
     });
 
-    if (!child) return res.status(404).json({ error: 'Child not found' });
+    if (!child) return res.status(404).json({ error: "Child not found" });
 
-    if (!checkPermission(currentUser, 'read', child)) {
-      return res.status(403).json({ error: 'Forbidden: You do not have permission to view this child.' });
+    if (!checkPermission(currentUser, "read", child)) {
+      return res
+        .status(403)
+        .json({ error: "Forbidden: You do not have permission to view this child." });
     }
 
-    // Add whatsLeft for consistency
-    const whatsLeft = (child.dueVaccines || []).filter(dv => !dv.isCompleted).length;
-    const filteredChild = { ...filterChildData(currentUser, child), whatsLeft };
+    // Step 2: process the fetched data
+    const whatsLeft = child.dueVaccines.filter((dv) => !dv.isCompleted).length;
+
+    // Separate the related data before filtering the main child object
+    const { vaccinations, weightRecords, dueVaccines, ...childData } = child;
+
+    const filteredChild = {
+      ...filterChildData(currentUser, childData),
+      weightRecords,
+      vaccinations,
+      dueVaccines,
+      whatsLeft,
+    };
 
     res.status(200).json(filteredChild);
-
   } catch (error) {
-    console.error('Error fetching single child:', error);
-    res.status(500).json({ error: 'Failed to retrieve child data', details: error.message });
+    console.error("Error fetching single child:", error);
+    res.status(500).json({
+      error: "Failed to retrieve child data",
+      details: error.message,
+    });
   }
 };
+
 
 
 // Search children (with query filters)
@@ -577,7 +580,7 @@ export const searchWardChildren = async (req, res) => {
     // Always restrict to the ward of the logged-in user
     const whereClause = { wardNumber: currentUser.wardId };
 
-    if (name) whereClause.fullName = { contains: name, mode: 'insensitive' };
+    if (name) whereClause.fullName = { startsWith: name.trim(), mode: 'insensitive' };
     if (phoneNumber) whereClause.phoneNumber = { contains: phoneNumber, mode: 'insensitive' };
     if (sewaDartaNumber) whereClause.sewaDartaNumber = parseInt(sewaDartaNumber, 10);
     if (gender) whereClause.gender = gender.toUpperCase();

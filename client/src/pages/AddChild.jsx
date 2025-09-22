@@ -506,7 +506,6 @@ export default function AddChild() {
   };
 
   const onSubmit = async (data) => {
-    console.log('Form data before submission:', data);
     try {
       const filteredWeightRecords = data.weightRecords.filter(
         (record) => record.date && record.weight,
@@ -537,7 +536,6 @@ export default function AddChild() {
         }
       });
 
-      console.log('Filtered Vaccines:', filteredVaccines);
 
       const payload = {
         ...data,
@@ -546,11 +544,17 @@ export default function AddChild() {
         administeredById: parseInt(data.administeredById),
         wardOfVaccination: 1
       };
-      console.log('payload add child', payload);
+
       const res = await axiosClient.post('/api/child', payload);
-      addChildToState(res.data);
+
+      // Ensure we're pushing just the child object
+      const newChild = res.data?.id ? res.data : res.data.child;
+
+      addChildToState(newChild);
+
       toast.success(t('toast.success'));
       reset();
+
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       console.error('Submission failed:', err);
@@ -560,6 +564,7 @@ export default function AddChild() {
 
   const onErrors = (errors) => {
     const errorMessage = getFirstErrorMessage(errors);
+
     console.log('Validation errors:', errors);
     toast.error(t('toast.validation_error', { message: errorMessage }));
   };

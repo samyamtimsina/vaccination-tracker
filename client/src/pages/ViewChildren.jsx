@@ -29,6 +29,7 @@ import { useChildContext } from '../context/ChildContext';
 import { useVaccineScheduleContext } from '../context/VaccineScheduleContext';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function ViewChildren() {
   const navigate = useNavigate();
@@ -60,9 +61,8 @@ export default function ViewChildren() {
   const [hasActiveFilters, setHasActiveFilters] = useState(false);
 
   const { childrenData, error, loading, fetchChildren } = useChildContext();
-  console.log('childrenData from the useChildContext in ViewChildren', childrenData);
+  const { user } = useAuth();
   const { vaccineSchedule, loading: scheduleLoading } = useVaccineScheduleContext();
-  console.log('vaccineSchedule', vaccineSchedule);
 
   const itemsPerPage = 12;
   const resultsPerPage = 10;
@@ -143,14 +143,21 @@ export default function ViewChildren() {
   // Primary search functionality - debounced search
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
-      if (!hasActiveFilters) {
+      if (!hasActiveFilters || !user) {
         setSearchResults([]);
         return;
       }
 
       setIsLoadingSearch(true);
+
       try {
-        const res = await axiosClient.get('/api/child/search-ward', {
+        // Choose API based on role
+        let endpoint = '/api/child/search-ward'; // default for WARD_OFFICER
+        if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') {
+          endpoint = '/api/child/search'; // superadmin/admin endpoint
+        }
+
+        const res = await axiosClient.get(endpoint, {
           params: {
             name: filters.name,
             phoneNumber: filters.phoneNumber,
@@ -173,6 +180,7 @@ export default function ViewChildren() {
         }
 
         setSearchResults(results);
+        console.log('search results', results);
       } catch (err) {
         console.error('Search failed:', err);
         setSearchResults([]);
@@ -182,7 +190,7 @@ export default function ViewChildren() {
     }, 400);
 
     return () => clearTimeout(delayDebounce);
-  }, [filters, hasActiveFilters]);
+  }, [filters, hasActiveFilters, user]);
 
   // Handle direct search by sewaDartaNumber
   const handleDirectSearch = async (number) => {
@@ -574,82 +582,224 @@ export default function ViewChildren() {
     const hasWeightRecords = child.weightRecords && child.weightRecords.length > 0;
     const latestWeight = hasWeightRecords ?
       child.weightRecords.sort((a, b) => new Date(b.date) - new Date(a.date))[0] : null;
+    const vaccinationCount = child._count?.vaccinations || 0;
+    const genderDisplay = child.gender === 'MALE' ? 'Male' : child.gender === 'FEMALE' ? 'Female' : child.gender || 'N/A';
 
     return (
       <div
         key={child.id}
-        className="bg-base-100 border border-base-300 rounded-lg shadow-sm hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+        className="bg-base-100 border border-base-300 rounded-xl shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300 cursor-pointer overflow-hidden group"
         onClick={() => handleChildSelect(child)}
       >
-        {/* Header */}
-        <div className="bg-base-200/30 px-4 py-3 border-b border-base-300 rounded-t-lg">
+        {/* Header Bar with Status */}
+        <div className="bg-gradient-to-r from-base-200 to-base-200/50 px-6 py-4 border-b border-base-300">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                <FaBaby className="text-primary text-sm" />
+            <div className="flex items-center space-x-4">
+              <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors">
+                <FaBaby className="text-primary text-xl" />
               </div>
               <div>
-                <h3 className="font-semibold text-base-content">
+                <h3 className="font-bold text-xl text-base-content group-hover:text-primary transition-colors">
                   {child.fullName} {child.lastName || ''}
                 </h3>
-                <p className="text-base-content/60 text-sm">{age.formatted}</p>
+                <div className="flex items-center space-x-3 text-sm text-base-content/70 mt-1">
+                  <span className="flex items-center space-x-1">
+                    <FaClock className="text-xs" />
+                    <span>{age.formatted}</span>
+                  </span>
+                  <span className="flex items-center space-x-1">
+                    <FaMapMarkerAlt className="text-xs" />
+                    <span>Ward {child.wardNumber}</span>
+                  </span>
+                  <span className="font-mono text-xs bg-base-300/50 px-2 py-1 rounded">
+                    #{child.sewaDartaNumber}
+                  </span>
+                </div>
               </div>
             </div>
-            <span className={`badge ${child.purnaKhop ? 'badge-success' : 'badge-warning'}`}>
-              {child.purnaKhop ? 'Complete' : 'Pending'}
-            </span>
+            <div className="flex flex-col items-end space-y-2">
+              <span className={`badge badge-lg ${child.purnaKhop ? 'badge-success' : 'badge-warning'}`}>
+                {child.purnaKhop ? (
+                  <>
+                    <FaCheckCircle className="mr-1" />
+                    Complete
+                  </>
+                ) : (
+                  <>
+                    <FaExclamationTriangle className="mr-1" />
+                    Pending
+                  </>
+                )}
+              </span>
+              <div className="text-xs text-base-content/60 text-right">
+                {vaccinationCount} vaccines given
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <span className="text-base-content/60">Birth (BS):</span>
-              <p className="font-medium">{safeAdToBs(child.birthDate)}</p>
-            </div>
-            <div>
-              <span className="text-base-content/60">Ward:</span>
-              <p className="font-medium">{child.wardNumber}</p>
-            </div>
-            <div>
-              <span className="text-base-content/60">Birth (AD):</span>
-              <p className="font-medium">{safeFormatDate(child.birthDate)}</p>
-            </div>
-            <div>
-              <span className="text-base-content/60">Vaccines:</span>
-              <p className="font-medium">{child._count?.vaccinations ? child._count.vaccinations : 0}</p>
-            </div>
-          </div>
+        {/* Main Content Grid */}
+        <div className="p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {latestWeight && (
-            <div className="pt-3 border-t border-base-300">
-              <div className="flex justify-between items-center">
-                <span className="text-base-content/60 text-sm flex items-center">
-                  <FaWeight className="mr-1" />
-                  Latest Weight
-                </span>
-                <span className="font-medium">{latestWeight.weight} kg</span>
+            {/* Personal Information Column */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                  <FaUser className="text-blue-600 text-xs" />
+                </div>
+                <h4 className="font-semibold text-base-content">Personal Information</h4>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b border-base-300/50">
+                  <span className="text-sm text-base-content/70">Parent Name</span>
+                  <span className="font-semibold text-base-content text-right max-w-32 truncate" title={child.parentName}>
+                    {child.parentName || 'N/A'}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-base-300/50">
+                  <span className="text-sm text-base-content/70">Gender</span>
+                  <span className="font-semibold text-base-content">{genderDisplay}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-base-300/50">
+                  <span className="text-sm text-base-content/70">Tole</span>
+                  <span className="font-semibold text-base-content text-right max-w-32 truncate" title={child.tole}>
+                    {child.tole || 'N/A'}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-base-300/50">
+                  <span className="text-sm text-base-content/70">Caste</span>
+                  <span className="font-semibold text-base-content">{child.casteCode || 'N/A'}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-base-content/70">Other Municipality</span>
+                  <span className={`badge badge-sm ${child.isFromOtherMunicipality ? 'badge-info' : 'badge-ghost'}`}>
+                    {child.isFromOtherMunicipality ? 'Yes' : 'No'}
+                  </span>
+                </div>
               </div>
             </div>
-          )}
 
-          <div className="pt-3 border-t border-base-300">
-            <p className="text-base-content/60 text-sm">
-              Created by{' '}
-              <span
-                className="font-medium text-primary hover:underline cursor-pointer"
-                onClick={(e) => { e.stopPropagation(); navigate(`/users/${child.createdBy.id}`); }}
-              >
-                {child.createdBy.name}
-              </span>
-            </p>
+            {/* Dates & Records Column */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                  <FaClock className="text-green-600 text-xs" />
+                </div>
+                <h4 className="font-semibold text-base-content">Dates & Records</h4>
+              </div>
+
+              <div className="space-y-3">
+                <div className="bg-base-200/30 rounded-lg p-3">
+                  <div className="text-xs text-base-content/60 mb-1">Birth Date</div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">AD:</span>
+                    <span className="font-semibold">{safeFormatDate(child.birthDate)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="font-medium">BS:</span>
+                    <span className="font-semibold">{safeAdToBs(child.birthDate)}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-base-300/50">
+                  <span className="text-sm text-base-content/70">Vaccines Given</span>
+                  <span className="badge badge-primary badge-lg font-bold">{vaccinationCount}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-base-300/50">
+                  <span className="text-sm text-base-content/70">Created</span>
+                  <span className="font-semibold text-base-content text-sm">{safeFormatDate(child.createdAt)}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-base-content/70">Created by</span>
+                  <button
+                    className="font-semibold text-primary hover:text-primary-focus hover:underline transition-colors text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/users/${child.createdBy.id}`);
+                    }}
+                  >
+                    {child.createdBy.name}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Weight & Actions Column */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
+                  <FaWeight className="text-purple-600 text-xs" />
+                </div>
+                <h4 className="font-semibold text-base-content">Weight & Actions</h4>
+              </div>
+
+              {/* Weight Display */}
+              {latestWeight ? (
+                <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg p-4 border border-primary/20">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-base-content/70">Latest Weight</span>
+                    <button
+                      className="btn btn-xs btn-primary btn-outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate("/graph", { state: { childrenData: child } });
+                      }}
+                    >
+                      <FaChartLine />
+                      Graph
+                    </button>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-primary mb-1">
+                      {latestWeight.weight}
+                      <span className="text-lg ml-1">kg</span>
+                    </div>
+                    <div className="text-xs text-base-content/60">
+                      Recorded: {safeFormatDate(latestWeight.createdAt)}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-base-200/30 rounded-lg p-4 text-center">
+                  <FaWeight className="text-base-content/40 text-2xl mx-auto mb-2" />
+                  <div className="text-sm text-base-content/60">No weight records</div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                <button
+                  className="w-full btn btn-primary group-hover:btn-primary-focus"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleChildSelect(child);
+                  }}
+                >
+                  <FaEye className="mr-2" />
+                  View Full Details
+                </button>
+
+                <button
+                  className="w-full btn btn-outline btn-primary btn-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('/add-vaccination', { state: { childId: child.id } });
+                  }}
+                >
+                  <FaSyringe className="mr-2" />
+                  Add Vaccine
+                </button>
+              </div>
+            </div>
           </div>
-
-          <button className="w-full btn btn-primary btn-sm">
-            <FaEye />
-            View Details
-          </button>
         </div>
       </div>
     );
@@ -1245,7 +1395,7 @@ export default function ViewChildren() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="space-y-4">
                   {currentChildren.map(renderChildCard)}
                 </div>
                 {totalPages > 1 && (

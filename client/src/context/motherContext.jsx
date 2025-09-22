@@ -1,16 +1,36 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import axiosClient from '../api/axiosClient';
+import { useAuth } from './AuthContext';
 
 const MotherContext = createContext();
 
 export function MotherProvider({ children }) {
+  const { registerResetCallback, unregisterResetCallback } = useAuth();
   const [mothersData, setMothersData] = useState([]);
-  const [fetched, setFetched] = useState(false); 
+  const [fetched, setFetched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Reset function for this context
+  const resetMotherContext = () => {
+    setMothersData([]);
+    setFetched(false);
+    setLoading(false);
+    setError(null);
+  };
+
+  // Register reset callback with AuthContext
+  useEffect(() => {
+    registerResetCallback(resetMotherContext);
+
+    return () => {
+      unregisterResetCallback(resetMotherContext);
+    };
+  }, [registerResetCallback, unregisterResetCallback]);
+
   async function fetchMothers() {
-    if (fetched) return;     setLoading(true);
+    if (fetched) return;
+    setLoading(true);
     try {
       const res = await axiosClient.get('/api/mothers/ward');
       setMothersData(res.data);

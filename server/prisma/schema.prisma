@@ -87,6 +87,12 @@ model Child {
   NotificationLog           NotificationLog[]
   isFromOtherMunicipality   Boolean             @default(false)
   weightRecords             WeightRecord[]
+  @@index([wardNumber])
+  @@index([phoneNumber])
+  @@index([fullName])        // fast prefix search (or FULLTEXT/trigram if substrings)
+  @@index([parentName])      // same as above
+  @@index([birthDate])       // useful for age filtering
+  @@index([createdAt])       // for sorting/pagination
 }
 
 model Mother {
@@ -141,6 +147,8 @@ model VaccinationRecord {
   administeredBy            User?       @relation(name: "AdministeredByVaccination", fields: [administeredById], references: [id])
   createdAt                 DateTime    @default(now())
   wardOfVaccination         Int
+  @@index([citizenId, dateGiven])
+  @@index([wardOfVaccination])
 }
 
 model VaccineType {
@@ -202,6 +210,7 @@ model ChildDueVaccine {
   catchUpLocked   Boolean      @default(false)
   isCatchUp       Boolean @default(false)
   @@index([dueDate, isCompleted, notificationSent])
+  @@index([childId, isCompleted])
 
 }
 
@@ -257,4 +266,5 @@ model WeightRecord {
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
   wardOfVaccination         Int
+   @@index([childId, date])
 }

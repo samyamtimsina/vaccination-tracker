@@ -590,7 +590,6 @@ export default function EditChild() {
       try {
         const res = await axiosClient.get(`/api/child/${selectedChild.sewaDartaNumber}`);
         const childData = res.data;
-        console.log('childData fetched:', childData);
 
         const fullProfile = !!childData.parentName;
         setIsFullProfile(fullProfile);
@@ -839,7 +838,6 @@ export default function EditChild() {
       }
 
       const res = await axiosClient.put(`/api/child/${fetchedChild.sewaDartaNumber}`, payload);
-      console.log('payload sent for update:', payload);
       updateChildInState(res.data);
       toast.success(t('toast.update_success'));
     } catch (err) {

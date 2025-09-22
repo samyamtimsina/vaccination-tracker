@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axiosClient from '../api/axiosClient';
 
 const AuthContext = createContext();
@@ -6,6 +6,16 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Keep track of reset callbacks from other contexts
+  const [resetCallbacks, setResetCallbacks] = useState([]);
+
+  const registerResetCallback = useCallback((callback) => {
+    setResetCallbacks(prev => [...prev, callback]);
+  }, []);
+
+  const unregisterResetCallback = useCallback((callback) => {
+    setResetCallbacks(prev => prev.filter(cb => cb !== callback));
+  }, []);
 
   //automatic refresh token
   useEffect(() => {
@@ -70,6 +80,9 @@ export function AuthProvider({ children }) {
       // Tell the server to clear the httpOnly cookie.
       await axiosClient.post('/api/auth/logout');
       setUser(null);
+
+      // Call all registered reset callbacks to clear other contexts
+      resetCallbacks.forEach(callback => callback());
     } catch (error) {
       console.error('Logout failed:', error);
     }
@@ -77,7 +90,16 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, setUser, login, logout, loading, isAuthenticated: !!user }}
+      value={{
+        user,
+        setUser,
+        login,
+        logout,
+        loading,
+        isAuthenticated: !!user,
+        registerResetCallback,
+        unregisterResetCallback
+      }}
     >
       {children}
     </AuthContext.Provider>
