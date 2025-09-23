@@ -15,16 +15,20 @@ const router = express.Router();
 
 router.get('/me', authenticate, getMe);
 router.get('/all', authenticate, authorize('SUPER_ADMIN'), getAllUsers);
-router.patch('/:userId', updateUserProfile);
+
+router.get('/ward', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'), getWardUsers);
+
+router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'), getUsers);
+
 router.get(
   '/:userId',
   authenticate,
 
-  authorize('ADMIN', 'SUPER_ADMIN', ' WARD_OFFICER'),
+  authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'),
   getUserProfile,
 );
+router.patch('/:userId', updateUserProfile);
 
-router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'), getWardUsers);
 
 router.post('/update-user-status/:id', authenticate,
   authorize('SUPER_ADMIN'),

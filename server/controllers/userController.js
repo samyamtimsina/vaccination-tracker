@@ -47,6 +47,7 @@ export const getAllUsers = async (req, res) => {
   }
 }
 export const getUsers = async (req, res) => {
+  console.log('Fetching users with role filter:', req.query.role);
   try {
     const { role } = req.query;
 
@@ -59,6 +60,7 @@ export const getUsers = async (req, res) => {
         id: true,
         name: true,
         role: true,
+        wardId: true,
       },
     });
 
@@ -70,6 +72,7 @@ export const getUsers = async (req, res) => {
   }
 };
 export const getWardUsers = async (req, res) => {
+  console.log('Fetching ward users for wardId:', req.user.wardId);
   try {
     const { role } = req.query;
     console.log('role', role)
@@ -85,6 +88,8 @@ export const getWardUsers = async (req, res) => {
       select: {
         id: true,
         name: true,
+        role: true,
+        wardId: true,
       },
     });
 

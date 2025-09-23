@@ -470,12 +470,19 @@ export default function AddChild() {
   useEffect(() => {
     const fetchHealthWorkers = async () => {
       try {
-        const res = await axiosClient.get('/api/users?role=WARD_OFFICER');
+        let url = '/api/users?role=WARD_OFFICER';
+
+        if (currentUser?.role === 'SUPER_ADMIN') {
+          url = '/api/users';
+        }
+
+        const res = await axiosClient.get(url);
         setHealthWorkers(res.data);
       } catch (err) {
         console.error('Failed to fetch health workers:', err);
       }
     };
+
     fetchHealthWorkers();
   }, []);
 
@@ -909,17 +916,30 @@ export default function AddChild() {
                 </label>
                 <select
                   {...register('administeredById')}
-                  className={`select select-bordered w-full max-w-xs ${errors.administeredById ? 'select-error' : ''
-                    }`}
+                  className={`select select-bordered w-full max-w-xs ${errors.administeredById ? 'select-error' : ''}`}
                   defaultValue=""
                 >
-                  <option value="" disabled>{t('personalInfo.administered_by.placeholder')}</option>
-                  {healthWorkers.map(worker => (
-                    <option key={worker.id} value={worker.id}>
-                      {worker.name}
-                    </option>
-                  ))}
+                  <option value="" disabled>
+                    {t('personalInfo.administered_by.placeholder')}
+                  </option>
+
+                  {healthWorkers
+                    .sort((a, b) => {
+                      // Sort by wardId first (nulls at the end), then by name
+                      const wardA = a.wardId ?? Infinity;
+                      const wardB = b.wardId ?? Infinity;
+                      if (wardA !== wardB) return wardA - wardB;
+                      return a.name.localeCompare(b.name);
+                    })
+                    .map((worker) => (
+                      <option key={worker.id} value={worker.id}>
+                        {worker.wardId ? `Ward ${worker.wardId} — ` : ''}
+                        {worker.name}
+                        {worker.role ? ` [${worker.role}]` : ''}
+                      </option>
+                    ))}
                 </select>
+
                 {errors.administeredById && (
                   <p className="text-error text-sm mt-1">
                     {t('personalInfo.administered_by.required')}
