@@ -173,6 +173,7 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
 };
 
 // VaccineCard Component
+// VaccineCard Component (patched for EditChild)
 const VaccineCard = ({
   vaccineName,
   dose,
@@ -184,9 +185,7 @@ const VaccineCard = ({
   toggleRemarks,
   theme,
   t,
-  isPartialEdit,
-  existingDate,
-  existingRemarks
+  isFullProfile
 }) => {
   // Watch the live date for this vaccine dose
   const watchedDate = useWatch({
@@ -197,8 +196,8 @@ const VaccineCard = ({
   const remarksKey = `${vaccineName}-${dose.doseIndex}`;
   const showRemark = showRemarks[remarksKey] || false;
 
-  // If user has entered or already has a date, mark as completed
-  const isCompleted = !!watchedDate || !!existingDate;
+  // ✅ If user has entered or already has a date, mark as completed
+  const isCompleted = !!watchedDate;
 
   const displayStatus = isCompleted
     ? {
@@ -269,21 +268,21 @@ const VaccineCard = ({
 
         {/* Date Input */}
         <div>
-          {existingDate && isPartialEdit ? (
-            <input
-              type="text"
-              className="input input-bordered input-sm w-full input-disabled"
-              value={adToBs(safeFormatDateYYMMDD(existingDate))}
-              disabled
-              readOnly
-            />
-          ) : (
-            <Controller
-              name={`vaccines.${vaccineName}.${displayStatus.doseIndex}.date`}
-              control={control}
-              render={({ field }) => (
-                <div className="relative">
-                  {dose.status !== "NOT_YET_ELIGIBLE" ? (
+          <Controller
+            name={`vaccines.${vaccineName}.${displayStatus.doseIndex}.date`}
+            control={control}
+            render={({ field }) => (
+              <div className="relative">
+                {dose.status !== "NOT_YET_ELIGIBLE" ? (
+                  (!isFullProfile && field.value) ? (
+                    // readonly fallback for partial profiles with existing date
+                    <input
+                      type="text"
+                      className="input input-bordered input-sm w-full bg-base-200 cursor-not-allowed"
+                      value={field.value}
+                      readOnly
+                    />
+                  ) : (
                     <>
                       <NepaliDatePicker
                         className="w-full"
@@ -310,61 +309,69 @@ const VaccineCard = ({
                         </button>
                       )}
                     </>
-                  ) : (
-                    <input
-                      type="text"
-                      className="input input-bordered input-sm w-full input-disabled"
-                      value=""
-                      disabled
-                      readOnly
-                      placeholder={t("vaccine_card.unavailable_placeholder", {
-                        age: getRecommendedAgeText(displayStatus.doseInfo),
-                      })}
-                    />
-                  )}
+                  )
+                ) : (
+                  <input
+                    type="text"
+                    className="input input-bordered input-sm w-full input-disabled"
+                    value=""
+                    disabled
+                    readOnly
+                    placeholder={t("vaccine_card.unavailable_placeholder", {
+                      age: getRecommendedAgeText(displayStatus.doseInfo),
+                    })}
+                  />
+                )}
+              </div>
+            )}
+          />
+
+          {/* Remarks Section */}
+          {dose.status !== "NOT_YET_ELIGIBLE" && (
+            <div className="pt-2 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => toggleRemarks(vaccineName, displayStatus.doseIndex)}
+                className="btn btn-sm w-full justify-between p-2 bg-base-200 hover:bg-base-300"
+              >
+                <span className="flex items-center text-xs">
+                  <FaClipboardList className="w-3 h-3 mr-1" />
+                  {t("vaccine_card.remarks")}
+                </span>
+                <span
+                  className={`text-xs transform transition-transform ${showRemark ? "rotate-180" : ""
+                    }`}
+                >
+                  ▼
+                </span>
+              </button>
+
+              {showRemark && (
+                <div className="mt-2">
+                  <textarea
+                    {...register(
+                      `vaccines.${vaccineName}.${displayStatus.doseIndex}.remarks`
+                    )}
+                    className="textarea textarea-bordered textarea-xs w-full"
+                    placeholder={t("vaccine_card.remarks_placeholder")}
+                    rows={2}
+                    readOnly={!isFullProfile && !!field.value} // lock remarks if partial profile
+                  />
                 </div>
               )}
-            />
+            </div>
           )}
         </div>
 
-        {/* Remarks Section */}
-        {dose.status !== "NOT_YET_ELIGIBLE" && (
-          <div className="pt-2 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={() => toggleRemarks(vaccineName, displayStatus.doseIndex)}
-              className="btn btn-ghost btn-xs w-full justify-between p-2"
-            >
-              <span className="flex items-center text-xs">
-                <FaClipboardList className="w-3 h-3 mr-1" />
-                {t("vaccine_card.remarks")}
-              </span>
-              <span
-                className={`text-xs transform transition-transform ${showRemark ? "rotate-180" : ""}`}
-              >
-                ▼
-              </span>
-            </button>
 
-            {showRemark && (
-              <div className="mt-2">
-                <textarea
-                  {...register(`vaccines.${vaccineName}.${displayStatus.doseIndex}.remarks`)}
-                  className={`textarea textarea-bordered textarea-xs w-full ${existingRemarks && isPartialEdit ? 'textarea-disabled' : ''}`}
-                  placeholder={t("vaccine_card.remarks_placeholder")}
-                  rows={2}
-                  defaultValue={existingRemarks || ''}
-                  disabled={existingRemarks && isPartialEdit}
-                />
-              </div>
-            )}
-          </div>
-        )}
+        {/* Remarks Section */}
+
       </div>
     </div>
   );
 };
+
+
 
 // Vaccine Section Component
 const VaccineSection = ({
@@ -379,8 +386,7 @@ const VaccineSection = ({
   toggleRemarks,
   theme,
   t,
-  isPartialEdit,
-  existingVaccinations
+  isFullProfile,
 }) => {
   const isExpanded = expandedSections[sectionKey];
   const isEmpty = sectionData.count === 0;
@@ -399,6 +405,15 @@ const VaccineSection = ({
     return titles[key];
   };
 
+  const getSectionDescription = () => {
+    const descriptions = {
+      CURRENT: 'These are routine doses for the child. Some may be due, overdue, or upcoming.',
+      CATCH_UP: 'These are booster doses for the child. They are administered at specific ages.',
+      NOT_APPLICABLE: 'These vaccines are not applicable for this child'
+    };
+    return descriptions[sectionKey];
+  };
+
   return (
     <div className="mb-6">
       {isExpanded && !isEmpty && (
@@ -409,29 +424,22 @@ const VaccineSection = ({
                 {vaccine.vaccineName}
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {vaccine.doses.map((dose) => {
-                  const existingVaccination = existingVaccinations.find(
-                    vac => vac.vaccineName === vaccine.vaccineName && vac.doseNumber === dose.dose
-                  );
-                  return (
-                    <VaccineCard
-                      key={`${vaccine.vaccineName}-${dose.doseIndex}`}
-                      vaccineName={vaccine.vaccineName}
-                      dose={dose}
-                      sectionType={sectionKey}
-                      control={control}
-                      register={register}
-                      setValue={setValue}
-                      showRemarks={showRemarks}
-                      toggleRemarks={toggleRemarks}
-                      theme={theme}
-                      t={t}
-                      isPartialEdit={isPartialEdit}
-                      existingDate={existingVaccination?.dateGiven}
-                      existingRemarks={existingVaccination?.remarks}
-                    />
-                  );
-                })}
+                {vaccine.doses.map((dose) => (
+                  <VaccineCard
+                    key={`${vaccine.vaccineName}-${dose.doseIndex}`}
+                    vaccineName={vaccine.vaccineName}
+                    dose={dose}
+                    sectionType={sectionKey}
+                    control={control}
+                    register={register}
+                    setValue={setValue}
+                    showRemarks={showRemarks}
+                    toggleRemarks={toggleRemarks}
+                    theme={theme}
+                    t={t}
+                    isFullProfile={isFullProfile}
+                  />
+                ))}
               </div>
             </div>
           ))}
@@ -471,7 +479,7 @@ export default function EditChild() {
       birthDate: '',
       administeredById: '',
       vaccines: {},
-      weightRecords: [{ dbId: null, date: '', weight: '' }],
+      weightRecords: [{ id: null, date: '', weight: '' }],
     },
   });
 
@@ -504,8 +512,6 @@ export default function EditChild() {
     isComplete: false,
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [isPartialEdit, setIsPartialEdit] = useState(false);
-  const [existingVaccinations, setExistingVaccinations] = useState([]);
   const resultsPerPage = 10;
 
   const { fields, append, remove, replace } = useFieldArray({
@@ -590,17 +596,10 @@ export default function EditChild() {
       try {
         const res = await axiosClient.get(`/api/child/${selectedChild.sewaDartaNumber}`);
         const childData = res.data;
+        console.log('childData fetched:', childData);
 
         const fullProfile = !!childData.parentName;
         setIsFullProfile(fullProfile);
-
-        // Assume userWardId is fetched from user context or API
-        // For this example, we'll assume it's available via an API call or context
-        // Replace this with actual logic to get userWardId
-        const userWardId = await fetchUserWardId(); // Hypothetical function
-        const isPartial = childData.wardNumber !== userWardId;
-        setIsPartialEdit(isPartial);
-
         setFetchedChild(childData);
 
         const defaultFormValues = {
@@ -628,20 +627,17 @@ export default function EditChild() {
 
         reset(defaultFormValues);
 
-        const newWeightRecords = isPartial
-          ? [{ dbId: null, date: '', weight: '' }]
-          : childData.weightRecords.length > 0
-            ? childData.weightRecords.map((rec) => ({
-              dbId: rec.id ? rec.id.toString() : null,
-              date: adToBs(safeFormatDateYYMMDD(rec.date)),
-              weight: rec.weight.toString(),
-            }))
-            : [{ dbId: null, date: '', weight: '' }];
+        const newWeightRecords = childData.weightRecords.length > 0
+          ? childData.weightRecords.map((rec) => ({
+            dbId: rec.id ? rec.id.toString() : null,
+            date: adToBs(safeFormatDateYYMMDD(rec.date)),
+            weight: rec.weight.toString(),
+          }))
+          : [{ dbId: null, date: '', weight: '' }];
 
         replace(newWeightRecords);
 
         const vaccineTypeIdToName = {};
-        const tempExistingVaccinations = [];
         Object.entries(vaccineSchedule?.doses || {}).forEach(([vaccineName, doses]) => {
           if (doses.length > 0 && doses[0].vaccineTypeId) {
             vaccineTypeIdToName[doses[0].vaccineTypeId] = vaccineName;
@@ -649,7 +645,7 @@ export default function EditChild() {
         });
 
         childData.vaccinations.forEach((vac) => {
-          const vaccineName = vaccineTypeIdToName[vac.vaccineType.id];
+          const vaccineName = vaccineTypeIdToName[vac.vaccineType.id]
           if (!vaccineName) {
             console.warn(`Vaccine type ID ${vac.vaccineTypeId} not found in mapping`);
             return;
@@ -659,27 +655,18 @@ export default function EditChild() {
           if (doses) {
             const doseIndex = doses.findIndex((d) => d.doseNumber === vac.doseNumber);
             if (doseIndex !== -1) {
-              tempExistingVaccinations.push({
-                vaccineName,
-                doseNumber: vac.doseNumber,
-                dateGiven: vac.dateGiven,
-                remarks: vac.remarks,
-              });
-              if (!isPartial) {
-                setValue(
-                  `vaccines.${vaccineName}.${doseIndex}.date`,
-                  adToBs(safeFormatDateYYMMDD(vac.dateGiven))
-                );
-                setValue(
-                  `vaccines.${vaccineName}.${doseIndex}.remarks`,
-                  vac.remarks || ''
-                );
-              }
+              setValue(
+                `vaccines.${vaccineName}.${doseIndex}.date`,
+                adToBs(safeFormatDateYYMMDD(vac.dateGiven))
+              );
+              setValue(
+                `vaccines.${vaccineName}.${doseIndex}.remarks`,
+                vac.remarks || ''
+              );
             }
           }
         });
 
-        setExistingVaccinations(tempExistingVaccinations);
         setSewaDartaNumber(childData.sewaDartaNumber.toString());
       } catch (err) {
         console.error('Failed to fetch child data:', err);
@@ -692,18 +679,6 @@ export default function EditChild() {
 
     fetchChildData();
   }, [selectedChild, reset, setValue, replace, t, vaccineSchedule]);
-
-  // Hypothetical function to fetch userWardId (implement based on your auth system)
-  const fetchUserWardId = async () => {
-    // Replace with actual API call or context access
-    try {
-      const res = await axiosClient.get('/api/user/profile'); // Example endpoint
-      return res.data.wardId; // Adjust based on actual response structure
-    } catch (err) {
-      console.error('Failed to fetch user ward ID:', err);
-      return null;
-    }
-  };
 
   const toggleRemarks = (vaccineName, doseIndex) => {
     const key = `${vaccineName}-${doseIndex}`;
@@ -738,7 +713,7 @@ export default function EditChild() {
             weight: parseFloat(rec.weight),
           };
 
-          if (!isPartialEdit && rec.dbId && rec.dbId !== 'null' && rec.dbId !== '' && rec.dbId !== null) {
+          if (rec.dbId && rec.dbId !== 'null' && rec.dbId !== '' && rec.dbId !== null) {
             weightRecord.id = parseInt(rec.dbId);
           }
 
@@ -753,65 +728,34 @@ export default function EditChild() {
         }
       });
 
-      const filteredVaccinations = isPartialEdit
-        ? Object.entries(data.vaccines)
-          .flatMap(([vaccineName, doses]) =>
-            doses
-              .filter((dose) => dose.date)
-              .map((dose, index) => {
-                const scheduleDose = vaccineSchedule.doses[vaccineName][index];
-                const vaccineTypeId = vaccineTypeIdToName[vaccineName];
+      const filteredVaccinations = Object.entries(data.vaccines)
+        .flatMap(([vaccineName, doses]) =>
+          doses
+            .filter((dose) => dose.date)
+            .map((dose, index) => {
+              const scheduleDose = vaccineSchedule.doses[vaccineName][index];
+              const vaccineTypeId = vaccineTypeIdToName[vaccineName];
 
-                if (!vaccineTypeId) {
-                  console.error(`Vaccine type ID not found for ${vaccineName}`);
-                  return null;
-                }
+              if (!vaccineTypeId) {
+                console.error(`Vaccine type ID not found for ${vaccineName}`);
+                return null;
+              }
 
-                // Only include if no existing vaccination for this dose
-                const exists = existingVaccinations.some(
-                  vac => vac.vaccineName === vaccineName && vac.doseNumber === scheduleDose.doseNumber
-                );
-                if (exists) return null;
-
-                return {
-                  vaccineTypeId: vaccineTypeId,
-                  doseNumber: scheduleDose.doseNumber,
-                  dateGiven: dose.date,
-                  remarks: dose.remarks || null,
-                  type: scheduleDose.isBooster ? 'booster' : 'current'
-                };
-              })
-          )
-          .filter(vac => vac !== null)
-        : Object.entries(data.vaccines)
-          .flatMap(([vaccineName, doses]) =>
-            doses
-              .filter((dose) => dose.date)
-              .map((dose, index) => {
-                const scheduleDose = vaccineSchedule.doses[vaccineName][index];
-                const vaccineTypeId = vaccineTypeIdToName[vaccineName];
-
-                if (!vaccineTypeId) {
-                  console.error(`Vaccine type ID not found for ${vaccineName}`);
-                  return null;
-                }
-
-                return {
-                  vaccineTypeId: vaccineTypeId,
-                  doseNumber: scheduleDose.doseNumber,
-                  dateGiven: dose.date,
-                  remarks: dose.remarks || null,
-                  type: scheduleDose.isBooster ? 'booster' : 'current'
-                };
-              })
-          )
-          .filter(vac => vac !== null);
+              return {
+                vaccineTypeId: vaccineTypeId,
+                doseNumber: scheduleDose.doseNumber,
+                dateGiven: dose.date,
+                remarks: dose.remarks || null,
+                type: scheduleDose.isBooster ? 'booster' : 'current'
+              };
+            })
+        ).filter(vac => vac !== null); // Remove any null entries
 
       const administeredById = data.administeredById;
 
       let payload = {};
 
-      if (isFullProfile && !isPartialEdit) {
+      if (isFullProfile) {
         payload = {
           weightRecords: filteredWeightRecords,
           vaccinations: filteredVaccinations,
@@ -1127,40 +1071,258 @@ export default function EditChild() {
                         {t('personalInfo.title')}
                       </h2>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      <div className="form-control">
-                        <label className="label"><span className="label-text font-medium">सेवा दर्ता नं.</span></label>
-                        <p className="p-3 border rounded-lg bg-base-200 font-semibold">{fetchedChild.sewaDartaNumber}</p>
-                      </div>
-                      <div className="form-control">
-                        <label className="label"><span className="label-text font-medium">नाम</span></label>
-                        <p className="p-3 border rounded-lg bg-base-200 font-semibold">{fetchedChild.fullName}</p>
-                      </div>
-                      <div className="form-control">
-                        <label className="label"><span className="label-text font-medium">लिङ्ग</span></label>
-                        <p className="p-3 border rounded-lg bg-base-200 font-semibold">
-                          {fetchedChild.gender === 'MALE'
-                            ? t('personalInfo.form.gender.options.male')
-                            : fetchedChild.gender === 'FEMALE'
-                              ? t('personalInfo.form.gender.options.female')
-                              : t('personalInfo.form.gender.options.other')}
-                        </p>
-                      </div>
-                      <div className="form-control">
-                        <label className="label"><span className="label-text font-medium">जन्म मिति</span></label>
-                        <p className="p-3 border rounded-lg bg-base-200 font-semibold">{adToBs(safeFormatDateYYMMDD(fetchedChild.birthDate))}</p>
-                      </div>
-                      <div className="form-control">
-                        <label className="label">
-                          <span className="label-text font-medium">उमेर</span>
-                        </label>
-                        {birthDate && (
+                    {isFullProfile ? (
+                      <>
+                        <div className="mb-8 p-4 bg-info/10 border border-info/20 rounded-lg">
+                          <div className="flex items-center">
+                            <Controller
+                              name="isFromOtherMunicipality"
+                              control={control}
+                              render={({ field }) => (
+                                <input
+                                  type="checkbox"
+                                  checked={field.value}
+                                  onChange={(e) => field.onChange(e.target.checked)}
+                                  id="isFromOtherMunicipality"
+                                  className="checkbox checkbox-primary"
+                                />
+                              )}
+                            />
+                            <label
+                              htmlFor="isFromOtherMunicipality"
+                              className="ml-3 text-base font-medium text-base-content cursor-pointer"
+                            >
+                              {t('personalInfo.municipality.label')}
+                            </label>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          <div>
+                            <label className="label">
+                              <span className="label-text text-base font-medium">
+                                {t('personalInfo.form.firstName.label')} <span className="text-error">*</span>
+                              </span>
+                            </label>
+                            <input
+                              {...register('firstName')}
+                              className={`input input-bordered w-full ${errors.firstName ? 'input-error' : ''}`}
+                              placeholder={t('personalInfo.form.firstName.placeholder')}
+                            />
+                            {errors.firstName && (
+                              <p className="text-error text-sm mt-1">
+                                {t('personalInfo.form.firstName.required')}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="label">
+                              <span className="label-text text-base font-medium">
+                                {t('personalInfo.form.lastName.label')}
+                              </span>
+                            </label>
+                            <input
+                              {...register('lastName')}
+                              className="input input-bordered w-full"
+                              placeholder={t('personalInfo.form.lastName.placeholder')}
+                            />
+                            {errors.lastName && (
+                              <p className="text-error text-sm mt-1">
+                                {t('personalInfo.form.lastName.required')}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="label">
+                              <span className="label-text text-base font-medium">
+                                {t('personalInfo.form.gender.label')} <span className="text-error">*</span>
+                              </span>
+                            </label>
+                            <select
+                              {...register('gender')}
+                              className={`select select-bordered w-full ${errors.gender ? 'select-error' : ''}`}
+                            >
+                              <option value="">{t('personalInfo.form.gender.placeholder')}</option>
+                              <option value="MALE">{t('personalInfo.form.gender.options.male')}</option>
+                              <option value="FEMALE">{t('personalInfo.form.gender.options.female')}</option>
+                              <option value="OTHER">{t('personalInfo.form.gender.options.other')}</option>
+                            </select>
+                            {errors.gender && (
+                              <p className="text-error text-sm mt-1">
+                                {t('personalInfo.form.gender.required')}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="label">
+                              <span className="label-text text-base font-medium">
+                                {t('personalInfo.form.wardNumber.label')} <span className="text-error">*</span>
+                              </span>
+                            </label>
+                            <input
+                              {...register('wardNumber')}
+                              className={`input input-bordered w-full ${errors.wardNumber ? 'input-error' : ''}`}
+                              placeholder={t('personalInfo.form.wardNumber.placeholder')}
+                            />
+                            {errors.wardNumber && (
+                              <p className="text-error text-sm mt-1">
+                                {t('personalInfo.form.wardNumber.required')}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="label">
+                              <span className="label-text text-base font-medium">
+                                {t('personalInfo.form.casteCode.label')} <span className="text-error">*</span>
+                              </span>
+                            </label>
+                            <input
+                              type="number"
+                              {...register('casteCode')}
+                              className={`input input-bordered w-full ${errors.casteCode ? 'input-error' : ''}`}
+                              placeholder={t('personalInfo.form.casteCode.placeholder')}
+                            />
+                            {errors.casteCode && (
+                              <p className="text-error text-sm mt-1">
+                                {t('personalInfo.form.casteCode.required')}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="label">
+                              <span className="label-text text-base font-medium">
+                                {t('personalInfo.form.parentName.label')} <span className="text-error">*</span>
+                              </span>
+                            </label>
+                            <input
+                              {...register('parentName')}
+                              className={`input input-bordered w-full ${errors.parentName ? 'input-error' : ''}`}
+                              placeholder={t('personalInfo.form.parentName.placeholder')}
+                            />
+                            {errors.parentName && (
+                              <p className="text-error text-sm mt-1">
+                                {t('personalInfo.form.parentName.required')}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="label">
+                              <span className="label-text text-base font-medium">
+                                {t('personalInfo.form.tole.label')} <span className="text-error">*</span>
+                              </span>
+                            </label>
+                            <input
+                              {...register('tole')}
+                              className={`input input-bordered w-full ${errors.tole ? 'input-error' : ''}`}
+                              placeholder={t('personalInfo.form.tole.placeholder')}
+                            />
+                            {errors.tole && (
+                              <p className="text-error text-sm mt-1">
+                                {t('personalInfo.form.tole.required')}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="label">
+                              <span className="label-text text-base font-medium">
+                                {t('personalInfo.form.phoneNumber.label')}
+                              </span>
+                            </label>
+                            <input
+                              {...register('phoneNumber')}
+                              className="input input-bordered w-full"
+                              placeholder={t('personalInfo.form.phoneNumber.placeholder')}
+                            />
+                            {errors.phoneNumber && (
+                              <p className="text-error text-sm mt-1">
+                                {t('personalInfo.form.phoneNumber.required')}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="label">
+                              <span className="label-text text-base font-medium">
+                                {t('personalInfo.form.birthDate.label')} <span className="text-error">*</span>
+                              </span>
+                            </label>
+                            <div className="relative">
+                              <Controller
+                                name="birthDate"
+                                control={control}
+                                render={({ field }) => (
+                                  <>
+                                    <NepaliDatePicker
+                                      className="w-full"
+                                      inputClassName={`input input-bordered w-full pr-10 ${errors.birthDate ? 'input-error' : ''}`}
+                                      value={field.value || ''}
+                                      onChange={(value) => field.onChange(value)}
+                                      language="ne"
+                                      theme={theme}
+                                    />
+                                    {field.value && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setValue('birthDate', '')}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/50 hover:text-error transition-colors"
+                                        title={t('personalInfo.form.birthDate.clear_title')}
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                              />
+                            </div>
+                            {errors.birthDate && (
+                              <p className="text-error text-sm mt-1">
+                                {t('personalInfo.form.birthDate.required')}
+                              </p>
+                            )}
+                            {birthDate && (
+                              <div className="mt-3 p-3 bg-success/10 rounded-lg border border-success/20">
+                                <div className="text-base text-success font-medium">
+                                  {t('personalInfo.age', { months: age.months || 0, days: age.days || 0 })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="form-control">
+                          <label className="label"><span className="label-text font-medium">सेवा दर्ता नं.</span></label>
+                          <p className="p-3 border rounded-lg bg-base-200 font-semibold">{fetchedChild.sewaDartaNumber}</p>
+                        </div>
+                        <div className="form-control">
+                          <label className="label"><span className="label-text font-medium">नाम</span></label>
+                          <p className="p-3 border rounded-lg bg-base-200 font-semibold">{fetchedChild.fullName}</p>
+                        </div>
+                        <div className="form-control">
+                          <label className="label"><span className="label-text font-medium">लिङ्ग</span></label>
                           <p className="p-3 border rounded-lg bg-base-200 font-semibold">
-                            {t('personalInfo.age', { months: age.months, days: age.days })}
+                            {fetchedChild.gender === 'MALE'
+                              ? t('personalInfo.form.gender.options.male')
+                              : fetchedChild.gender === 'FEMALE'
+                                ? t('personalInfo.form.gender.options.female')
+                                : t('personalInfo.form.gender.options.other')}
                           </p>
-                        )}
+                        </div>
+                        <div className="form-control">
+                          <label className="label"><span className="label-text font-medium">जन्म मिति</span></label>
+                          <p className="p-3 border rounded-lg bg-base-200 font-semibold">{adToBs(safeFormatDateYYMMDD(fetchedChild.birthDate))}</p>
+                        </div>
+                        <div className="form-control">
+                          <label className="label">
+                            <span className="label-text font-medium">उमेर</span>
+                          </label>
+                          {birthDate && (
+                            <p className="p-3 border rounded-lg bg-base-200 font-semibold">
+                              {t('personalInfo.age', { months: age.months, days: age.days })}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <div className="mt-8">
                       <label className="label">
                         <span className="label-text text-base font-medium">
@@ -1194,43 +1356,6 @@ export default function EditChild() {
                       </h2>
                     </div>
                     <div className="space-y-6">
-                      {fetchedChild.weightRecords.map((record, index) => (
-                        <div
-                          key={`existing-${record.id}`}
-                          className="p-6 bg-base-200 rounded-lg border border-base-300"
-                        >
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-                            <div>
-                              <label className="label">
-                                <span className="label-text text-base font-medium">
-                                  {t('weightTracking.date_label', { index: index + 1 })}
-                                </span>
-                              </label>
-                              <input
-                                type="text"
-                                className="input input-bordered w-full input-disabled"
-                                value={adToBs(safeFormatDateYYMMDD(record.date))}
-                                disabled
-                                readOnly
-                              />
-                            </div>
-                            <div>
-                              <label className="label">
-                                <span className="label-text text-base font-medium">
-                                  {t('weightTracking.weight_label')}
-                                </span>
-                              </label>
-                              <input
-                                type="text"
-                                className="input input-bordered w-full input-disabled"
-                                value={record.weight}
-                                disabled
-                                readOnly
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
                       {fields.map((field, index) => (
                         <div
                           key={field.id}
@@ -1245,23 +1370,33 @@ export default function EditChild() {
                             <div>
                               <label className="label">
                                 <span className="label-text text-base font-medium">
-                                  {t('weightTracking.date_label', { index: fetchedChild.weightRecords.length + index + 1 })}
+                                  {t('weightTracking.date_label', { index: index + 1 })}
                                 </span>
                               </label>
                               <Controller
                                 name={`weightRecords.${index}.date`}
                                 control={control}
                                 render={({ field }) => (
-                                  <NepaliDatePicker
-                                    className="w-full"
-                                    inputClassName="input input-bordered w-full"
-                                    value={field.value || ''}
-                                    onChange={(value) => field.onChange(value)}
-                                    language="ne"
-                                    theme={theme}
-                                  />
+                                  (!isFullProfile && field.value) ? (
+                                    <input
+                                      type="text"
+                                      className="input input-bordered w-full bg-base-200 cursor-not-allowed"
+                                      value={field.value}
+                                      readOnly
+                                    />
+                                  ) : (
+                                    <NepaliDatePicker
+                                      className="w-full"
+                                      inputClassName="input input-bordered w-full"
+                                      value={field.value || ''}
+                                      onChange={(value) => field.onChange(value)}
+                                      language="ne"
+                                      theme={theme}
+                                    />
+                                  )
                                 )}
                               />
+
                               {errors.weightRecords?.[index]?.date && (
                                 <p className="text-error text-sm mt-1">
                                   {t('weightTracking.errors.date_required')}
@@ -1283,6 +1418,7 @@ export default function EditChild() {
                                 })}
                                 className="input input-bordered w-full"
                                 placeholder={t('weightTracking.weight_label')}
+                                disabled={!isFullProfile && field.dbId}
                               />
                               {errors.weightRecords?.[index]?.weight && (
                                 <p className="text-error text-sm mt-1">
@@ -1291,7 +1427,7 @@ export default function EditChild() {
                               )}
                             </div>
                             <div className="flex space-x-3">
-                              {fields.length > 1 && (
+                              {isFullProfile && fields.length > 1 && (
                                 <button
                                   type="button"
                                   onClick={() => remove(index)}
@@ -1312,6 +1448,7 @@ export default function EditChild() {
                                 </button>
                               )}
                             </div>
+
                           </div>
                         </div>
                       ))}
@@ -1319,7 +1456,7 @@ export default function EditChild() {
                         <div className="text-center py-12">
                           <button
                             type="button"
-                            onClick={() => append({ dbId: null, date: '', weight: '' })}
+                            onClick={() => append({ date: '', weight: '' })}
                             className="btn btn-success btn-lg"
                           >
                             <FaPlus className="mr-2" />
@@ -1344,6 +1481,7 @@ export default function EditChild() {
                               बच्चाको उमेर: {age.months} महिना, {age.days} दिन
                             </p>
                           )}
+
                         </div>
                       </div>
                       {birthDate && gender && (
@@ -1398,8 +1536,7 @@ export default function EditChild() {
                               toggleRemarks={toggleRemarks}
                               theme={theme}
                               t={t}
-                              isPartialEdit={isPartialEdit}
-                              existingVaccinations={existingVaccinations}
+                              isFullProfile={isFullProfile}
                             />
                           )
                         ))}

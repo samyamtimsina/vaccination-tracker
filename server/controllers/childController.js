@@ -275,7 +275,7 @@ export const getAllChildren = async (req, res) => {
           isFromOtherMunicipality: true,
           casteCode: true,
           createdAt: true,
-          _count: { select: { vaccinations: true } },
+          _count: { select: { vaccinations: true, weightRecords: true } },
           // weightRecords: {
           //   select: {
           //     id: true,
@@ -333,91 +333,91 @@ export const getAllChildren = async (req, res) => {
 };
 
 // Get children for a specific ward (returns the SAME data shape as getAllChildren)
-export const getWardChildren = async (req, res) => {
-  try {
-    const currentUser = req.user;
-    if (!currentUser?.wardId) {
-      return res.status(401).json({ error: 'Unauthorized. User or wardId not found.' });
-    }
+// export const getWardChildren = async (req, res) => {
+//   try {
+//     const currentUser = req.user;
+//     if (!currentUser?.wardId) {
+//       return res.status(401).json({ error: 'Unauthorized. User or wardId not found.' });
+//     }
 
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = parseInt(req.query.limit) || 20;
+//     const skip = (page - 1) * limit;
 
-    const where = { wardNumber: currentUser.wardId };
+//     const where = { wardNumber: currentUser.wardId };
 
-    const [total, children] = await Promise.all([
-      prisma.child.count({ where }),
-      prisma.child.findMany({
-        where,
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          sewaDartaNumber: true,
-          fullName: true,
-          wardNumber: true,
-          birthDate: true,
-          purnaKhop: true,
-          gender: true,
-          parentName: true,
-          tole: true,
-          phoneNumber: true,
-          isFromOtherMunicipality: true,
-          casteCode: true,
-          createdAt: true,
-          _count: { select: { vaccinations: true } },
-          // weightRecords: {
-          //   select: {
-          //     id: true,
-          //     createdAt: true,
-          //     createdBy: { select: { id: true, name: true } },
-          //     administeredBy: { select: { id: true, name: true } },
-          //     date: true,
-          //     weight: true,
-          //   },
-          //   orderBy: { date: 'desc' },
-          //   take: 1,
-          // },
-          // vaccinations: {
-          //   select: {
-          //     id: true,
-          //     createdAt: true,
-          //     createdBy: { select: { id: true, name: true } },
-          //     administeredBy: { select: { id: true, name: true } },
-          //     vaccineType: true,
-          //     dateGiven: true,
-          //     doseNumber: true,
-          //   },
-          // },
-          // dueVaccines: {
-          //   select: {
-          //     id: true,
-          //     vaccineTypeId: true,
-          //     doseNumber: true,
-          //     dueDate: true,
-          //     isCompleted: true,
-          //     isCatchUp: true,
-          //     catchUpLocked: true,
-          //   },
-          // },
-          createdBy: { select: { id: true, name: true } },
-          verifiedBy: { select: { id: true, name: true } },
-        },
-      }),
-    ]);
+//     const [total, children] = await Promise.all([
+//       prisma.child.count({ where }),
+//       prisma.child.findMany({
+//         where,
+//         skip,
+//         take: limit,
+//         select: {
+//           id: true,
+//           sewaDartaNumber: true,
+//           fullName: true,
+//           wardNumber: true,
+//           birthDate: true,
+//           purnaKhop: true,
+//           gender: true,
+//           parentName: true,
+//           tole: true,
+//           phoneNumber: true,
+//           isFromOtherMunicipality: true,
+//           casteCode: true,
+//           createdAt: true,
+//           _count: { select: { vaccinations: true } },
+//           // weightRecords: {
+//           //   select: {
+//           //     id: true,
+//           //     createdAt: true,
+//           //     createdBy: { select: { id: true, name: true } },
+//           //     administeredBy: { select: { id: true, name: true } },
+//           //     date: true,
+//           //     weight: true,
+//           //   },
+//           //   orderBy: { date: 'desc' },
+//           //   take: 1,
+//           // },
+//           // vaccinations: {
+//           //   select: {
+//           //     id: true,
+//           //     createdAt: true,
+//           //     createdBy: { select: { id: true, name: true } },
+//           //     administeredBy: { select: { id: true, name: true } },
+//           //     vaccineType: true,
+//           //     dateGiven: true,
+//           //     doseNumber: true,
+//           //   },
+//           // },
+//           // dueVaccines: {
+//           //   select: {
+//           //     id: true,
+//           //     vaccineTypeId: true,
+//           //     doseNumber: true,
+//           //     dueDate: true,
+//           //     isCompleted: true,
+//           //     isCatchUp: true,
+//           //     catchUpLocked: true,
+//           //   },
+//           // },
+//           createdBy: { select: { id: true, name: true } },
+//           verifiedBy: { select: { id: true, name: true } },
+//         },
+//       }),
+//     ]);
 
-    const childrenWithWhatsLeft = children.map(child => {
-      const whatsLeft = (child.dueVaccines || []).filter(dv => !dv.isCompleted).length;
-      return { ...child, whatsLeft };
-    });
+//     const childrenWithWhatsLeft = children.map(child => {
+//       const whatsLeft = (child.dueVaccines || []).filter(dv => !dv.isCompleted).length;
+//       return { ...child, whatsLeft };
+//     });
 
-    res.status(200).json({ children: childrenWithWhatsLeft, total, page, limit });
-  } catch (error) {
-    console.error('Error fetching ward children:', error);
-    res.status(500).json({ error: 'Failed to fetch ward children', details: error.message });
-  }
-};
+//     res.status(200).json({ children: childrenWithWhatsLeft, total, page, limit });
+//   } catch (error) {
+//     console.error('Error fetching ward children:', error);
+//     res.status(500).json({ error: 'Failed to fetch ward children', details: error.message });
+//   }
+// };
 
 // Get single child (by ID or Sewa Darta Number) -- returns the SAME data shape as getAllChildren
 // Get single child (by ID or Sewa Darta Number)

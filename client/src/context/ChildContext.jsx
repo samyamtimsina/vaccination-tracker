@@ -1,13 +1,13 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axiosClient from '../api/axiosClient';
-import { useAuth } from './AuthContext';
+import { useAuth } from './AuthContext'; // Add this import
 
 const ChildContext = createContext();
 
 export function ChildProvider({ children }) {
-  const { user, registerResetCallback, unregisterResetCallback } = useAuth();
+  const { registerResetCallback, unregisterResetCallback } = useAuth(); // Add this
   const [childrenData, setChildrenData] = useState([]);
-  const [fetched, setFetched] = useState(false); // avoid refetch
+  const [fetched, setFetched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -29,19 +29,12 @@ export function ChildProvider({ children }) {
   }, [registerResetCallback, unregisterResetCallback]);
 
   async function fetchChildren() {
-    if (fetched) return; // Skip if already fetched
+    if (fetched) return;
     setLoading(true);
-
     try {
-      let endpoint = '/api/child/ward'; // default
-      if (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') {
-        endpoint = '/api/child/all';
-      } else if (user?.role === 'WARD_OFFICER') {
-        endpoint = '/api/child/ward';
-      }
-
-      const res = await axiosClient.get(endpoint);
+      const res = await axiosClient.get('/api/child/all');
       setChildrenData(res.data);
+      console.log('Fetched children data:', res.data);
       setFetched(true);
     } catch (err) {
       console.error('Failed to fetch children:', err);
@@ -50,18 +43,47 @@ export function ChildProvider({ children }) {
       setLoading(false);
     }
   }
-
   function addChildToState(newChild) {
-    setChildrenData((prev) => [...prev, newChild]);
+    setChildrenData((prev) => {
+      if (!prev || !Array.isArray(prev.children)) {
+        // Fallback if somehow not in expected shape
+        return { children: [newChild], total: 1, page: 1, limit: 20 };
+      }
+
+      return {
+        ...prev,
+        children: [...prev.children, newChild],
+        total: (prev.total || 0) + 1,
+      };
+    });
   }
 
   function updateChildInState(updatedChild) {
-    setChildrenData((prev) =>
-      prev.map((child) =>
-        child.id === updatedChild.id ? updatedChild : child,
-      ),
-    );
+    setChildrenData((prev) => {
+      if (!prev || !Array.isArray(prev.children)) return prev;
+
+      return {
+        ...prev,
+        children: prev.children.map((child) =>
+          child.id === updatedChild.id ? updatedChild : child
+        ),
+      };
+    });
   }
+
+  function updateChildInState(updatedChild) {
+    setChildrenData((prev) => {
+      if (!prev || !Array.isArray(prev.children)) return prev;
+
+      return {
+        ...prev,
+        children: prev.children.map((child) =>
+          child.id === updatedChild.id ? updatedChild : child
+        ),
+      };
+    });
+  }
+
 
   return (
     <ChildContext.Provider

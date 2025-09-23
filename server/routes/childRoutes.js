@@ -5,7 +5,7 @@ import {
   createChild,
   getAllChildren,
   getChild,
-  getWardChildren,
+  // getWardChildren,
   searchChildren,
   searchWardChildren,
   updateChild,
@@ -26,12 +26,12 @@ router.get(
 router.get('/search', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'), searchChildren);
 router.get('/search-ward', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'), searchWardChildren);
 
-router.get(
-  '/ward',
-  authenticate,
-  authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'),
-  getWardChildren,
-);
+// router.get(
+//   '/ward',
+//   authenticate,
+//   authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'),
+//   getWardChildren,
+// );
 
 router.get('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'WARD_OFFICER'), getChild);
 router.put(

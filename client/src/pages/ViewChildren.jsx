@@ -732,45 +732,39 @@ export default function ViewChildren() {
               </div>
             </div>
 
-            {/* Weight & Actions Column */}
+            {/* Records & Actions Column */}
             <div className="space-y-4">
               <div className="flex items-center space-x-2 mb-3">
                 <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
-                  <FaWeight className="text-purple-600 text-xs" />
+                  <FaChartLine className="text-purple-600 text-xs" />
                 </div>
-                <h4 className="font-semibold text-base-content">Weight & Actions</h4>
+                <h4 className="font-semibold text-base-content">Records & Actions</h4>
               </div>
 
-              {/* Weight Display */}
-              {latestWeight ? (
-                <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg p-4 border border-primary/20">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-base-content/70">Latest Weight</span>
-                    <button
-                      className="btn btn-xs btn-primary btn-outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate("/graph", { state: { childrenData: child } });
-                      }}
-                    >
-                      <FaChartLine />
-                      Graph
-                    </button>
+              {/* Counts Display - Side by Side */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg p-3 border border-primary/20 text-center">
+                  <div className="text-xl font-bold text-primary mb-1">
+                    {child._count?.vaccinations || 0}
                   </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-primary mb-1">
-                      {latestWeight.weight}
-                      <span className="text-lg ml-1">kg</span>
-                    </div>
-                    <div className="text-xs text-base-content/60">
-                      Recorded: {safeFormatDate(latestWeight.createdAt)}
-                    </div>
-                  </div>
+                  <div className="text-xs text-base-content/60">Vaccines</div>
                 </div>
-              ) : (
-                <div className="bg-base-200/30 rounded-lg p-4 text-center">
-                  <FaWeight className="text-base-content/40 text-2xl mx-auto mb-2" />
-                  <div className="text-sm text-base-content/60">No weight records</div>
+
+                <div className="bg-gradient-to-r from-purple/5 to-purple/10 rounded-lg p-3 border border-purple/20 text-center">
+                  <div className="text-xl font-bold text-purple-600 mb-1">
+                    {child._count?.weightRecords || 0}
+                  </div>
+                  <div className="text-xs text-base-content/60">Weights</div>
+                </div>
+              </div>
+
+              {/* Latest Weight Info if available */}
+              {latestWeight && (
+                <div className="text-center text-sm text-base-content/70 bg-base-200/30 rounded p-2">
+                  Latest: <span className="font-semibold text-purple-600">{latestWeight.weight} kg</span>
+                  <div className="text-xs text-base-content/50">
+                    {safeFormatDate(latestWeight.createdAt)}
+                  </div>
                 </div>
               )}
 
@@ -791,12 +785,30 @@ export default function ViewChildren() {
                   className="w-full btn btn-outline btn-primary btn-sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate('/add-vaccination', { state: { childId: child.id } });
+                    navigate('/edit-child', {
+                      state: {
+                        selectedChild: child,
+                        sewaDartaNumber: child.sewaDartaNumber
+                      }
+                    });
                   }}
                 >
-                  <FaSyringe className="mr-2" />
-                  Add Vaccine
+                  <FaUser className="mr-2" />
+                  Edit Record
                 </button>
+
+                {child._count?.weightRecords > 0 && (
+                  <button
+                    className="w-full btn btn-outline btn-secondary btn-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate("/graph", { state: { childrenData: child } });
+                    }}
+                  >
+                    <FaChartLine className="mr-1" />
+                    View Graph
+                  </button>
+                )}
               </div>
             </div>
           </div>
