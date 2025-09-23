@@ -172,8 +172,6 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
   return categories;
 };
 
-// VaccineCard Component
-// VaccineCard Component (patched for EditChild)
 const VaccineCard = ({
   vaccineName,
   dose,
@@ -185,18 +183,33 @@ const VaccineCard = ({
   toggleRemarks,
   theme,
   t,
-  isFullProfile
+  isFullProfile,
 }) => {
+  const isServerDate = useWatch({
+    control,
+    name: `vaccines.${vaccineName}.${dose.doseIndex}.isServerDate`,
+  });
+
   // Watch the live date for this vaccine dose
   const watchedDate = useWatch({
     control,
     name: `vaccines.${vaccineName}.${dose.doseIndex}.date`,
   });
 
+  // Watch the remarks value (for updates as user types)
+  const watchedRemarks = useWatch({
+    control,
+    name: `vaccines.${vaccineName}.${dose.doseIndex}.remarks`,
+  });
+
+  // ✅ Capture initial remarks only once (server-provided snapshot)
+  const initialRemarks = useMemo(() => watchedRemarks, []);
+  const isReadOnly = !isFullProfile && !!initialRemarks;
+
   const remarksKey = `${vaccineName}-${dose.doseIndex}`;
   const showRemark = showRemarks[remarksKey] || false;
 
-  // ✅ If user has entered or already has a date, mark as completed
+  // If user has entered or already has a date, mark as completed
   const isCompleted = !!watchedDate;
 
   const displayStatus = isCompleted
@@ -355,21 +368,19 @@ const VaccineCard = ({
                     className="textarea textarea-bordered textarea-xs w-full"
                     placeholder={t("vaccine_card.remarks_placeholder")}
                     rows={2}
-                    readOnly={!isFullProfile && !!field.value} // lock remarks if partial profile
+                    readOnly={!isFullProfile && isServerDate}
                   />
                 </div>
               )}
             </div>
           )}
         </div>
-
-
-        {/* Remarks Section */}
-
       </div>
     </div>
   );
 };
+
+
 
 
 
@@ -387,6 +398,7 @@ const VaccineSection = ({
   theme,
   t,
   isFullProfile,
+  serverRemarks
 }) => {
   const isExpanded = expandedSections[sectionKey];
   const isEmpty = sectionData.count === 0;
@@ -493,6 +505,7 @@ export default function EditChild() {
   const [isLoading, setIsLoading] = useState(false);
   const [fetchedChild, setFetchedChild] = useState(null);
   const [healthWorkers, setHealthWorkers] = useState([]);
+  const [serverRemarks, setServerRemarks] = useState({});
   const [showRemarks, setShowRemarks] = useState({});
   const [expandedSections, setExpandedSections] = useState({
     CURRENT: true,
@@ -645,7 +658,7 @@ export default function EditChild() {
         });
 
         childData.vaccinations.forEach((vac) => {
-          const vaccineName = vaccineTypeIdToName[vac.vaccineType.id]
+          const vaccineName = vaccineTypeIdToName[vac.vaccineType.id];
           if (!vaccineName) {
             console.warn(`Vaccine type ID ${vac.vaccineTypeId} not found in mapping`);
             return;
@@ -663,9 +676,15 @@ export default function EditChild() {
                 `vaccines.${vaccineName}.${doseIndex}.remarks`,
                 vac.remarks || ''
               );
+              setValue(
+                `vaccines.${vaccineName}.${doseIndex}.isServerDate`,
+                true
+              );
             }
+
           }
         });
+
 
         setSewaDartaNumber(childData.sewaDartaNumber.toString());
       } catch (err) {
@@ -884,141 +903,128 @@ export default function EditChild() {
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-6 py-8">
         {showSearchSection ? (
-          <div className="bg-base-100 shadow-sm rounded-xl border border-base-300 p-8 mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center">
-                <FaSearch className="text-primary text-xl mr-3" />
-                <h2 className="text-xl font-medium text-base-content">
-                  बच्चाको खोजी
-                </h2>
+          <div className="bg-base-100 shadow-sm rounded-xl border border-base-300 p-6 mb-8">
+            <div className="flex items-center mb-4">
+              <FaSearch className="text-primary text-lg mr-2" />
+              <h2 className="text-lg font-medium text-base-content">बच्चाको खोजी</h2>
+            </div>
+
+            {/* Compact Search Form */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="form-control">
+                <input
+                  type="text"
+                  value={filters.name}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, name: e.target.value }))}
+                  className="input input-bordered input-sm"
+                  placeholder="नाम..."
+                />
+              </div>
+              <div className="form-control">
+                <input
+                  type="text"
+                  value={filters.serviceRegistrationNumber}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, serviceRegistrationNumber: e.target.value }))}
+                  className="input input-bordered input-sm"
+                  placeholder="सेवा दर्ता नं..."
+                />
+              </div>
+              <div className="form-control">
+                <input
+                  type="text"
+                  value={filters.phoneNumber}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, phoneNumber: e.target.value }))}
+                  className="input input-bordered input-sm"
+                  placeholder="फोन नम्बर..."
+                />
               </div>
             </div>
-            <div className="form-control w-full mb-4">
-              <label className="label">
-                <span className="label-text font-medium">नाम</span>
-              </label>
-              <input
-                type="text"
-                value={filters.name}
-                onChange={(e) => setFilters((prev) => ({ ...prev, name: e.target.value }))}
-                className="input input-bordered w-full"
-                placeholder="नाम..."
-              />
-            </div>
-            <div className="form-control w-full mb-4">
-              <label className="label">
-                <span className="label-text font-medium">सेवा दर्ता नं.</span>
-              </label>
-              <input
-                type="text"
-                value={filters.serviceRegistrationNumber}
-                onChange={(e) => setFilters((prev) => ({ ...prev, serviceRegistrationNumber: e.target.value }))}
-                className="input input-bordered w-full"
-                placeholder="सेवा दर्ता नम्बर..."
-              />
-            </div>
-            <div className="form-control w-full mb-6">
-              <label className="label">
-                <span className="label-text font-medium">फोन नम्बर</span>
-              </label>
-              <input
-                type="text"
-                value={filters.phoneNumber}
-                onChange={(e) => setFilters((prev) => ({ ...prev, phoneNumber: e.target.value }))}
-                className="input input-bordered w-full"
-                placeholder="फोन नम्बर..."
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+
+            {/* Filters Row */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4 items-end">
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text">वडा नं.</span>
-                </label>
                 <select
                   value={filters.wardNumber}
                   onChange={(e) => setFilters((prev) => ({ ...prev, wardNumber: e.target.value }))}
-                  className="select select-bordered w-full"
+                  className="select select-bordered select-sm"
                 >
-                  <option value="">सबै</option>
+                  <option value="">वडा - सबै</option>
                   {[...Array(13)].map((_, i) => (
                     <option key={i + 1} value={i + 1}>
-                      {i + 1}
+                      वडा {i + 1}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text">लिङ्ग</span>
-                </label>
                 <select
                   value={filters.gender}
                   onChange={(e) => setFilters((prev) => ({ ...prev, gender: e.target.value }))}
-                  className="select select-bordered w-full"
+                  className="select select-bordered select-sm"
                 >
-                  <option value="">सबै</option>
+                  <option value="">लिङ्ग - सबै</option>
                   <option value="MALE">पुरुष</option>
                   <option value="FEMALE">महिला</option>
                   <option value="OTHER">अन्य</option>
                 </select>
               </div>
-              <div className="form-control flex-row items-center space-x-4">
-                <div className="form-control">
-                  <label className="label cursor-pointer flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={filters.createdByMe}
-                      onChange={(e) => setFilters((prev) => ({ ...prev, createdByMe: e.target.checked }))}
-                      className="checkbox checkbox-primary"
-                    />
-                    <span className="label-text ml-2">मैले दर्ता गरेको</span>
-                  </label>
-                </div>
-                <div className="form-control">
-                  <label className="label cursor-pointer flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={filters.isComplete}
-                      onChange={(e) => setFilters((prev) => ({ ...prev, isComplete: e.target.checked }))}
-                      className="checkbox checkbox-primary"
-                    />
-                    <span className="label-text ml-2">पूर्ण विवरण</span>
-                  </label>
-                </div>
+              <div className="form-control">
+                <label className="label cursor-pointer justify-start py-2">
+                  <input
+                    type="checkbox"
+                    checked={filters.createdByMe}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, createdByMe: e.target.checked }))}
+                    className="checkbox checkbox-primary checkbox-sm"
+                  />
+                  <span className="label-text text-sm ml-2">मैले दर्ता गरेको</span>
+                </label>
+              </div>
+              <div className="form-control">
+                <label className="label cursor-pointer justify-start py-2">
+                  <input
+                    type="checkbox"
+                    checked={filters.isComplete}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, isComplete: e.target.checked }))}
+                    className="checkbox checkbox-primary checkbox-sm"
+                  />
+                  <span className="label-text text-sm ml-2">पूर्ण विवरण</span>
+                </label>
               </div>
             </div>
+
+            {/* Results Section */}
             {isLoading ? (
-              <div className="text-center py-12">
-                <span className="loading loading-spinner loading-lg text-primary"></span>
+              <div className="text-center py-8">
+                <span className="loading loading-spinner loading-md text-primary"></span>
               </div>
             ) : paginatedResults.length > 0 ? (
               <>
                 <div className="overflow-x-auto">
-                  <table className="table w-full table-zebra">
+                  <table className="table table-sm w-full table-zebra">
                     <thead>
-                      <tr>
-                        <th>सेवा दर्ता नं.</th>
-                        <th>नाम</th>
-                        <th>लिङ्ग</th>
-                        <th>जन्म मिति</th>
-                        <th>वडा नं.</th>
-                        <th>क्रियाहरू</th>
+                      <tr className="text-xs">
+                        <th className="py-2">सेवा दर्ता नं.</th>
+                        <th className="py-2">नाम</th>
+                        <th className="py-2">लिङ्ग</th>
+                        <th className="py-2">जन्म मिति</th>
+                        <th className="py-2">वडा नं.</th>
+                        <th className="py-2 text-center">क्रिया</th>
                       </tr>
                     </thead>
                     <tbody>
                       {paginatedResults.map((child) => (
-                        <tr key={child.sewaDartaNumber}>
-                          <td>{child.sewaDartaNumber}</td>
-                          <td>{child.fullName}</td>
-                          <td>
+                        <tr key={child.sewaDartaNumber} className="hover">
+                          <td className="py-2 text-sm font-mono">{child.sewaDartaNumber}</td>
+                          <td className="py-2 text-sm font-medium">{child.fullName}</td>
+                          <td className="py-2 text-sm">
                             {child.gender === 'MALE' ? 'पुरुष' : child.gender === 'FEMALE' ? 'महिला' : 'अन्य'}
                           </td>
-                          <td>{adToBs(safeFormatDateYYMMDD(child.birthDate))}</td>
-                          <td>{child.wardNumber}</td>
-                          <td>
+                          <td className="py-2 text-sm">{adToBs(safeFormatDateYYMMDD(child.birthDate))}</td>
+                          <td className="py-2 text-sm text-center">{child.wardNumber}</td>
+                          <td className="py-2 text-center">
                             <button
                               onClick={() => handleChildSelect(child)}
-                              className="btn btn-primary btn-sm"
+                              className="btn btn-primary btn-xs"
                             >
                               छान्नुहोस्
                             </button>
@@ -1028,24 +1034,40 @@ export default function EditChild() {
                     </tbody>
                   </table>
                 </div>
-                <div className="flex justify-center mt-6">
-                  <div className="join">
-                    {Array.from({ length: totalPages }, (_, i) => (
-                      <button
-                        key={i}
-                        className={`join-item btn ${currentPage === i + 1 ? 'btn-active' : ''}`}
-                        onClick={() => setCurrentPage(i + 1)}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
+
+                {/* Compact Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center mt-4">
+                    <div className="join">
+                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        return (
+                          <button
+                            key={pageNum}
+                            className={`join-item btn btn-sm ${currentPage === pageNum ? 'btn-active' : ''}`}
+                            onClick={() => setCurrentPage(pageNum)}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             ) : (
-              <div className="text-center py-12">
-                <FaInfoCircle className="text-6xl text-base-content/40 mx-auto mb-4" />
-                <p className="text-base-content/70">कुनै बच्चा फेला परेन</p>
+              <div className="text-center py-8">
+                <FaInfoCircle className="text-4xl text-base-content/40 mx-auto mb-2" />
+                <p className="text-sm text-base-content/70">कुनै बच्चा फेला परेन</p>
               </div>
             )}
           </div>
@@ -1537,6 +1559,7 @@ export default function EditChild() {
                               theme={theme}
                               t={t}
                               isFullProfile={isFullProfile}
+                              serverRemarks={serverRemarks}
                             />
                           )
                         ))}
