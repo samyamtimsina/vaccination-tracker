@@ -1322,7 +1322,7 @@ export default function EditChild() {
                             {birthDate && (
                               <div className="mt-3 p-3 bg-success/10 rounded-lg border border-success/20">
                                 <div className="text-base text-success font-medium">
-                                  {t('personalInfo.age', { months: age.months || 0, days: age.days || 0 })}
+                                  {t('personalInfo.age', { years: age.years, months: age.months, days: age.days })}
                                 </div>
                               </div>
                             )}

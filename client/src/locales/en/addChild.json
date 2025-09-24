@@ -64,7 +64,8 @@
         "required": "Birth date is required."
       }
     },
-    "age": "Child age: {{months}} months, {{days}} days ",
+    "age": "Child's age: {{years}} years, {{months}} months, {{days}} days",
+
     "administered_by": {
       "label": "Administered by",
       "placeholder": "Select health worker",

@@ -15,9 +15,6 @@ import {
   FaWeight,
   FaSyringe,
   FaClipboardList,
-  FaHome,
-  FaPhone,
-  FaBirthdayCake,
   FaExclamationTriangle,
   FaHistory,
   FaCheckCircle,
@@ -31,7 +28,7 @@ import { useVaccineScheduleContext } from '../context/VaccineScheduleContext';
 import { useAuth } from '../context/AuthContext';
 
 import { useTheme } from '../context/ThemeContext';
-import { calculateAge } from '../../helpers/calculateAge.jsx';
+import { calculateAge, currentBSDate } from '../../helpers/calculateAge.jsx';
 import { getFirstErrorMessage } from '../../helpers/getFirstErrorMessage.jsx';
 import { useTranslation } from 'react-i18next';
 
@@ -57,15 +54,6 @@ const getVaccineStatus = (dose, childAge) => {
 
   const daysDifference = ageInDays - recommendedAgeDays;
 
-  // Debug logging - remove after fixing
-  // console.log(`Vaccine status check:`, {
-  //   vaccineType: dose.vaccineType,
-  //   doseNumber: dose.doseNumber,
-  //   childAgeDays: ageInDays,
-  //   recommendedAgeDays,
-  //   daysDifference,
-  //   recommendedAtWeeks: dose.recommendedAtWeeks
-  // });
 
   // Status categories with appropriate grace periods
   // If child is more than 7 days younger than recommended age, not yet eligible
@@ -470,7 +458,7 @@ export default function AddChild() {
   useEffect(() => {
     const fetchHealthWorkers = async () => {
       try {
-        let url = '/api/users?role=WARD_OFFICER';
+        let url = '/api/users/ward?role=WARD_OFFICER';
 
         if (currentUser?.role === 'SUPER_ADMIN') {
           url = '/api/users';
@@ -877,6 +865,7 @@ export default function AddChild() {
                             onChange={(value) => field.onChange(value)}
                             language="ne"
                             theme={theme}
+                            defaultDate={currentBSDate}
                           />
                           {field.value && (
                             <button
@@ -900,7 +889,9 @@ export default function AddChild() {
                   {birthDate && (
                     <div className="mt-3 p-3 bg-success/10 rounded-lg border border-success/20">
                       <div className="text-base text-success font-medium">
-                        {t('personalInfo.age', { months: age.months, days: age.days })}
+                        {t('personalInfo.age', { years: age.years, months: age.months, days: age.days })}
+
+
                       </div>
                     </div>
                   )}

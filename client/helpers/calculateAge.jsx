@@ -1,59 +1,63 @@
+// helpers/calculateAge.jsx
 import NepaliDate from 'nepali-date-converter';
 
+// Export the current BS date as a formatted string YYYY-MM-DD
+export const currentBSDate = (() => {
+    const today = new NepaliDate();
+    const year = today.getYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+})();
+
+// Age calculation function
 export function calculateAge(birthDate) {
-    if (!birthDate ||
+    if (
+        !birthDate ||
         typeof birthDate !== 'string' ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
-        return { days: 0, weeks: 0, months: 0 };
+        !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)
+    ) {
+        return { years: 0, months: 0, days: 0, weeks: 0 };
     }
 
     try {
         const [year, month, day] = birthDate.split('-').map(Number);
-        if (isNaN(year) ||
-            isNaN(month) ||
-            isNaN(day) ||
-            month < 1 ||
-            month > 12 ||
-            day < 1 ||
-            day > 32) {
-            throw new Error('Invalid date components');
-        }
         const nepaliBirthDate = new NepaliDate(year, month - 1, day);
-        const currentNepaliDate = new NepaliDate();
+        const currentNepaliDate = new NepaliDate(); // today in BS
 
-        let diffMonths = (currentNepaliDate.getYear() - nepaliBirthDate.getYear()) * 12 +
-            (currentNepaliDate.getMonth() - nepaliBirthDate.getMonth());
-        let diffDays = currentNepaliDate.getDate() - nepaliBirthDate.getDate();
+        let years = currentNepaliDate.getYear() - nepaliBirthDate.getYear();
+        let months = currentNepaliDate.getMonth() - nepaliBirthDate.getMonth();
+        let days = currentNepaliDate.getDate() - nepaliBirthDate.getDate();
 
-        if (diffDays < 0) {
-            diffMonths -= 1;
-            const lastMonth = new NepaliDate(
-                nepaliBirthDate.getYear(),
-                nepaliBirthDate.getMonth(),
+        if (days < 0) {
+            months -= 1;
+            const prevMonth = new NepaliDate(
+                currentNepaliDate.getYear(),
+                currentNepaliDate.getMonth(),
                 0
             );
-            diffDays += lastMonth.getDate();
+            days += prevMonth.getDate();
         }
-        if (diffMonths < 0) {
-            diffMonths += 12;
+
+        if (months < 0) {
+            years -= 1;
+            months += 12;
         }
 
         const birthGregorian = nepaliBirthDate.toJsDate();
         const currentGregorian = currentNepaliDate.toJsDate();
         const totalDays = Math.floor(
-            (currentGregorian.getTime() - birthGregorian.getTime()) /
-            (1000 * 60 * 60 * 24)
+            (currentGregorian - birthGregorian) / (1000 * 60 * 60 * 24)
         );
 
-        const age = {
-            days: Math.max(totalDays, 0),
+        return {
+            years: Math.max(years, 0),
+            months: Math.max(months, 0),
+            days: Math.max(days, 0),
             weeks: Math.floor(Math.max(totalDays, 0) / 7),
-            months: Math.max(diffMonths, 0),
         };
-
-        return age;
     } catch (err) {
         console.error('Error calculating age:', err);
-        return { days: 0, weeks: 0, months: 0 };
+        return { years: 0, months: 0, days: 0, weeks: 0 };
     }
 }
