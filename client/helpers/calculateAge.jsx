@@ -2,12 +2,9 @@
 import NepaliDate from 'nepali-date-converter';
 
 // Export the current BS date as a formatted string YYYY-MM-DD
-export const currentBSDate = (() => {
+export const currentBSYear = (() => {
     const today = new NepaliDate();
-    const year = today.getYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return today.getYear(); // just the BS year as a number
 })();
 
 // Age calculation function

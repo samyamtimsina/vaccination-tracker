@@ -28,7 +28,7 @@ import { useVaccineScheduleContext } from '../context/VaccineScheduleContext';
 import { useAuth } from '../context/AuthContext';
 
 import { useTheme } from '../context/ThemeContext';
-import { calculateAge, currentBSDate } from '../../helpers/calculateAge.jsx';
+import { calculateAge, currentBSYear } from '../../helpers/calculateAge.jsx';
 import { getFirstErrorMessage } from '../../helpers/getFirstErrorMessage.jsx';
 import { useTranslation } from 'react-i18next';
 
@@ -254,6 +254,8 @@ const VaccineCard = ({
                       language="ne"
                       theme={theme}
                       placeholder={t("vaccine_card.date_placeholder")}
+                      minYear={2000}           // example lower bound
+                      maxYear={currentBSYear}
                     />
                     {field.value && (
                       <button
@@ -865,7 +867,8 @@ export default function AddChild() {
                             onChange={(value) => field.onChange(value)}
                             language="ne"
                             theme={theme}
-                            defaultDate={currentBSDate}
+                            minYear={2000}           // example lower bound
+                            maxYear={currentBSYear}
                           />
                           {field.value && (
                             <button
@@ -974,6 +977,8 @@ export default function AddChild() {
                               onChange={(value) => field.onChange(value)}
                               language="ne"
                               theme={theme}
+                              minYear={2000}           // example lower bound
+                              maxYear={currentBSYear}
                             />
                           )}
                         />

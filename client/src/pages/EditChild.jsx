@@ -32,6 +32,7 @@ import { useAuth } from '../context/AuthContext';
 import { getFirstErrorMessage } from '../../helpers/getFirstErrorMessage.jsx';
 import { useTranslation } from 'react-i18next';
 import { adToBs, bsToAd } from '@sbmdkl/nepali-date-converter';
+import { calculateAge, currentBSYear } from '../../helpers/calculateAge.jsx';
 
 // Helper functions (unchanged)
 const safeFormatDateYYMMDD = (dateString) => {
@@ -40,29 +41,7 @@ const safeFormatDateYYMMDD = (dateString) => {
 };
 
 // Fixed calculateAge function
-const calculateAge = (birthDateBs) => {
-  if (!birthDateBs) return { years: 0, months: 0, days: 0 };
 
-  const adBirthStr = bsToAd(birthDateBs);
-  const birth = new Date(adBirthStr);
-  const now = new Date();
-
-  let years = now.getFullYear() - birth.getFullYear();
-  let months = now.getMonth() - birth.getMonth();
-  let days = now.getDate() - birth.getDate();
-
-  if (days < 0) {
-    months--;
-    days += new Date(now.getFullYear(), now.getMonth(), 0).getDate();
-  }
-
-  if (months < 0) {
-    years--;
-    months += 12;
-  }
-
-  return { years, months, days };
-};
 
 const getVaccineStatus = (dose, childAge) => {
   // Calculate child's total age in days
@@ -308,6 +287,8 @@ const VaccineCard = ({
                         language="ne"
                         theme={theme}
                         placeholder={t("vaccine_card.date_placeholder")}
+                        minYear={2000}           // example lower bound
+                        maxYear={currentBSYear}
                       />
                       {field.value && (
                         <button
@@ -1299,6 +1280,8 @@ export default function EditChild() {
                                       onChange={(value) => field.onChange(value)}
                                       language="ne"
                                       theme={theme}
+                                      minYear={2000}           // example lower bound
+                                      maxYear={currentBSYear}
                                     />
                                     {field.value && (
                                       <button
@@ -1453,6 +1436,8 @@ export default function EditChild() {
                                       onChange={(value) => field.onChange(value)}
                                       language="ne"
                                       theme={theme}
+                                      minYear={2000}           // example lower bound
+                                      maxYear={currentBSYear}
                                     />
                                   )
                                 )}
