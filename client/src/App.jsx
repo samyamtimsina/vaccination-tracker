@@ -13,6 +13,7 @@ import { VaccineScheduleProvider } from './context/VaccineScheduleContext.jsx';
 import './index.css';
 
 import AddChild from './pages/AddChild';
+import Analytics from './pages/Analytics.jsx';
 import AddMother from './pages/AddMother';
 import ViewChildren from './pages/ViewChildren';
 import ViewMothers from './pages/ViewMothers.jsx';
@@ -84,6 +85,7 @@ function App() {
                     <Route path="/add-child" element={<AddChild />} />
                     <Route path="/edit-child" element={<EditChild />} />
                     <Route path="/add-mother" element={<AddMother />} />
+                    <Route path="/analytics" element={<Analytics />} />
                   </Route>
 
                   {/* View routes (All roles) */}
@@ -93,7 +95,7 @@ function App() {
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/graph" element={<Graph />} />
                     <Route path="/print" element={<PrintCardWrapper />} />
-                    <Route path="/users/:userId" element={<UserProfile />} />
+                    <Route path="/user/:userId" element={<UserProfile />} />
                   </Route>
 
                   {/* Ward Officer dashboard */}

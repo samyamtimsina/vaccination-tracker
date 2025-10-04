@@ -130,25 +130,29 @@ model TDDose {
 }
 
 model VaccinationRecord {
-  id                        String      @id @default(uuid())
-  citizenId                 String
-  vaccineTypeId             Int
-  vaccineType               VaccineType @relation(fields: [vaccineTypeId], references: [id])
-  doseNumber                Int
-  dateGiven                 DateTime
-  isComplete                Boolean
-  remarks                   String?
-  customVaccineName         String?
-  type                      String      @default("routine")
-  child                     Child       @relation(fields: [citizenId], references: [id])
-  createdById               Int
-  createdBy                 User        @relation(name: "CreatedByVaccination", fields: [createdById], references: [id])
-  administeredById          Int?
-  administeredBy            User?       @relation(name: "AdministeredByVaccination", fields: [administeredById], references: [id])
-  createdAt                 DateTime    @default(now())
-  wardOfVaccination         Int
+  id                String      @id @default(uuid())
+  citizenId         String
+  vaccineTypeId     Int
+  vaccineType       VaccineType @relation(fields: [vaccineTypeId], references: [id])
+  doseNumber        Int
+  dateGiven         DateTime
+  isComplete        Boolean
+  remarks           String?
+  customVaccineName String?
+  type              String      @default("routine")
+  child             Child       @relation(fields: [citizenId], references: [id])
+  createdById       Int
+  createdBy         User        @relation(name: "CreatedByVaccination", fields: [createdById], references: [id])
+  administeredById  Int?
+  administeredBy    User?       @relation(name: "AdministeredByVaccination", fields: [administeredById], references: [id])
+  createdAt         DateTime    @default(now())
+  wardOfVaccination Int
+
+  @@index([dateGiven])
+  @@index([vaccineTypeId])
   @@index([citizenId, dateGiven])
   @@index([wardOfVaccination])
+  @@index([administeredById])
 }
 
 model VaccineType {
@@ -194,24 +198,25 @@ model VaccineScheduleVersion {
 }
 
 model ChildDueVaccine {
-  id              String        @id @default(uuid())
-  childId         String
-  child           Child         @relation(fields: [childId], references: [id])
-  vaccineTypeId   Int
-  vaccineType     VaccineType @relation(fields: [vaccineTypeId], references: [id])
-  doseNumber      Int
-  dueDate         DateTime
-  previousDueDate DateTime?
-  isCompleted     Boolean       @default(false)
-  notificationSent Boolean       @default(false)
-  correctiveSent  Boolean       @default(false)
-  createdAt       DateTime      @default(now())
-  scheduleVersion Int @default(1)
-  catchUpLocked   Boolean      @default(false)
-  isCatchUp       Boolean @default(false)
+  id               String      @id @default(uuid())
+  childId          String
+  child            Child       @relation(fields: [childId], references: [id])
+  vaccineTypeId    Int
+  vaccineType      VaccineType @relation(fields: [vaccineTypeId], references: [id])
+  doseNumber       Int
+  dueDate          DateTime
+  previousDueDate  DateTime?
+  isCompleted      Boolean     @default(false)
+  notificationSent Boolean     @default(false)
+  correctiveSent   Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  scheduleVersion  Int         @default(1)
+  catchUpLocked    Boolean     @default(false)
+  isCatchUp        Boolean     @default(false)
+
   @@index([dueDate, isCompleted, notificationSent])
   @@index([childId, isCompleted])
-
+  @@index([childId, vaccineTypeId, doseNumber])
 }
 
 model NotificationLog {
@@ -254,17 +259,19 @@ model Certificate {
 }
 
 model WeightRecord {
-  id                        String   @id @default(uuid())
-  date                      DateTime
-  weight                    Float
-  child                     Child    @relation(fields: [childId], references: [id])
-  childId                   String
-  createdById               Int
-  createdBy                 User     @relation(name: "CreatedByWeight", fields: [createdById], references: [id])
-  administeredById          Int?
-  administeredBy            User?    @relation(name: "AdministeredByWeight", fields: [administeredById], references: [id])
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
-  wardOfVaccination         Int
-   @@index([childId, date])
+  id                String   @id @default(uuid())
+  date              DateTime
+  weight            Float
+  child             Child    @relation(fields: [childId], references: [id])
+  childId           String
+  createdById       Int
+  createdBy         User     @relation(name: "CreatedByWeight", fields: [createdById], references: [id])
+  administeredById  Int?
+  administeredBy    User?    @relation(name: "AdministeredByWeight", fields: [administeredById], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  wardOfVaccination Int
+
+  @@index([childId, date])
+  @@index([wardOfVaccination])
 }

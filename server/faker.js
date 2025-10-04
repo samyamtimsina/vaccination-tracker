@@ -64,6 +64,7 @@ const generateData = async (totalChildren, batchSize = 1000) => {
                 createdById: creatorUser.id,
                 remarks: faker.lorem.sentence(),
                 verifiedById: null,
+                email: faker.internet.email().toLowerCase()
             });
         }
 

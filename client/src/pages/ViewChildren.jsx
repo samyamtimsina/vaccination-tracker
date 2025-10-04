@@ -904,7 +904,7 @@ export default function ViewChildren() {
                     <label className="text-xs text-base-content/60">Created By</label>
                     <div>
                       <button
-                        onClick={() => navigate(`/profile/${child.createdBy.id}`)}
+                        onClick={() => navigate(`/user/${child.createdBy.id}`)}
                         className="text-primary hover:underline"
                       >
                         {child.createdBy.name}

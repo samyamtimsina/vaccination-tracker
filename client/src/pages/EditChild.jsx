@@ -1513,29 +1513,21 @@ export default function EditChild() {
                     </div>
                   </div>
                   <div className="border-t border-base-300 pt-12">
-                    <div className="flex items-center justify-between mb-8">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-secondary/10 rounded-lg flex items-center justify-center mr-3">
-                          <FaSyringe className="text-secondary text-lg" />
-                        </div>
-                        <div>
-                          <h2 className="text-xl font-medium text-base-content">
-                            {t('vaccine_section.title')}
-                          </h2>
-                          {age.months >= 0 && birthDate && (
-                            <p className="text-sm text-base-content/70">
-                              बच्चाको उमेर: {age.months} महिना, {age.days} दिन
-                            </p>
-                          )}
-
-                        </div>
+                    <div className="flex items-center mb-8">
+                      <div className="w-8 h-8 bg-secondary/10 rounded-lg flex items-center justify-center mr-3">
+                        <FaSyringe className="text-secondary text-lg" />
                       </div>
-                      {birthDate && gender && (
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-primary">{totalVaccines}</div>
-                          <div className="text-sm text-base-content/70">{t('vaccine_section.total_vaccines')}</div>
-                        </div>
-                      )}
+                      <div>
+                        <h2 className="text-xl font-medium text-base-content">
+                          {t('vaccine_section.title')}
+                        </h2>
+                        {age.months >= 0 && birthDate && (
+                          <p className="text-sm text-base-content/70">
+                            बच्चाको उमेर: {age.months} महिना, {age.days} दिन
+                          </p>
+                        )}
+
+                      </div>
                     </div>
                     {(!birthDate || !gender) && (
                       <div className="text-center py-12 bg-base-200 rounded-lg border-2 border-dashed border-base-300">
@@ -1550,31 +1542,29 @@ export default function EditChild() {
                       <>
                         <div className="tabs tabs-boxed mb-6">
                           {Object.entries(categorizedVaccines).map(([sectionKey, sectionData]) => {
-                            if (sectionData.count > 0 || sectionKey === 'NOT_APPLICABLE') {
-                              const IconComponent = sectionData.icon;
-                              return (
-                                <button
-                                  key={sectionKey}
-                                  type="button"
-                                  onClick={() => setActiveTab(sectionKey)}
-                                  className={`tab flex items-center gap-2 ${activeTab === sectionKey ? 'tab-active' : ''}`}
-                                >
-                                  <IconComponent className={`text-xl ${sectionData.color}`} />
-                                  {t(`vaccine_section.tabs.${sectionKey.toLowerCase()}`, { count: sectionData.count })}
-                                </button>
-                              );
-                            }
-                            return null;
+                            // Show all tabs (even if count is 0) for consistent UX, as in AddChild
+                            const IconComponent = sectionData.icon;
+                            return (
+                              <button
+                                key={sectionKey}
+                                type="button"
+                                onClick={() => setActiveTab(sectionKey)}
+                                className={`tab flex items-center gap-2 ${activeTab === sectionKey ? 'tab-active' : ''}`}
+                              >
+                                <IconComponent className={`text-xl ${sectionData.color}`} />
+                                {t(`vaccine_section.tabs.${sectionKey.toLowerCase()}`, { count: sectionData.count })}
+                              </button>
+                            );
                           })}
                         </div>
-                        {Object.entries(categorizedVaccines).map(([sectionKey, sectionData]) => (
+                        {Object.entries(categorizedVaccines).map(([sectionKey, sectionData]) =>
                           activeTab === sectionKey && (
                             <VaccineSection
                               key={sectionKey}
                               sectionKey={sectionKey}
                               sectionData={sectionData}
-                              expandedSections={expandedSections}
-                              toggleSection={toggleSection}
+                              expandedSections={{ [sectionKey]: true }}
+                              toggleSection={() => { }}
                               control={control}
                               register={register}
                               setValue={setValue}
@@ -1586,7 +1576,7 @@ export default function EditChild() {
                               serverRemarks={serverRemarks}
                             />
                           )
-                        ))}
+                        )}
                       </>
                     )}
                     {birthDate && gender && categorizedVaccines.CURRENT.count === 0 && (
@@ -1636,27 +1626,6 @@ export default function EditChild() {
                         </p>
                       </div>
                       <div className="flex space-x-4">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (window.confirm(t('submitSection.reset_confirm'))) {
-                              reset();
-                              setShowRemarks({});
-                              setExpandedSections({
-                                CURRENT: true,
-                                CATCH_UP: false,
-                                NOT_APPLICABLE: false,
-                              });
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }
-                          }}
-                          className="btn btn-outline btn-neutral"
-                        >
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                          {t('submitSection.reset_button')}
-                        </button>
                         <button
                           type="submit"
                           disabled={isSubmitting}

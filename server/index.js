@@ -5,6 +5,7 @@ import authRoutes from './routes/authRoutes.js';
 import childRoutes from './routes/childRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import moment from 'moment-timezone';
@@ -59,6 +60,34 @@ app.use('/api/mothers', motherRoutes);
 
 //schedule routes
 app.use('/api/vaccine-schedule', scheduleRoutes);
+
+app.use('/api/analytics', analyticsRoutes);
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    service: 'Vaccination Analytics API'
+  });
+});
+
+// app.use((error, req, res, next) => {
+//   console.error('API Error:', error);
+//   res.status(500).json({
+//     success: false,
+//     error: 'Internal Server Error',
+//     message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+//   });
+// });
+
+// // 404 handler
+// app.use('*', (req, res) => {
+//   res.status(404).json({
+//     success: false,
+//     error: 'Route not found',
+//     path: req.originalUrl
+//   });
+// });
 
 app.get('/', (req, res) => {
   res.send('Vaccination API running');
