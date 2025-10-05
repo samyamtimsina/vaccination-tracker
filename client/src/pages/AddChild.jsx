@@ -96,7 +96,28 @@ const getVaccineStatus = (dose, childAge) => {
   };
 };
 
-const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
+// Add a helper for gender check
+const matchesRequiredGender = (dose, gender) => {
+  if (!dose.requiredGender) return true;
+  // Accepts "male", "female", "other" (case-insensitive)
+  return dose.requiredGender.toLowerCase() === gender?.toLowerCase();
+};
+
+// Add a helper for school class check
+const matchesSchoolClass = (dose, schoolClass) => {
+  if (dose.minSchoolClass && (!schoolClass || schoolClass < dose.minSchoolClass)) return false;
+  if (dose.maxSchoolClass && (!schoolClass || schoolClass > dose.maxSchoolClass)) return false;
+  return true;
+};
+
+// Add a helper for birth year check
+const matchesBirthYear = (dose, birthYear) => {
+  if (dose.minBirthYear && (!birthYear || birthYear < dose.minBirthYear)) return false;
+  return true;
+};
+
+// --- Enhanced categorizeVaccines ---
+const categorizeVaccines = (vaccineSchedule, childAge, gender, schoolClass, birthYear) => {
   const categories = {
     CURRENT: { vaccines: [], count: 0, icon: FaExclamationTriangle, color: 'text-red-600', title: 'Current & Overdue' },
     CATCH_UP: { vaccines: [], count: 0, icon: FaHistory, color: 'text-orange-600', title: 'Catch-up' },
@@ -104,17 +125,48 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
   };
 
   Object.entries(vaccineSchedule.doses).forEach(([vaccineName, doses]) => {
-    // Gender-specific filtering
-    if (vaccineName === 'HPV' && gender !== 'FEMALE') {
-      categories.NOT_APPLICABLE.vaccines.push({
-        vaccineName,
-        reason: 'Only applicable to females',
-        doses: []
-      });
-      return;
-    }
-
+    // Gender/schoolClass/birthYear filtering per dose
     const vaccineDoses = doses.map((dose, index) => {
+      // Gender check
+      if (!matchesRequiredGender(dose, gender)) {
+        return {
+          ...dose,
+          doseIndex: index,
+          status: 'NOT_APPLICABLE',
+          reason: 'Only applicable to specific gender',
+          color: 'text-gray-400',
+          bgColor: 'bg-gray-50',
+          borderColor: 'border-gray-200',
+          doseType: dose.isBooster ? 'booster' : 'current'
+        };
+      }
+      // School class check
+      if (!matchesSchoolClass(dose, schoolClass)) {
+        return {
+          ...dose,
+          doseIndex: index,
+          status: 'NOT_APPLICABLE',
+          reason: 'Only applicable for specific school class',
+          color: 'text-gray-400',
+          bgColor: 'bg-gray-50',
+          borderColor: 'border-gray-200',
+          doseType: dose.isBooster ? 'booster' : 'current'
+        };
+      }
+      // Birth year check
+      if (!matchesBirthYear(dose, birthYear)) {
+        return {
+          ...dose,
+          doseIndex: index,
+          status: 'NOT_APPLICABLE',
+          reason: 'Only applicable for specific birth year',
+          color: 'text-gray-400',
+          bgColor: 'bg-gray-50',
+          borderColor: 'border-gray-200',
+          doseType: dose.isBooster ? 'booster' : 'current'
+        };
+      }
+      // If all checks pass, use normal logic
       const statusInfo = getVaccineStatus(dose, childAge);
       return {
         doseIndex: index,
@@ -125,17 +177,24 @@ const categorizeVaccines = (vaccineSchedule, childAge, gender) => {
       };
     });
 
-    const currentDoses = vaccineDoses.filter(d => d.doseType === 'current');
-    const boosterDoses = vaccineDoses.filter(d => d.doseType === 'booster');
+    // Split into applicable and not applicable
+    const applicableDoses = vaccineDoses.filter(d => d.status !== 'NOT_APPLICABLE');
+    const notApplicableDoses = vaccineDoses.filter(d => d.status === 'NOT_APPLICABLE');
+
+    const currentDoses = applicableDoses.filter(d => d.doseType === 'current');
+    const boosterDoses = applicableDoses.filter(d => d.doseType === 'booster');
 
     if (currentDoses.length > 0) {
       categories.CURRENT.vaccines.push({ vaccineName, doses: currentDoses });
       categories.CURRENT.count += currentDoses.length;
     }
-
     if (boosterDoses.length > 0) {
       categories.CATCH_UP.vaccines.push({ vaccineName, doses: boosterDoses });
       categories.CATCH_UP.count += boosterDoses.length;
+    }
+    if (notApplicableDoses.length > 0) {
+      categories.NOT_APPLICABLE.vaccines.push({ vaccineName, doses: notApplicableDoses });
+      categories.NOT_APPLICABLE.count += notApplicableDoses.length;
     }
   });
 
@@ -412,6 +471,7 @@ const VaccineSection = ({
 
 export default function AddChild() {
   const { vaccineSchedule, loading } = useVaccineScheduleContext();
+  console.log('vaccine schedule from context', vaccineSchedule)
   if (loading || !vaccineSchedule) return <div>Loading schedule...</div>;
 
   const { t, i18n } = useTranslation('addChild');
@@ -443,8 +503,12 @@ export default function AddChild() {
   });
 
   const navigate = useNavigate();
-  const gender = useWatch({ control, name: 'gender', defaultValue: '' });
+  const schoolClass = useWatch({ control, name: 'schoolClass', defaultValue: '' });
   const birthDate = useWatch({ control, name: 'birthDate', defaultValue: '' });
+  const gender = useWatch({ control, name: 'gender', defaultValue: '' });
+
+  // Calculate birth year from birthDate (assuming AD, adjust if using BS)
+  const birthYear = birthDate ? new Date(birthDate).getFullYear() : undefined;
 
   // State management
   const [healthWorkers, setHealthWorkers] = useState([]);
@@ -568,7 +632,7 @@ export default function AddChild() {
 
   const age = calculateAge(birthDate);
 
-  // Categorize vaccines based on age and gender
+  // Categorize vaccines based on age, gender, schoolClass, birthYear
   const categorizedVaccines = useMemo(() => {
     if (!birthDate || !gender) {
       return {
@@ -577,8 +641,8 @@ export default function AddChild() {
         NOT_APPLICABLE: { vaccines: [], count: 0, icon: FaLock, color: 'text-gray-400', title: 'Not Applicable' }
       };
     }
-    return categorizeVaccines(vaccineSchedule, age, gender);
-  }, [age, gender, birthDate]);
+    return categorizeVaccines(vaccineSchedule, age, gender, schoolClass ? parseInt(schoolClass) : undefined, birthYear);
+  }, [age, gender, birthDate, schoolClass, birthYear, vaccineSchedule]);
 
   const totalVaccines = Object.values(categorizedVaccines).reduce((sum, cat) => sum + cat.count, 0);
 
@@ -897,6 +961,27 @@ export default function AddChild() {
 
                       </div>
                     </div>
+                  )}
+                </div>
+
+                {/* School Class (optional) */}
+                <div>
+                  <label className="label">
+                    <span className="label-text text-base font-medium">
+                      {t('personalInfo.form.schoolClass.label')}
+                    </span>
+                  </label>
+                  <input
+                    {...register('schoolClass')}
+                    type="number"
+                    min={1}
+                    className="input input-bordered w-full"
+                    placeholder={t('personalInfo.form.schoolClass.placeholder')}
+                  />
+                  {errors.schoolClass && (
+                    <p className="text-error text-sm mt-1">
+                      {t('personalInfo.form.schoolClass.required')}
+                    </p>
                   )}
                 </div>
               </div>

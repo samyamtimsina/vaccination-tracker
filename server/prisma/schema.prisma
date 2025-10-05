@@ -171,6 +171,7 @@ model Dose {
   vaccineTypeId       Int
   vaccineType         VaccineType @relation(fields: [vaccineTypeId], references: [id])
   doseNumber          Int
+
   recommendedAtDays   Float?
   recommendedAtWeeks  Float?
   recommendedAtMonths Float?
@@ -181,6 +182,13 @@ model Dose {
   maxAgeWeeks         Float?
   maxAgeMonths        Float?
   maxAgeYears         Float?
+
+  requiredGender    String?   // "male", "female", or null = any
+  minSchoolClass    Int?      // e.g., 6
+  maxSchoolClass    Int?
+  minBirthYear      Int?      // if needed
+  otherCriteria     Json?     // for future extensibility (like chronic conditions)
+
   scheduleVersionId   Int @default(1)
   scheduleVersion     VaccineScheduleVersion @relation(fields: [scheduleVersionId], references: [id])
   @@unique([vaccineTypeId, doseNumber, scheduleVersionId])
