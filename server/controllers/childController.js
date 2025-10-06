@@ -736,6 +736,19 @@ export const updateChild = async (req, res) => {
         }
       }
 
+      // Remove vaccinations that were cleared in the UI
+      if (req.body.removedVaccinations && Array.isArray(req.body.removedVaccinations)) {
+        for (const { vaccineTypeId, doseNumber } of req.body.removedVaccinations) {
+          await tx.vaccinationRecord.deleteMany({
+            where: {
+              citizenId: existingChild.id,
+              vaccineTypeId,
+              doseNumber,
+            },
+          });
+        }
+      }
+
       // --- Weight Records ---
       const incomingWeights = Array.isArray(weightRecords) ? weightRecords : [];
       const incomingIds = incomingWeights.filter(w => w.id).map(w => w.id);
