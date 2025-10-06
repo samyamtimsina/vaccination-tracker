@@ -453,6 +453,7 @@ export const getChild = async (req, res) => {
             vaccineType: true,
             dateGiven: true,
             doseNumber: true,
+            remarks: true,
           },
         },
         dueVaccines: {

@@ -786,6 +786,7 @@ export default function EditChild() {
   const handleChildSelect = (child) => {
     if (!child) return;
     setSelectedChild(child);
+    console.log('selected child', child)
     setShowSearchSection(false);
   };
 
