@@ -3,6 +3,9 @@ import {
   createMother,
   getMothers,
   getWardMothers,
+  searchMothers,
+  getMother,
+  updateMother,
 } from '../controllers/motherController.js';
 
 import { authenticate, authorize } from '../middlewares/auth.js';
@@ -14,20 +17,23 @@ router.post(
 
   authenticate,
   authorize('SUPER_ADMIN', 'WARD_OFFICER'),
-  createMother,
+  createMother
 );
 router.get(
   '/all',
 
   authenticate,
   authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'),
-  getMothers,
+  getMothers
 );
 router.get(
   '/ward',
   authenticate,
   authorize('ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'),
-  getWardMothers,
+  getWardMothers
 );
+router.get('/search', searchMothers);
+router.get('/:sewaDartaNumber', getMother);
+router.put('/:sewaDartaNumber', updateMother);
 
 export default router;

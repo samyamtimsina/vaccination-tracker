@@ -100,7 +100,7 @@ model Mother {
   sewaDartaNumber           Int       @unique @default(autoincrement())
   name                      String
   casteCode                 Int
-  age                       Int
+  dateOfBirth               DateTime
   phoneNumber               String
   tole                      String
   wardNumber                Int

@@ -6,7 +6,7 @@ import ProtectedRoute from './components/ProtectedRoutes';
 
 import { AuthProvider } from './context/AuthContext';
 import { ChildProvider } from './context/ChildContext';
-import { MotherProvider } from './context/MotherContext.jsx';
+import { MotherProvider } from './context/motherContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { VaccineScheduleProvider } from './context/VaccineScheduleContext.jsx';
 
@@ -38,6 +38,7 @@ import AnalyticsPage from './components/SuperAdminAnalytics.jsx';
 import AdminDashboard from './components/Dashboards/AdminDashboard.jsx';
 import Schedule from './components/Schedule.jsx'
 import NotFound from './pages/NotFound.jsx';
+import EditMother from './pages/EditMother.jsx';
 
 
 const MainLayout = () => (
@@ -84,6 +85,7 @@ function App() {
                   <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARD_OFFICER']}><Layout /></ProtectedRoute>}>
                     <Route path="/add-child" element={<AddChild />} />
                     <Route path="/edit-child" element={<EditChild />} />
+                    <Route path="/edit-mother" element={<EditMother />} />
                     <Route path="/add-mother" element={<AddMother />} />
                     <Route path="/analytics" element={<Analytics />} />
                   </Route>

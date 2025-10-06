@@ -6,28 +6,15 @@ import { NepaliDatePicker } from 'nepali-datepicker-reactjs';
 import 'nepali-datepicker-reactjs/dist/index.css';
 import { FaArrowLeft } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import NepaliDate from 'nepali-date-converter';
 import { useTranslation } from 'react-i18next';
 import { useMotherContext } from '../context/motherContext';
+// FIX: Import the shared, correct age calculation helper from the helper file
+import { calculateAge } from '../../helpers/calculateAge.jsx';
+
+// REMOVED: The incorrect local function calculateAgeFromDOB was removed.
 
 export default function AddMother() {
   const [healthWorkers, setHealthWorkers] = useState([]);
-
-  // NEW: Fetch list of health workers from your API
-  useEffect(() => {
-    const fetchHealthWorkers = async () => {
-      try {
-        // You will need to create this API endpoint on your backend
-        const res = await axiosClient.get('/api/users?role=WARD_OFFICER');
-        setHealthWorkers(res.data);
-      } catch (err) {
-        console.error('Failed to fetch health workers:', err);
-        // You can set a default or show an error message
-      }
-    };
-    fetchHealthWorkers();
-  }, []);
-
   const { addMotherToState } = useMotherContext();
   const { t } = useTranslation('addMother');
   const {
@@ -35,19 +22,46 @@ export default function AddMother() {
     handleSubmit,
     reset,
     control,
+    watch,
     setValue,
     formState: { errors, isSubmitting },
   } = useForm();
   const navigate = useNavigate();
+
+  // Fetch health workers
+  useEffect(() => {
+    const fetchHealthWorkers = async () => {
+      try {
+        const res = await axiosClient.get('/api/users?role=WARD_OFFICER');
+        setHealthWorkers(res.data);
+      } catch (err) {
+        console.error('Failed to fetch health workers:', err);
+      }
+    };
+    fetchHealthWorkers();
+  }, []);
+
+  // Caste code options (same as AddChild)
+  const casteCodeOptions = [
+    { value: 1, label: 'Code 1: Dalit' },
+    { value: 2, label: 'Code 2: Pahad Janajati (Hill Indigenous Nationalities)' },
+    { value: 3, label: 'Code 3: Madheshi' },
+    { value: 4, label: 'Code 4: Muslim' },
+    { value: 5, label: 'Code 5: Brahmin/Chhetri' },
+    { value: 6, label: 'Code 6: Other (Anya)' }
+  ];
+
+  const dateOfBirth = watch('dateOfBirth');
+  // FIX: Use the imported, correct calculateAge function
+  const age = calculateAge(dateOfBirth);
+
   const onSubmit = async (data) => {
     try {
-      // Validate administeredById if any TD doses are provided
       if ((data.tdDose1 || data.tdDose2 || data.tdDose2Plus) && !data.administeredById) {
         toast.error(t('health_worker_required'));
         return;
       }
 
-      // Build the tdDoses array
       const tdDoses = [];
       if (data.tdDose1) {
         tdDoses.push({
@@ -74,23 +88,20 @@ export default function AddMother() {
         });
       }
 
-      // Construct the payload
+      // Construct the payload (remove age, wardNumber)
       const payload = {
         fullName: data.fullName,
         lastName: data.lastName || '',
         casteCode: parseInt(data.casteCode, 10),
-        age: parseInt(data.age, 10),
+        dateOfBirth: data.dateOfBirth,
         phoneNumber: data.phoneNumber,
         tole: data.tole,
-        wardNumber: parseInt(data.wardNumber, 10),
         pregnancyCount: parseInt(data.pregnancyCount, 10),
         previousTDTakenCount: parseInt(data.previousTDTakenCount, 10),
         remarks: data.remarks || '',
         isFromOtherMunicipality: false,
-        tdDoses, // Always include, even if empty
+        tdDoses,
       };
-
-      console.log('Payload being sent:', payload);
 
       const response = await axiosClient.post('http://localhost:5000/api/mothers', payload);
       addMotherToState(response.data);
@@ -102,6 +113,7 @@ export default function AddMother() {
       toast.error(t('error_message'));
     }
   };
+
   return (
     <>
       <ToastContainer position="top-right" autoClose={3000} />
@@ -179,43 +191,28 @@ export default function AddMother() {
                 placeholder={t('tole_placeholder')}
               />
             </div>
-            <div className="form-control">
-              <label className="label" htmlFor="wardNumber">
-                <span className="label-text">
-                  {t('ward_number')} <span className="text-error">*</span>
-                </span>
-              </label>
-              <input
-                id="wardNumber"
-                type="number"
-                {...register('wardNumber', { required: true })}
-                className="input input-bordered w-full"
-                placeholder={t('ward_number_placeholder')}
-              />
-              {errors.wardNumber && (
-                <label className="label">
-                  <span className="label-text-alt text-error">
-                    {t('ward_number_error')}
-                  </span>
-                </label>
-              )}
-            </div>
+            {/* Caste Code (Jaati) */}
             <div className="form-control">
               <label className="label" htmlFor="casteCode">
                 <span className="label-text">
                   {t('caste_code')} <span className="text-error">*</span>
                 </span>
               </label>
-              <input
+              <select
                 id="casteCode"
-                type="number"
-                {...register('casteCode', {
-                  required: true,
-                  valueAsNumber: true,
-                })}
-                className="input input-bordered w-full"
-                placeholder={t('caste_code_placeholder')}
-              />
+                {...register('casteCode', { required: true })}
+                className="select select-bordered w-full"
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  {t('caste_code_placeholder')}
+                </option>
+                {casteCodeOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
               {errors.casteCode && (
                 <label className="label">
                   <span className="label-text-alt text-error">
@@ -224,25 +221,55 @@ export default function AddMother() {
                 </label>
               )}
             </div>
+            {/* Date of Birth */}
             <div className="form-control">
-              <label className="label" htmlFor="age">
+              <label className="label" htmlFor="dateOfBirth">
                 <span className="label-text">
-                  {t('age')} <span className="text-error">*</span>
+                  {t('date_of_birth')} <span className="text-error">*</span>
                 </span>
               </label>
-              <input
-                id="age"
-                type="number"
-                {...register('age', { required: true, valueAsNumber: true })}
-                className="input input-bordered w-full"
-                placeholder={t('age_placeholder')}
-              />
-              {errors.age && (
+              <div className="relative">
+                <Controller
+                  name="dateOfBirth"
+                  control={control}
+                  rules={{ required: true }}
+                  render={({ field }) => (
+                    <>
+                      <NepaliDatePicker
+                        {...field}
+                        inputClassName="input input-bordered w-full pr-8"
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        className="w-full"
+                        style={{ cursor: 'pointer' }}
+                      />
+                      {field.value && (
+                        <button
+                          type="button"
+                          onClick={() => setValue('dateOfBirth', '')}
+                          className="absolute right-3 top-1/2 flex h-6 w-6 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
+                          title={t('clear_date')}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </>
+                  )}
+                />
+              </div>
+              {errors.dateOfBirth && (
                 <label className="label">
                   <span className="label-text-alt text-error">
-                    {t('age_error')}
+                    {t('date_of_birth_error')}
                   </span>
                 </label>
+              )}
+              {/* Show calculated age in Nepali style like AddChild */}
+              {dateOfBirth && (
+                <div className="mt-2 text-success font-medium">
+                  {/* The calculateAge function returns { years, months, days } */}
+                  {`आमाको उमेर: ${age.years} वर्ष, ${age.months} महिना, ${age.days} दिन`}
+                </div>
               )}
             </div>
             <div className="form-control">
@@ -274,10 +301,7 @@ export default function AddMother() {
               <input
                 id="pregnancyCount"
                 type="number"
-                {...register('pregnancyCount', {
-                  required: true,
-                  valueAsNumber: true,
-                })}
+                {...register('pregnancyCount', { required: true, valueAsNumber: true, min: 1 })}
                 className="input input-bordered w-full"
                 placeholder={t('pregnancy_count_placeholder')}
               />
@@ -298,10 +322,7 @@ export default function AddMother() {
               <input
                 id="previousTDTakenCount"
                 type="number"
-                {...register('previousTDTakenCount', {
-                  required: true,
-                  valueAsNumber: true,
-                })}
+                {...register('previousTDTakenCount', { required: true, valueAsNumber: true, min: 0 })}
                 className="input input-bordered w-full"
                 placeholder={t('previous_td_taken_count_placeholder')}
               />
@@ -315,47 +336,21 @@ export default function AddMother() {
             </div>
           </div>
         </section>
-        {/* NEW: Administered By Section */}
-        <div className="form-control mt-8">
-          <label className="label">
-            <span className="label-text text-base font-medium">
-              {t('administered_by')} <span className="text-error">*</span>
-            </span>
-          </label>
-          <select
-            {...register('administeredById', {
-              required: (data) =>
-                data.tdDose1 || data.tdDose2 || data.tdDose2Plus ? t('health_worker_required') : false,
-            })}
-            className={`select select-bordered w-full ${errors.administeredById ? 'select-error' : ''}`}
-            defaultValue=""
-          >
-            <option value="" disabled>
-              {t('select_health_worker')}
-            </option>
-            {healthWorkers.map((worker) => (
-              <option key={worker.id} value={worker.id}>
-                {worker.name}
-              </option>
-            ))}
-          </select>
-          {errors.administeredById && (
-            <label className="label">
-              <span className="label-text-alt text-error">{errors.administeredById.message}</span>
-            </label>
-          )}
-        </div>
 
         <section className="bg-base-200 p-6 rounded-lg border border-base-300 shadow-sm">
           <h3 className="text-lg font-medium text-base-content mb-3">
-            {t('td_vaccination_dates')}
+            {t('td_vaccination_history')}
           </h3>
+          <p className="text-sm text-base-content/70 mb-4">
+            {t('td_vaccination_description')}
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* TD Dose 1 */}
             <div className="form-control">
               <label className="label" htmlFor="tdDose1">
                 <span className="label-text">{t('td_dose_1')}</span>
               </label>
-              <div className="relative flex items-center">
+              <div className="relative">
                 <Controller
                   name="tdDose1"
                   control={control}
@@ -363,11 +358,12 @@ export default function AddMother() {
                     <>
                       <NepaliDatePicker
                         {...field}
-                        inputClassName="input input-bordered w-full"
+                        inputClassName="input input-bordered w-full pr-8"
                         value={field.value || ''}
                         onChange={field.onChange}
                         className="w-full"
                         style={{ cursor: 'pointer' }}
+                        placeholder={t('date_placeholder')}
                       />
                       {field.value && (
                         <button
@@ -384,11 +380,13 @@ export default function AddMother() {
                 />
               </div>
             </div>
+
+            {/* TD Dose 2 */}
             <div className="form-control">
               <label className="label" htmlFor="tdDose2">
                 <span className="label-text">{t('td_dose_2')}</span>
               </label>
-              <div className="relative flex items-center">
+              <div className="relative">
                 <Controller
                   name="tdDose2"
                   control={control}
@@ -396,17 +394,18 @@ export default function AddMother() {
                     <>
                       <NepaliDatePicker
                         {...field}
-                        inputClassName="input input-bordered w-full"
+                        inputClassName="input input-bordered w-full pr-8"
                         value={field.value || ''}
                         onChange={field.onChange}
                         className="w-full"
                         style={{ cursor: 'pointer' }}
+                        placeholder={t('date_placeholder')}
                       />
                       {field.value && (
                         <button
                           type="button"
                           onClick={() => setValue('tdDose2', '')}
-                          className="absolute right-3 top-1/2 flex h-6 w-6 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
                           title={t('clear_date')}
                         >
                           ✕
@@ -417,11 +416,13 @@ export default function AddMother() {
                 />
               </div>
             </div>
+
+            {/* TD Dose 2+ / Booster */}
             <div className="form-control">
               <label className="label" htmlFor="tdDose2Plus">
                 <span className="label-text">{t('td_dose_2_plus')}</span>
               </label>
-              <div className="relative flex items-center">
+              <div className="relative">
                 <Controller
                   name="tdDose2Plus"
                   control={control}
@@ -429,17 +430,18 @@ export default function AddMother() {
                     <>
                       <NepaliDatePicker
                         {...field}
-                        inputClassName="input input-bordered w-full"
+                        inputClassName="input input-bordered w-full pr-8"
                         value={field.value || ''}
                         onChange={field.onChange}
                         className="w-full"
                         style={{ cursor: 'pointer' }}
+                        placeholder={t('date_placeholder')}
                       />
                       {field.value && (
                         <button
                           type="button"
                           onClick={() => setValue('tdDose2Plus', '')}
-                          className="absolute right-3 top-1/2 flex h-6 w-6 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
                           title={t('clear_date')}
                         >
                           ✕
@@ -450,6 +452,39 @@ export default function AddMother() {
                 />
               </div>
             </div>
+
+            {/* Administered By */}
+            {(watch('tdDose1') || watch('tdDose2') || watch('tdDose2Plus')) && (
+              <div className="form-control">
+                <label className="label" htmlFor="administeredById">
+                  <span className="label-text">
+                    {t('administered_by')} <span className="text-error">*</span>
+                  </span>
+                </label>
+                <select
+                  id="administeredById"
+                  {...register('administeredById', { required: true, valueAsNumber: true })}
+                  className="select select-bordered w-full"
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    {t('administered_by_placeholder')}
+                  </option>
+                  {healthWorkers.map(worker => (
+                    <option key={worker.id} value={worker.id}>
+                      {worker.fullName}
+                    </option>
+                  ))}
+                </select>
+                {errors.administeredById && (
+                  <label className="label">
+                    <span className="label-text-alt text-error">
+                      {t('administered_by_error')}
+                    </span>
+                  </label>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
