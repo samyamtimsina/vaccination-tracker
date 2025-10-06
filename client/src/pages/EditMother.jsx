@@ -250,7 +250,51 @@ export default function EditMother() {
             updateMotherInState(response.data);
 
             toast.success(t('success_message'));
-            reset();
+
+            // Update fetchedMother and reset form with new data
+            setFetchedMother(response.data);
+
+            // Prepare new values for reset (same logic as in fetchMotherData)
+            const motherData = response.data;
+            let dobBs = '';
+            if (motherData.dateOfBirth) {
+                const adDate = typeof motherData.dateOfBirth === 'string'
+                    ? motherData.dateOfBirth.split('T')[0]
+                    : motherData.dateOfBirth;
+                dobBs = adToBs(adDate);
+            }
+            const tdDose1 = motherData.tdDoses?.find(d => d.doseNumber === 1);
+            const tdDose2 = motherData.tdDoses?.find(d => d.doseNumber === 2);
+            const tdDose2Plus = motherData.tdDoses?.find(d => d.doseNumber === 3);
+
+            const tdDose1Date = tdDose1?.dateGiven ? adToBs(tdDose1.dateGiven.split('T')[0]) : '';
+            const tdDose2Date = tdDose2?.dateGiven ? adToBs(tdDose2.dateGiven.split('T')[0]) : '';
+            const tdDose2PlusDate = tdDose2Plus?.dateGiven ? adToBs(tdDose2Plus.dateGiven.split('T')[0]) : '';
+
+            let administeredById = '';
+            if (tdDose2Plus && tdDose2Plus.administeredById) {
+                administeredById = tdDose2Plus.administeredById.toString();
+            } else if (tdDose2 && tdDose2.administeredById) {
+                administeredById = tdDose2.administeredById.toString();
+            } else if (tdDose1 && tdDose1.administeredById) {
+                administeredById = tdDose1.administeredById.toString();
+            }
+
+            reset({
+                fullName: motherData.name?.split(' ')[0] || '',
+                lastName: motherData.name?.split(' ').slice(1).join(' ') || '',
+                casteCode: motherData.casteCode?.toString() || '',
+                dateOfBirth: dobBs,
+                phoneNumber: motherData.phoneNumber || '',
+                tole: motherData.tole || '',
+                pregnancyCount: motherData.pregnancyCount?.toString() || '',
+                previousTDTakenCount: motherData.previousTDTakenCount?.toString() || '',
+                remarks: motherData.remarks || '',
+                tdDose1: tdDose1Date,
+                tdDose2: tdDose2Date,
+                tdDose2Plus: tdDose2PlusDate,
+                administeredById,
+            });
         } catch (err) {
             console.error('Frontend error:', err.response?.data || err.message);
             toast.error(t('error_message'));

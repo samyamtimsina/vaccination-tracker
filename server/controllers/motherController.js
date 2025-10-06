@@ -181,6 +181,8 @@ export const getMother = async (req, res) => {
 };
 
 // Update a mother
+// motherController.js
+
 export const updateMother = async (req, res) => {
   try {
     const { sewaDartaNumber } = req.params;
@@ -213,29 +215,30 @@ export const updateMother = async (req, res) => {
       });
     }
 
-    const { fullName, lastName, ...motherData } = validationResult.data;
+    // FIX LINE: Destructure tdDoses out of the validated data
+    const { fullName, lastName, tdDoses: validatedTDDoses, ...motherDataWithoutDoses } = validationResult.data;
     const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Update mother main fields
+    // 1. Update mother main fields (Use motherDataWithoutDoses)
     const updatedMother = await prisma.mother.update({
       where: { sewaDartaNumber: Number(sewaDartaNumber) },
       data: {
-        ...motherData,
+        ...motherDataWithoutDoses,
         name: `${fullName} ${lastName || ''}`.trim(),
-        // Do not update createdById or wardNumber here
       },
     });
 
-    // Remove all previous tdDoses and re-create (simple approach)
+    // 2. Remove all previous tdDoses and re-create (simple approach)
     await prisma.tDDose.deleteMany({
       where: { motherId: updatedMother.id },
     });
-    if (tdDosesParsed.length > 0) {
+    // Use the validated array
+    if (validatedTDDoses.length > 0) {
       await prisma.tDDose.createMany({
-        data: tdDosesParsed.map((dose) => ({
+        data: validatedTDDoses.map((dose) => ({
           ...dose,
           motherId: updatedMother.id,
           createdById: user.id,
@@ -243,7 +246,7 @@ export const updateMother = async (req, res) => {
       });
     }
 
-    // Return updated mother with doses
+    // 3. Return updated mother with doses
     const motherWithDoses = await prisma.mother.findUnique({
       where: { sewaDartaNumber: Number(sewaDartaNumber) },
       include: {
