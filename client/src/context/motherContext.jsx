@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from './AuthContext';
 
@@ -7,6 +7,7 @@ const MotherContext = createContext();
 export function MotherProvider({ children }) {
   const { registerResetCallback, unregisterResetCallback } = useAuth();
   const [mothersData, setMothersData] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
   const [fetched, setFetched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -17,27 +18,38 @@ export function MotherProvider({ children }) {
     setFetched(false);
     setLoading(false);
     setError(null);
+    setPagination({ page: 1, limit: 20, total: 0 });
   };
 
-  // Register reset callback with AuthContext
   useEffect(() => {
     registerResetCallback(resetMotherContext);
-
     return () => {
       unregisterResetCallback(resetMotherContext);
     };
   }, [registerResetCallback, unregisterResetCallback]);
 
-  async function fetchMothers() {
-    if (fetched) return;
+  const fetchMothers = useCallback(async (page = 1, limit = 20) => {
     setLoading(true);
     try {
-      const res = await axiosClient.get('/api/mothers/ward');
-      setMothersData(res.data);
+      const res = await axiosClient.get('/api/mothers/ward', { params: { page, limit } });
+      setMothersData(res.data.mothers);
+      setPagination({ page: res.data.page, limit: res.data.limit, total: res.data.total });
       setFetched(true);
     } catch (err) {
-      console.error('Failed to fetch mothers:', err);
       setError('Failed to load mothers records. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  async function fetchMotherDetails(sewaDartaNumber) {
+    setLoading(true);
+    try {
+      const res = await axiosClient.get(`/api/mothers/${sewaDartaNumber}`);
+      return res.data;
+    } catch (err) {
+      setError('Failed to load mother details.');
+      return null;
     } finally {
       setLoading(false);
     }
@@ -62,8 +74,10 @@ export function MotherProvider({ children }) {
         error,
         loading,
         fetchMothers,
+        fetchMotherDetails,
         addMotherToState,
         updateMotherInState,
+        pagination,
       }}
     >
       {children}

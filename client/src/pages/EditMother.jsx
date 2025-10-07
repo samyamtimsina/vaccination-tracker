@@ -11,12 +11,14 @@ import { useTranslation } from 'react-i18next';
 import { calculateAge } from '../../helpers/calculateAge.jsx';
 import { useMotherContext } from '../context/motherContext';
 import { adToBs } from '@sbmdkl/nepali-date-converter';
+import { useAuth } from '../context/AuthContext';
 
 export default function EditMother() {
     const { t } = useTranslation('addMother');
     const navigate = useNavigate();
     const location = useLocation();
     const { updateMotherInState } = useMotherContext();
+    const { user } = useAuth();
 
     const [selectedMother, setSelectedMother] = useState(null);
     const [showSearchSection, setShowSearchSection] = useState(true);
@@ -24,8 +26,9 @@ export default function EditMother() {
     const [fetchedMother, setFetchedMother] = useState(null);
     const [healthWorkers, setHealthWorkers] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
-    const [searchResults, setSearchResults] = useState([]);
     const resultsPerPage = 10;
+
+    const [searchResults, setSearchResults] = useState([]);
     const [filters, setFilters] = useState({
         name: '',
         phoneNumber: '',
@@ -64,10 +67,7 @@ export default function EditMother() {
     useEffect(() => {
         const fetchHealthWorkers = async () => {
             try {
-                // Use the same logic as EditChild: show all for SUPER_ADMIN, else only ward officers
                 let url = '/api/users?role=WARD_OFFICER';
-                // If you have user context and role, you can check for SUPER_ADMIN here
-                // if (user?.role === 'SUPER_ADMIN') url = '/api/users';
                 const res = await axiosClient.get(url);
                 setHealthWorkers(res.data);
             } catch (err) {
@@ -93,6 +93,7 @@ export default function EditMother() {
                 const res = await axiosClient.get(`/api/mothers/${selectedMother.sewaDartaNumber}`);
                 const motherData = res.data;
                 setFetchedMother(motherData);
+                console.log('motherdata', motherData)
 
                 // --- Populate form fields like EditChild ---
                 // Parse AD dateOfBirth to BS for the date picker
@@ -167,9 +168,11 @@ export default function EditMother() {
                         sewaDartaNumber: filters.sewaDartaNumber,
                         wardId: filters.wardNumber || 'all',
                         createdByMe: filters.createdByMe,
+                        page: currentPage,
+                        limit: resultsPerPage,
                     },
                 });
-                setSearchResults(Array.isArray(res.data) ? res.data : []);
+                setSearchResults(Array.isArray(res.data.mothers) ? res.data.mothers : []);
             } catch (err) {
                 console.error('Search failed:', err);
                 toast.error('खोज्दा त्रुटि भयो');
@@ -178,14 +181,12 @@ export default function EditMother() {
                 setIsLoading(false);
             }
         }, 400);
-
         return () => clearTimeout(delayDebounce);
-    }, [filters]);
+    }, [filters, currentPage]);
 
     const dateOfBirth = watch('dateOfBirth');
     const age = calculateAge(dateOfBirth);
 
-    // Caste code options (same as AddChild)
     const casteCodeOptions = [
         { value: 1, label: 'Code 1: Dalit' },
         { value: 2, label: 'Code 2: Pahad Janajati (Hill Indigenous Nationalities)' },
@@ -194,6 +195,26 @@ export default function EditMother() {
         { value: 5, label: 'Code 5: Brahmin/Chhetri' },
         { value: 6, label: 'Code 6: Other (Anya)' }
     ];
+
+    // --- Cross-ward protection logic ---
+    console.log('fetchedMother ward ', fetchedMother);
+    console.log('fetchedMother ward ', fetchedMother?.wardNumber);
+    console.log('user', user)
+    console.log('user ward', user?.wardId);
+    const isFullProfile = fetchedMother && user && fetchedMother.wardNumber === user.wardId;
+    console.log('isFullProfile', isFullProfile);
+
+    // Only allow saving if:
+    // - Editable (isFullProfile), OR
+    // - At least one new TD dose is being added (field is empty and user fills it)
+    const tdDose1 = watch('tdDose1');
+    const tdDose2 = watch('tdDose2');
+    const tdDose2Plus = watch('tdDose2Plus');
+    const canSave =
+        isFullProfile ||
+        (!fetchedMother?.tdDoses?.find(d => d.doseNumber === 1)?.dateGiven && tdDose1) ||
+        (!fetchedMother?.tdDoses?.find(d => d.doseNumber === 2)?.dateGiven && tdDose2) ||
+        (!fetchedMother?.tdDoses?.find(d => d.doseNumber === 3)?.dateGiven && tdDose2Plus);
 
     const onSubmit = async (data) => {
         if (!fetchedMother) {
@@ -254,18 +275,16 @@ export default function EditMother() {
             // Update fetchedMother and reset form with new data
             setFetchedMother(response.data);
 
-            // Prepare new values for reset (same logic as in fetchMotherData)
-            const motherData = response.data;
             let dobBs = '';
-            if (motherData.dateOfBirth) {
-                const adDate = typeof motherData.dateOfBirth === 'string'
-                    ? motherData.dateOfBirth.split('T')[0]
-                    : motherData.dateOfBirth;
+            if (response.data.dateOfBirth) {
+                const adDate = typeof response.data.dateOfBirth === 'string'
+                    ? response.data.dateOfBirth.split('T')[0]
+                    : response.data.dateOfBirth;
                 dobBs = adToBs(adDate);
             }
-            const tdDose1 = motherData.tdDoses?.find(d => d.doseNumber === 1);
-            const tdDose2 = motherData.tdDoses?.find(d => d.doseNumber === 2);
-            const tdDose2Plus = motherData.tdDoses?.find(d => d.doseNumber === 3);
+            const tdDose1 = response.data.tdDoses?.find(d => d.doseNumber === 1);
+            const tdDose2 = response.data.tdDoses?.find(d => d.doseNumber === 2);
+            const tdDose2Plus = response.data.tdDoses?.find(d => d.doseNumber === 3);
 
             const tdDose1Date = tdDose1?.dateGiven ? adToBs(tdDose1.dateGiven.split('T')[0]) : '';
             const tdDose2Date = tdDose2?.dateGiven ? adToBs(tdDose2.dateGiven.split('T')[0]) : '';
@@ -281,15 +300,15 @@ export default function EditMother() {
             }
 
             reset({
-                fullName: motherData.name?.split(' ')[0] || '',
-                lastName: motherData.name?.split(' ').slice(1).join(' ') || '',
-                casteCode: motherData.casteCode?.toString() || '',
+                fullName: response.data.name?.split(' ')[0] || '',
+                lastName: response.data.name?.split(' ').slice(1).join(' ') || '',
+                casteCode: response.data.casteCode?.toString() || '',
                 dateOfBirth: dobBs,
-                phoneNumber: motherData.phoneNumber || '',
-                tole: motherData.tole || '',
-                pregnancyCount: motherData.pregnancyCount?.toString() || '',
-                previousTDTakenCount: motherData.previousTDTakenCount?.toString() || '',
-                remarks: motherData.remarks || '',
+                phoneNumber: response.data.phoneNumber || '',
+                tole: response.data.tole || '',
+                pregnancyCount: response.data.pregnancyCount?.toString() || '',
+                previousTDTakenCount: response.data.previousTDTakenCount?.toString() || '',
+                remarks: response.data.remarks || '',
                 tdDose1: tdDose1Date,
                 tdDose2: tdDose2Date,
                 tdDose2Plus: tdDose2PlusDate,
@@ -499,209 +518,204 @@ export default function EditMother() {
                                         {t('personal_information')}
                                     </h2>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <div className="form-control">
-                                        <label className="label" htmlFor="fullName">
-                                            <span className="label-text">
-                                                {t('full_name')} <span className="text-error">*</span>
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="fullName"
-                                            {...register('fullName', { required: true })}
-                                            className="input input-bordered w-full"
-                                            placeholder={t('full_name_placeholder')}
-                                        />
-                                        {errors.fullName && (
-                                            <label className="label">
-                                                <span className="label-text-alt text-error">
-                                                    {t('full_name_error')}
-                                                </span>
+                                {isFullProfile ? (
+                                    // Editable fields if same ward
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div className="form-control">
+                                            <label className="label" htmlFor="fullName">
+                                                <span className="label-text">{t('full_name')} <span className="text-error">*</span></span>
                                             </label>
-                                        )}
-                                    </div>
-                                    <div className="form-control">
-                                        <label className="label" htmlFor="lastName">
-                                            <span className="label-text">
-                                                {t('last_name')} <span className="text-error">*</span>
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="lastName"
-                                            {...register('lastName', { required: true })}
-                                            className="input input-bordered w-full"
-                                            placeholder={t('last_name_placeholder')}
-                                        />
-                                        {errors.lastName && (
-                                            <label className="label">
-                                                <span className="label-text-alt text-error">
-                                                    {t('last_name_error')}
-                                                </span>
+                                            <input
+                                                id="fullName"
+                                                {...register('fullName', { required: true })}
+                                                className="input input-bordered w-full"
+                                                placeholder={t('full_name_placeholder')}
+                                            />
+                                            {errors.fullName && (
+                                                <label className="label">
+                                                    <span className="label-text-alt text-error">{t('full_name_error')}</span>
+                                                </label>
+                                            )}
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label" htmlFor="lastName">
+                                                <span className="label-text">{t('last_name')} <span className="text-error">*</span></span>
                                             </label>
-                                        )}
-                                    </div>
-                                    <div className="form-control">
-                                        <label className="label" htmlFor="tole">
-                                            <span className="label-text">{t('tole')}</span>
-                                        </label>
-                                        <input
-                                            id="tole"
-                                            {...register('tole')}
-                                            className="input input-bordered w-full"
-                                            placeholder={t('tole_placeholder')}
-                                        />
-                                    </div>
-                                    {/* Caste Code (Jaati) */}
-                                    <div className="form-control">
-                                        <label className="label" htmlFor="casteCode">
-                                            <span className="label-text">
-                                                {t('caste_code')} <span className="text-error">*</span>
-                                            </span>
-                                        </label>
-                                        <select
-                                            id="casteCode"
-                                            {...register('casteCode', { required: true })}
-                                            className="select select-bordered w-full"
-                                            defaultValue=""
-                                        >
-                                            <option value="" disabled>
-                                                {t('caste_code_placeholder')}
-                                            </option>
-                                            {casteCodeOptions.map(option => (
-                                                <option key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {errors.casteCode && (
-                                            <label className="label">
-                                                <span className="label-text-alt text-error">
-                                                    {t('caste_code_error')}
-                                                </span>
+                                            <input
+                                                id="lastName"
+                                                {...register('lastName', { required: true })}
+                                                className="input input-bordered w-full"
+                                                placeholder={t('last_name_placeholder')}
+                                            />
+                                            {errors.lastName && (
+                                                <label className="label">
+                                                    <span className="label-text-alt text-error">{t('last_name_error')}</span>
+                                                </label>
+                                            )}
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label" htmlFor="tole">
+                                                <span className="label-text">{t('tole')}</span>
                                             </label>
-                                        )}
-                                    </div>
-                                    {/* Date of Birth */}
-                                    <div className="form-control">
-                                        <label className="label" htmlFor="dateOfBirth">
-                                            <span className="label-text">
-                                                {t('date_of_birth')} <span className="text-error">*</span>
-                                            </span>
-                                        </label>
-                                        <div className="relative">
-                                            <Controller
-                                                name="dateOfBirth"
-                                                control={control}
-                                                rules={{ required: true }}
-                                                render={({ field }) => (
-                                                    <>
+                                            <input
+                                                id="tole"
+                                                {...register('tole')}
+                                                className="input input-bordered w-full"
+                                                placeholder={t('tole_placeholder')}
+                                            />
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label" htmlFor="casteCode">
+                                                <span className="label-text">{t('caste_code')} <span className="text-error">*</span></span>
+                                            </label>
+                                            <select
+                                                id="casteCode"
+                                                {...register('casteCode', { required: true })}
+                                                className="select select-bordered w-full"
+                                                defaultValue=""
+                                            >
+                                                <option value="" disabled>{t('caste_code_placeholder')}</option>
+                                                {casteCodeOptions.map(option => (
+                                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                                ))}
+                                            </select>
+                                            {errors.casteCode && (
+                                                <label className="label">
+                                                    <span className="label-text-alt text-error">{t('caste_code_error')}</span>
+                                                </label>
+                                            )}
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label" htmlFor="dateOfBirth">
+                                                <span className="label-text">{t('date_of_birth')} <span className="text-error">*</span></span>
+                                            </label>
+                                            <div className="relative">
+                                                <Controller
+                                                    name="dateOfBirth"
+                                                    control={control}
+                                                    rules={{ required: true }}
+                                                    render={({ field }) => (
                                                         <NepaliDatePicker
                                                             {...field}
                                                             inputClassName="input input-bordered w-full pr-8"
                                                             value={field.value || ''}
                                                             onChange={field.onChange}
                                                             className="w-full"
-                                                            style={{ cursor: 'pointer' }}
+                                                            placeholder={t('date_placeholder')}
                                                         />
-                                                        {field.value && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setValue('dateOfBirth', '')}
-                                                                className="absolute right-3 top-1/2 flex h-6 w-6 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
-                                                                title={t('clear_date')}
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        )}
-                                                    </>
-                                                )}
-                                            />
-                                        </div>
-                                        {errors.dateOfBirth && (
-                                            <label className="label">
-                                                <span className="label-text-alt text-error">
-                                                    {t('date_of_birth_error')}
-                                                </span>
-                                            </label>
-                                        )}
-                                        {/* Show calculated age in Nepali style like AddChild */}
-                                        {dateOfBirth && (
-                                            <div className="mt-2 text-success font-medium">
-                                                {`आमाको उमेर: ${age.years} वर्ष, ${age.months} महिना, ${age.days} दिन`}
+                                                    )}
+                                                />
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="form-control">
-                                        <label className="label" htmlFor="phoneNumber">
-                                            <span className="label-text">
-                                                {t('phone_number')} <span className="text-error">*</span>
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="phoneNumber"
-                                            {...register('phoneNumber', { required: true })}
-                                            className="input input-bordered w-full"
-                                            placeholder={t('phone_number_placeholder')}
-                                        />
-                                        {errors.phoneNumber && (
-                                            <label className="label">
-                                                <span className="label-text-alt text-error">
-                                                    {t('phone_number_error')}
-                                                </span>
+                                            {errors.dateOfBirth && (
+                                                <label className="label">
+                                                    <span className="label-text-alt text-error">{t('date_of_birth_error')}</span>
+                                                </label>
+                                            )}
+                                            {dateOfBirth && (
+                                                <div className="mt-2 text-success font-medium">
+                                                    {`आमाको उमेर: ${age.years} वर्ष, ${age.months} महिना, ${age.days} दिन`}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label" htmlFor="phoneNumber">
+                                                <span className="label-text">{t('phone_number')} <span className="text-error">*</span></span>
                                             </label>
-                                        )}
-                                    </div>
-                                    <div className="form-control">
-                                        <label className="label" htmlFor="pregnancyCount">
-                                            <span className="label-text">
-                                                {t('pregnancy_count')} <span className="text-error">*</span>
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="pregnancyCount"
-                                            type="number"
-                                            {...register('pregnancyCount', {
-                                                required: true,
-                                                valueAsNumber: true,
-                                                min: 1,
-                                            })}
-                                            className="input input-bordered w-full"
-                                            placeholder={t('pregnancy_count_placeholder')}
-                                        />
-                                        {errors.pregnancyCount && (
-                                            <label className="label">
-                                                <span className="label-text-alt text-error">
-                                                    {t('pregnancy_count_error')}
-                                                </span>
+                                            <input
+                                                id="phoneNumber"
+                                                {...register('phoneNumber', { required: true })}
+                                                className="input input-bordered w-full"
+                                                placeholder={t('phone_number_placeholder')}
+                                            />
+                                            {errors.phoneNumber && (
+                                                <label className="label">
+                                                    <span className="label-text-alt text-error">{t('phone_number_error')}</span>
+                                                </label>
+                                            )}
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label" htmlFor="pregnancyCount">
+                                                <span className="label-text">{t('pregnancy_count')} <span className="text-error">*</span></span>
                                             </label>
-                                        )}
-                                    </div>
-                                    <div className="form-control">
-                                        <label className="label" htmlFor="previousTDTakenCount">
-                                            <span className="label-text">
-                                                {t('previous_td_taken_count')} <span className="text-error">*</span>
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="previousTDTakenCount"
-                                            type="number"
-                                            {...register('previousTDTakenCount', {
-                                                required: true,
-                                                valueAsNumber: true,
-                                                min: 0,
-                                            })}
-                                            className="input input-bordered w-full"
-                                            placeholder={t('previous_td_taken_count_placeholder')}
-                                        />
-                                        {errors.previousTDTakenCount && (
-                                            <label className="label">
-                                                <span className="label-text-alt text-error">
-                                                    {t('previous_td_taken_count_error')}
-                                                </span>
+                                            <input
+                                                id="pregnancyCount"
+                                                type="number"
+                                                {...register('pregnancyCount', { required: true, valueAsNumber: true, min: 1 })}
+                                                className="input input-bordered w-full"
+                                                placeholder={t('pregnancy_count_placeholder')}
+                                            />
+                                            {errors.pregnancyCount && (
+                                                <label className="label">
+                                                    <span className="label-text-alt text-error">{t('pregnancy_count_error')}</span>
+                                                </label>
+                                            )}
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label" htmlFor="previousTDTakenCount">
+                                                <span className="label-text">{t('previous_td_taken_count')} <span className="text-error">*</span></span>
                                             </label>
-                                        )}
+                                            <input
+                                                id="previousTDTakenCount"
+                                                type="number"
+                                                {...register('previousTDTakenCount', { required: true, valueAsNumber: true, min: 0 })}
+                                                className="input input-bordered w-full"
+                                                placeholder={t('previous_td_taken_count_placeholder')}
+                                            />
+                                            {errors.previousTDTakenCount && (
+                                                <label className="label">
+                                                    <span className="label-text-alt text-error">{t('previous_td_taken_count_error')}</span>
+                                                </label>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    // Read-only summary if different ward
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div className="form-control">
+                                            <label className="label"><span className="label-text font-medium">{t('full_name')}</span></label>
+                                            <p className="p-3 border rounded-lg bg-base-200 font-semibold">{fetchedMother?.name?.split(' ')[0]}</p>
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label"><span className="label-text font-medium">{t('last_name')}</span></label>
+                                            <p className="p-3 border rounded-lg bg-base-200 font-semibold">{fetchedMother?.name?.split(' ').slice(1).join(' ')}</p>
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label"><span className="label-text font-medium">{t('tole')}</span></label>
+                                            <p className="p-3 border rounded-lg bg-base-200 font-semibold">{fetchedMother?.tole}</p>
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label"><span className="label-text font-medium">{t('caste_code')}</span></label>
+                                            <p className="p-3 border rounded-lg bg-base-200 font-semibold">{fetchedMother?.casteCode}</p>
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label"><span className="label-text font-medium">{t('date_of_birth')}</span></label>
+                                            <p className="p-3 border rounded-lg bg-base-200 font-semibold">
+                                                {fetchedMother?.dateOfBirth ? adToBs(fetchedMother.dateOfBirth.split('T')[0]) : ''}
+                                            </p>
+                                            {fetchedMother?.dateOfBirth && (
+                                                <div className="mt-2 text-success font-medium">
+                                                    {`आमाको उमेर: ${age.years} वर्ष, ${age.months} महिना, ${age.days} दिन`}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label"><span className="label-text font-medium">{t('phone_number')}</span></label>
+                                            <p className="p-3 border rounded-lg bg-base-200 font-semibold">{fetchedMother?.phoneNumber}</p>
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label"><span className="label-text font-medium">{t('pregnancy_count')}</span></label>
+                                            <p className="p-3 border rounded-lg bg-base-200 font-semibold">{fetchedMother?.pregnancyCount}</p>
+                                        </div>
+                                        <div className="form-control">
+                                            <label className="label"><span className="label-text font-medium">{t('previous_td_taken_count')}</span></label>
+                                            <p className="p-3 border rounded-lg bg-base-200 font-semibold">{fetchedMother?.previousTDTakenCount}</p>
+                                        </div>
+                                        <div className="form-control col-span-full">
+                                            <label className="label"><span className="label-text font-medium">{t('remarks')}</span></label>
+                                            <p className="p-3 border rounded-lg bg-base-200">{fetchedMother?.remarks}</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <section className="bg-base-200 p-6 rounded-lg border border-base-300 shadow-sm">
                                 <h3 className="text-lg font-medium text-base-content mb-3">
@@ -721,27 +735,30 @@ export default function EditMother() {
                                                 name="tdDose1"
                                                 control={control}
                                                 render={({ field }) => (
-                                                    <>
-                                                        <NepaliDatePicker
-                                                            {...field}
-                                                            inputClassName="input input-bordered w-full pr-8"
-                                                            value={field.value || ''}
-                                                            onChange={field.onChange}
-                                                            className="w-full"
-                                                            style={{ cursor: 'pointer' }}
-                                                            placeholder={t('date_placeholder')}
-                                                        />
-                                                        {field.value && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setValue('tdDose1', '')}
-                                                                className="absolute right-3 top-1/2 flex h-6 w-6 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
-                                                                title={t('clear_date')}
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        )}
-                                                    </>
+                                                    <NepaliDatePicker
+                                                        {...field}
+                                                        inputClassName="input input-bordered w-full pr-8"
+                                                        value={field.value || ''}
+                                                        onChange={
+                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 1)?.dateGiven
+                                                                ? undefined
+                                                                : field.onChange
+                                                        }
+                                                        className="w-full"
+                                                        style={{
+                                                            cursor:
+                                                                !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 1)?.dateGiven
+                                                                    ? 'not-allowed'
+                                                                    : 'pointer',
+                                                        }}
+                                                        readOnly={
+                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 1)?.dateGiven
+                                                        }
+                                                        disabled={
+                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 1)?.dateGiven
+                                                        }
+                                                        placeholder={t('date_placeholder')}
+                                                    />
                                                 )}
                                             />
                                         </div>
@@ -756,27 +773,30 @@ export default function EditMother() {
                                                 name="tdDose2"
                                                 control={control}
                                                 render={({ field }) => (
-                                                    <>
-                                                        <NepaliDatePicker
-                                                            {...field}
-                                                            inputClassName="input input-bordered w-full pr-8"
-                                                            value={field.value || ''}
-                                                            onChange={field.onChange}
-                                                            className="w-full"
-                                                            style={{ cursor: 'pointer' }}
-                                                            placeholder={t('date_placeholder')}
-                                                        />
-                                                        {field.value && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setValue('tdDose2', '')}
-                                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
-                                                                title={t('clear_date')}
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        )}
-                                                    </>
+                                                    <NepaliDatePicker
+                                                        {...field}
+                                                        inputClassName="input input-bordered w-full pr-8"
+                                                        value={field.value || ''}
+                                                        onChange={
+                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 2)?.dateGiven
+                                                                ? undefined
+                                                                : field.onChange
+                                                        }
+                                                        className="w-full"
+                                                        style={{
+                                                            cursor:
+                                                                !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 2)?.dateGiven
+                                                                    ? 'not-allowed'
+                                                                    : 'pointer',
+                                                        }}
+                                                        readOnly={
+                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 2)?.dateGiven
+                                                        }
+                                                        disabled={
+                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 2)?.dateGiven
+                                                        }
+                                                        placeholder={t('date_placeholder')}
+                                                    />
                                                 )}
                                             />
                                         </div>
@@ -791,33 +811,36 @@ export default function EditMother() {
                                                 name="tdDose2Plus"
                                                 control={control}
                                                 render={({ field }) => (
-                                                    <>
-                                                        <NepaliDatePicker
-                                                            {...field}
-                                                            inputClassName="input input-bordered w-full pr-8"
-                                                            value={field.value || ''}
-                                                            onChange={field.onChange}
-                                                            className="w-full"
-                                                            style={{ cursor: 'pointer' }}
-                                                            placeholder={t('date_placeholder')}
-                                                        />
-                                                        {field.value && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setValue('tdDose2Plus', '')}
-                                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-1 text-error transition-all duration-200 hover:scale-110 hover:bg-error/20 focus:outline-none cursor-pointer"
-                                                                title={t('clear_date')}
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        )}
-                                                    </>
+                                                    <NepaliDatePicker
+                                                        {...field}
+                                                        inputClassName="input input-bordered w-full pr-8"
+                                                        value={field.value || ''}
+                                                        onChange={
+                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 3)?.dateGiven
+                                                                ? undefined
+                                                                : field.onChange
+                                                        }
+                                                        className="w-full"
+                                                        style={{
+                                                            cursor:
+                                                                !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 3)?.dateGiven
+                                                                    ? 'not-allowed'
+                                                                    : 'pointer',
+                                                        }}
+                                                        readOnly={
+                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 3)?.dateGiven
+                                                        }
+                                                        disabled={
+                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 3)?.dateGiven
+                                                        }
+                                                        placeholder={t('date_placeholder')}
+                                                    />
                                                 )}
                                             />
                                         </div>
                                     </div>
                                     {/* Administered By */}
-                                    {(watch('tdDose1') || watch('tdDose2') || watch('tdDose2Plus')) && (
+                                    {(tdDose1 || tdDose2 || tdDose2Plus) && (
                                         <div className="form-control">
                                             <label className="label" htmlFor="administeredById">
                                                 <span className="label-text">
@@ -829,13 +852,19 @@ export default function EditMother() {
                                                 {...register('administeredById', { required: true, valueAsNumber: true })}
                                                 className="select select-bordered w-full"
                                                 defaultValue=""
+                                                disabled={
+                                                    !isFullProfile && !(
+                                                        (!fetchedMother?.tdDoses?.find(d => d.doseNumber === 1)?.dateGiven && tdDose1) ||
+                                                        (!fetchedMother?.tdDoses?.find(d => d.doseNumber === 2)?.dateGiven && tdDose2) ||
+                                                        (!fetchedMother?.tdDoses?.find(d => d.doseNumber === 3)?.dateGiven && tdDose2Plus)
+                                                    )
+                                                }
                                             >
                                                 <option value="" disabled>
                                                     {t('administered_by_placeholder')}
                                                 </option>
                                                 {healthWorkers
                                                     .sort((a, b) => {
-                                                        // Sort by wardId first (nulls at the end), then by name
                                                         const wardA = a.wardId ?? Infinity;
                                                         const wardB = b.wardId ?? Infinity;
                                                         if (wardA !== wardB) return wardA - wardB;
@@ -871,15 +900,16 @@ export default function EditMother() {
                                         rows={4}
                                         className="textarea textarea-bordered h-24 w-full"
                                         placeholder={t('remarks_placeholder')}
+                                        readOnly={!isFullProfile}
                                     />
                                 </div>
                             </section>
                             <div className="flex space-x-3 pt-0">
                                 <button
                                     type="submit"
-                                    disabled={isSubmitting}
+                                    disabled={isSubmitting || !canSave}
                                     className={`btn flex-1 text-base font-semibold transition-all duration-300 ease-in-out
-      ${isSubmitting ? 'btn-disabled' : 'btn-primary'}
+      ${isSubmitting || !canSave ? 'btn-disabled' : 'btn-primary'}
       hover:-translate-y-0.5 hover:shadow-md active:translate-y-0`}
                                 >
                                     {isSubmitting ? t('saving') : t('save')}

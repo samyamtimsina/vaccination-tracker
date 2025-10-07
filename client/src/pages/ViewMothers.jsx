@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FaSpinner,
   FaChevronLeft,
@@ -32,74 +32,36 @@ export default function AllMothers() {
   const [selectedMother, setSelectedMother] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [sortBy, setSortBy] = useState('name');
+  const [filterStatus, setFilterStatus] = useState('all'); // <-- Add this
+  const [sortBy, setSortBy] = useState('name'); // <-- And this
   const itemsPerPage = 20;
   const navigate = useNavigate();
 
-  const { mothersData, error, loading, fetchMothers } = useMotherContext();
+  const { mothersData, fetchMotherDetails, pagination, loading, error, fetchMothers } = useMotherContext();
 
-  useEffect(() => {
-    fetchMothers();
-  }, [fetchMothers]);
+  const handleViewDetails = async (mother) => {
+    const fullMother = await fetchMotherDetails(mother.sewaDartaNumber);
+    if (fullMother) setSelectedMother(fullMother);
+  };
 
-  const filteredMothers = useMemo(() => {
-    if (!mothersData) {
-      return [];
-    }
-    
-    let filtered = mothersData.filter(
-      (mother) =>
-        mother.name && mother.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    if (filterStatus === 'vaccinated') {
-      filtered = filtered.filter(mother => 
-        mother.tdDoses && mother.tdDoses.length >= 3
-      );
-    } else if (filterStatus === 'pending') {
-      filtered = filtered.filter(mother => 
-        !mother.tdDoses || mother.tdDoses.length < 3
-      );
-    }
-
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'age':
-          return (a.age || 0) - (b.age || 0);
-        case 'ward':
-          return (a.wardNumber || 0) - (b.wardNumber || 0);
-        case 'recent':
-          return new Date(b.createdAt) - new Date(a.createdAt);
-        case 'name':
-        default:
-          return (a.name || '').localeCompare(b.name || '');
-      }
-    });
-
-    return filtered;
-  }, [mothersData, searchTerm, filterStatus, sortBy]);
-
-  useEffect(() => {
-    const totalPages = Math.ceil(filteredMothers.length / itemsPerPage);
-    if (currentPage > totalPages) {
-      setCurrentPage(Math.max(1, totalPages));
-    }
-  }, [filteredMothers, currentPage, itemsPerPage]);
-
-  const currentMothers = useMemo(() => {
-    const indexOfLast = currentPage * itemsPerPage;
-    const indexOfFirst = indexOfLast - itemsPerPage;
-    return filteredMothers.slice(indexOfFirst, indexOfLast);
-  }, [filteredMothers, currentPage, itemsPerPage]);
-
-  const totalPages = Math.ceil(filteredMothers.length / itemsPerPage);
-
-  const vaccinatedCount = mothersData ? mothersData.filter(mother => 
+  // Stats
+  const vaccinatedCount = mothersData ? mothersData.filter(mother =>
     mother.tdDoses && mother.tdDoses.length >= 3
   ).length : 0;
-
   const pendingCount = mothersData ? mothersData.length - vaccinatedCount : 0;
+  const totalPages = Math.ceil((pagination?.total || 0) / itemsPerPage);
+
+  // Optionally, filter/search on backend for large lists
+  const filteredMothers = mothersData.filter(
+    (mother) =>
+      !searchTerm ||
+      (mother.name && mother.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  useEffect(() => {
+    fetchMothers(currentPage, itemsPerPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, itemsPerPage]);
 
   if (loading) {
     return (
@@ -121,8 +83,8 @@ export default function AllMothers() {
               {t('error.title')}
             </h2>
             <p className="text-base-content text-sm mb-4">{t('error.message', { error })}</p>
-            <button 
-              onClick={() => fetchMothers()} 
+            <button
+              onClick={() => fetchMothers(currentPage, itemsPerPage)}
               className="btn btn-primary btn-sm"
             >
               {t('error.try_again')}
@@ -267,11 +229,11 @@ export default function AllMothers() {
                       </span>
                       <span className="flex items-center space-x-1 text-base-content/70">
                         <FaUserMd className="text-xs" />
-                        <span 
+                        <span
                           className="hover:text-primary hover:underline cursor-pointer"
                           onClick={() => navigate(`/users/${selectedMother.createdBy.id}`)}
                         >
-                          {t('motherDetails.personalInfo.createdBy')}: {selectedMother.createdBy.name}
+                          {t('motherDetails.personalInfo.createdBy')}: {selectedMother.createdBy ? selectedMother.createdBy.name : t('motherCard.unknown')}
                         </span>
                       </span>
                     </div>
@@ -360,7 +322,7 @@ export default function AllMothers() {
                                   {dose.createdBy && (
                                     <div className="flex items-center space-x-1 text-base-content/70">
                                       <FaUserMd className="text-xs" />
-                                      <span 
+                                      <span
                                         className="hover:text-primary hover:underline cursor-pointer"
                                         onClick={() => navigate(`/users/${dose.createdBy.id}`)}
                                       >
@@ -371,7 +333,7 @@ export default function AllMothers() {
                                   {dose.administeredBy && (
                                     <div className="flex items-center space-x-1 text-base-content/70">
                                       <FaUserMd className="text-xs" />
-                                      <span 
+                                      <span
                                         className="hover:text-primary hover:underline cursor-pointer"
                                         onClick={() => navigate(`/users/${dose.administeredBy.id}`)}
                                       >
@@ -454,7 +416,7 @@ export default function AllMothers() {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-base-100 rounded-lg p-4 shadow-sm border border-base-300">
             <div className="flex items-center space-x-3">
               <div className="bg-success/10 p-2 rounded-lg">
@@ -468,7 +430,7 @@ export default function AllMothers() {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-base-100 rounded-lg p-4 shadow-sm border border-base-300">
             <div className="flex items-center space-x-3">
               <div className="bg-warning/10 p-2 rounded-lg">
@@ -482,7 +444,7 @@ export default function AllMothers() {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-base-100 rounded-lg p-4 shadow-sm border border-base-300">
             <div className="flex items-center space-x-3">
               <div className="bg-info/10 p-2 rounded-lg">
@@ -565,14 +527,14 @@ export default function AllMothers() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-              {currentMothers.map((mother) => {
+              {filteredMothers.map((mother) => {
                 const isTDFullyVaccinated = mother.tdDoses && mother.tdDoses.length >= 3;
 
                 return (
                   <div
                     key={mother.id}
                     className="bg-base-100 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 border border-base-300 overflow-hidden group cursor-pointer"
-                    onClick={() => setSelectedMother(mother)}
+                    onClick={() => handleViewDetails(mother)}
                   >
                     <div className="bg-base-200 border-b border-base-300 p-4">
                       <div className="flex items-center justify-between mb-2">
@@ -621,11 +583,11 @@ export default function AllMothers() {
                         <div className="flex items-center justify-between text-xs pt-2 border-t border-base-300">
                           <span className="text-base-content/60 flex items-center space-x-1">
                             <FaUserMd className="text-xs" />
-                            <span 
+                            <span
                               className="hover:text-primary hover:underline cursor-pointer"
-                              onClick={() => navigate(`/users/${mother.createdBy.id}`)}
+                              onClick={() => mother.createdBy && navigate(`/users/${mother.createdBy.id}`)}
                             >
-                              {t('motherCard.createdBy')}: {mother.createdBy.name}
+                              {t('motherCard.createdBy')}: {mother.createdBy ? mother.createdBy.name : t('motherCard.unknown')}
                             </span>
                           </span>
                           <span className="text-base-content/60">

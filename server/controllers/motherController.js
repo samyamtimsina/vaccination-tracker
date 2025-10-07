@@ -89,49 +89,92 @@ export const getMothers = async (req, res) => {
   }
 };
 
+// Get all mothers (admin/superadmin, paginated, partial fields)
+export const getAllMothers = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const [total, mothers] = await Promise.all([
+      prisma.mother.count(),
+      prisma.mother.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          sewaDartaNumber: true,
+          name: true,
+          casteCode: true,
+          dateOfBirth: true,
+          phoneNumber: true,
+          tole: true,
+          wardNumber: true,
+          pregnancyCount: true,
+          previousTDTakenCount: true,
+          remarks: true,
+          createdAt: true,
+          isFromOtherMunicipality: true,
+          tdDoses: { select: { id: true, doseNumber: true } },
+          createdBy: { select: { id: true, name: true } },
+        }
+      })
+    ]);
+    res.status(200).json({ mothers, total, page, limit });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch mothers', details: error.message });
+  }
+};
+
+// Get mothers for a ward (ward officer, paginated, partial fields)
 export const getWardMothers = async (req, res) => {
   try {
     if (!req.user || !req.user.wardId) {
-      return res
-        .status(401)
-        .json({ error: 'Unauthorized. User or wardId not found.' });
+      return res.status(401).json({ error: 'Unauthorized. User or wardId not found.' });
     }
     const { wardId } = req.user;
-    const mothers = await prisma.mother.findMany({
-      where: {
-        wardNumber: wardId,
-      },
-      include: {
-        createdBy: {
-          select: { id: true, name: true },
-        },
-        tdDoses: {
-          include: {
-            createdBy: {
-              select: { id: true, name: true },
-            },
-            administeredBy: {
-              select: { id: true, name: true },
-            },
-          },
-        },
-      },
-    });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
 
-    if (!mothers) {
-      return res.status(404).json({ error: 'No mothers found' });
-    }
-
-    res.status(200).json(mothers);
-  } catch (error) { }
+    const [total, mothers] = await Promise.all([
+      prisma.mother.count({ where: { wardNumber: wardId } }),
+      prisma.mother.findMany({
+        where: { wardNumber: wardId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          sewaDartaNumber: true,
+          name: true,
+          casteCode: true,
+          dateOfBirth: true,
+          phoneNumber: true,
+          tole: true,
+          wardNumber: true,
+          pregnancyCount: true,
+          previousTDTakenCount: true,
+          remarks: true,
+          createdAt: true,
+          isFromOtherMunicipality: true,
+          tdDoses: { select: { id: true, doseNumber: true } },
+          createdBy: { select: { id: true, name: true } },
+        }
+      })
+    ]);
+    res.status(200).json({ mothers, total, page, limit });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch mothers', details: error.message });
+  }
 };
 
-// Search mothers (by name, phone, sewaDartaNumber, ward, createdByMe)
+// Search mothers (paginated, partial fields)
 export const searchMothers = async (req, res) => {
   try {
-    const { name, phoneNumber, sewaDartaNumber, wardId, createdByMe } = req.query;
+    const { name, phoneNumber, sewaDartaNumber, wardId, createdByMe, page = 1, limit = 20 } = req.query;
     const user = req.user;
-
     const where = {};
     if (name) where.name = { contains: name, mode: 'insensitive' };
     if (phoneNumber) where.phoneNumber = { contains: phoneNumber, mode: 'insensitive' };
@@ -139,22 +182,41 @@ export const searchMothers = async (req, res) => {
     if (wardId && wardId !== 'all') where.wardNumber = Number(wardId);
     if (createdByMe && user) where.createdById = user.id;
 
-    const mothers = await prisma.mother.findMany({
-      where,
-      orderBy: { sewaDartaNumber: 'desc' },
-      include: {
-        tdDoses: true,
-      },
-    });
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    res.status(200).json(mothers);
+    const [total, mothers] = await Promise.all([
+      prisma.mother.count({ where }),
+      prisma.mother.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: parseInt(limit),
+        select: {
+          id: true,
+          sewaDartaNumber: true,
+          name: true,
+          casteCode: true,
+          dateOfBirth: true,
+          phoneNumber: true,
+          tole: true,
+          wardNumber: true,
+          pregnancyCount: true,
+          previousTDTakenCount: true,
+          remarks: true,
+          createdAt: true,
+          isFromOtherMunicipality: true,
+          tdDoses: { select: { id: true, doseNumber: true } },
+          createdBy: { select: { id: true, name: true } },
+        }
+      })
+    ]);
+    res.status(200).json({ mothers, total, page: parseInt(page), limit: parseInt(limit) });
   } catch (error) {
-    console.error('Error searching mothers:', error);
     res.status(500).json({ error: 'Failed to search mothers', details: error.message });
   }
 };
 
-// Get a single mother by sewaDartaNumber
+// Get single mother (full details)
 export const getMother = async (req, res) => {
   try {
     const { sewaDartaNumber } = req.params;
@@ -175,7 +237,6 @@ export const getMother = async (req, res) => {
     }
     res.status(200).json(mother);
   } catch (error) {
-    console.error('Error fetching mother:', error);
     res.status(500).json({ error: 'Failed to fetch mother', details: error.message });
   }
 };

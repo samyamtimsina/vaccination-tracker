@@ -113,6 +113,13 @@ model Mother {
   isFromOtherMunicipality   Boolean   @default(false)
   NotificationLog           NotificationLog[]
   tdDoses                   TDDose[]
+
+  @@index([sewaDartaNumber])
+  @@index([name])
+  @@index([wardNumber])
+  @@index([phoneNumber])
+  @@index([createdById])
+  @@index([createdAt])
 }
 
 model TDDose {

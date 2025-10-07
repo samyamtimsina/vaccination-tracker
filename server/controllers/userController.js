@@ -1,6 +1,7 @@
 import { prisma } from '../utils/prisma.js';
 
 export const getMe = (req, res) => {
+  console.log('req.user', req.user)
   if (req.user) {
     const user = {
       id: req.user.id,
@@ -8,7 +9,8 @@ export const getMe = (req, res) => {
       name: req.user.name,
       role: req.user.role,
       phoneNumber: req.user.phoneNumber,
-      status: req.user.status
+      status: req.user.status,
+      wardId: req.user.wardId
 
     };
     res.status(200).json({ user });
