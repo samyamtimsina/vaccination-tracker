@@ -12,6 +12,9 @@ import { calculateAge } from '../../helpers/calculateAge.jsx';
 import { useMotherContext } from '../context/motherContext';
 import { adToBs } from '@sbmdkl/nepali-date-converter';
 import { useAuth } from '../context/AuthContext';
+import {
+    FaClipboardList,
+} from 'react-icons/fa';
 
 export default function EditMother() {
     const { t } = useTranslation('addMother');
@@ -139,6 +142,9 @@ export default function EditMother() {
                     tdDose2: tdDose2Date,
                     tdDose2Plus: tdDose2PlusDate,
                     administeredById,
+                    tdDose1Remarks: tdDose1?.remarks || '',
+                    tdDose2Remarks: tdDose2?.remarks || '',
+                    tdDose2PlusRemarks: tdDose2Plus?.remarks || '',
                 });
             } catch (err) {
                 console.error('Failed to fetch mother data:', err);
@@ -233,7 +239,7 @@ export default function EditMother() {
                     doseNumber: 1,
                     dateGiven: data.tdDose1,
                     administeredById: parseInt(data.administeredById, 10),
-                    remarks: '',
+                    remarks: data.tdDose1Remarks || '',
                 });
             }
             if (data.tdDose2) {
@@ -241,7 +247,7 @@ export default function EditMother() {
                     doseNumber: 2,
                     dateGiven: data.tdDose2,
                     administeredById: parseInt(data.administeredById, 10),
-                    remarks: '',
+                    remarks: data.tdDose2Remarks || '',
                 });
             }
             if (data.tdDose2Plus) {
@@ -249,7 +255,7 @@ export default function EditMother() {
                     doseNumber: 3,
                     dateGiven: data.tdDose2Plus,
                     administeredById: parseInt(data.administeredById, 10),
-                    remarks: '',
+                    remarks: data.tdDose2PlusRemarks || '',
                 });
             }
 
@@ -313,6 +319,9 @@ export default function EditMother() {
                 tdDose2: tdDose2Date,
                 tdDose2Plus: tdDose2PlusDate,
                 administeredById,
+                tdDose1Remarks: tdDose1?.remarks || '',
+                tdDose2Remarks: tdDose2?.remarks || '',
+                tdDose2PlusRemarks: tdDose2Plus?.remarks || '',
             });
         } catch (err) {
             console.error('Frontend error:', err.response?.data || err.message);
@@ -325,6 +334,20 @@ export default function EditMother() {
     const paginatedResults = Array.isArray(searchResults)
         ? searchResults.slice((currentPage - 1) * resultsPerPage, currentPage * resultsPerPage)
         : [];
+
+    const [tdDoseRemarksOpen, setTdDoseRemarksOpen] = useState({
+        1: false,
+        2: false,
+        3: false,
+    });
+    const [tdDoseIsServerDate, setTdDoseIsServerDate] = useState({
+        1: false,
+        2: false,
+        3: false,
+    });
+
+    const isDoseReadOnly = (doseNumber) =>
+        !isFullProfile && tdDoseIsServerDate[doseNumber];
 
     return (
         <div className="min-h-screen bg-base-200">
@@ -726,117 +749,222 @@ export default function EditMother() {
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {/* TD Dose 1 */}
-                                    <div className="form-control">
-                                        <label className="label" htmlFor="tdDose1">
-                                            <span className="label-text">{t('td_dose_1')}</span>
-                                        </label>
-                                        <div className="relative">
-                                            <Controller
-                                                name="tdDose1"
-                                                control={control}
-                                                render={({ field }) => (
-                                                    <NepaliDatePicker
-                                                        {...field}
-                                                        inputClassName="input input-bordered w-full pr-8"
-                                                        value={field.value || ''}
-                                                        onChange={
-                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 1)?.dateGiven
-                                                                ? undefined
-                                                                : field.onChange
-                                                        }
-                                                        className="w-full"
-                                                        style={{
-                                                            cursor:
-                                                                !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 1)?.dateGiven
-                                                                    ? 'not-allowed'
-                                                                    : 'pointer',
-                                                        }}
-                                                        readOnly={
-                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 1)?.dateGiven
-                                                        }
-                                                        disabled={
-                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 1)?.dateGiven
-                                                        }
-                                                        placeholder={t('date_placeholder')}
-                                                    />
+                                    <div className="p-4 border rounded-lg bg-base-100 border-base-300 border-l-4">
+                                        <div className="space-y-3">
+                                            <div>
+                                                <h4 className="font-medium text-base-content">
+                                                    {t('td_dose_1')}
+                                                </h4>
+                                            </div>
+                                            <div className="relative">
+                                                <Controller
+                                                    name="tdDose1"
+                                                    control={control}
+                                                    render={({ field }) =>
+                                                        (!isFullProfile && field.value) ? (
+                                                            <input
+                                                                type="text"
+                                                                className="input input-bordered input-sm w-full bg-base-200 cursor-not-allowed"
+                                                                value={field.value || ''}
+                                                                readOnly
+                                                            />
+                                                        ) : (
+                                                            <>
+                                                                <NepaliDatePicker
+                                                                    {...field}
+                                                                    inputClassName="input input-bordered input-sm w-full pr-8"
+                                                                    value={field.value || ''}
+                                                                    onChange={field.onChange}
+                                                                    className="w-full"
+                                                                    placeholder={t('date_placeholder')}
+                                                                />
+                                                                {field.value && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setValue('tdDose1', '')}
+                                                                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                                                                        title={t('clear_date')}
+                                                                    >
+                                                                        ✕
+                                                                    </button>
+                                                                )}
+                                                            </>
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="pt-2 border-t border-gray-200">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTdDoseRemarksOpen(prev => ({ ...prev, 1: !prev[1] }))}
+                                                    className="btn btn-sm w-full justify-between p-2 bg-base-200 hover:bg-base-300"
+                                                >
+                                                    <span className="flex items-center text-xs">
+                                                        <FaClipboardList className="w-3 h-3 mr-1" />
+                                                        {t('remarks')}
+                                                    </span>
+                                                    <span className={`text-xs transform transition-transform ${tdDoseRemarksOpen[1] ? 'rotate-180' : ''}`}>
+                                                        ▼
+                                                    </span>
+                                                </button>
+                                                {tdDoseRemarksOpen[1] && (
+                                                    <div className="mt-2">
+                                                        <textarea
+                                                            {...register('tdDose1Remarks')}
+                                                            className={`textarea textarea-bordered textarea-xs w-full ${(!isFullProfile && tdDoseIsServerDate[1]) ? 'bg-base-200 cursor-not-allowed' : ''}`}
+                                                            placeholder={t('remarks_placeholder')}
+                                                            rows={2}
+                                                            readOnly={!isFullProfile && tdDoseIsServerDate[1]}
+                                                        />
+                                                    </div>
                                                 )}
-                                            />
+                                            </div>
                                         </div>
                                     </div>
                                     {/* TD Dose 2 */}
-                                    <div className="form-control">
-                                        <label className="label" htmlFor="tdDose2">
-                                            <span className="label-text">{t('td_dose_2')}</span>
-                                        </label>
-                                        <div className="relative">
-                                            <Controller
-                                                name="tdDose2"
-                                                control={control}
-                                                render={({ field }) => (
-                                                    <NepaliDatePicker
-                                                        {...field}
-                                                        inputClassName="input input-bordered w-full pr-8"
-                                                        value={field.value || ''}
-                                                        onChange={
-                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 2)?.dateGiven
-                                                                ? undefined
-                                                                : field.onChange
-                                                        }
-                                                        className="w-full"
-                                                        style={{
-                                                            cursor:
-                                                                !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 2)?.dateGiven
-                                                                    ? 'not-allowed'
-                                                                    : 'pointer',
-                                                        }}
-                                                        readOnly={
-                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 2)?.dateGiven
-                                                        }
-                                                        disabled={
-                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 2)?.dateGiven
-                                                        }
-                                                        placeholder={t('date_placeholder')}
-                                                    />
+                                    <div className="p-4 border rounded-lg bg-base-100 border-base-300 border-l-4">
+                                        <div className="space-y-3">
+                                            <div>
+                                                <h4 className="font-medium text-base-content">
+                                                    {t('td_dose_2')}
+                                                </h4>
+                                            </div>
+                                            <div className="relative">
+                                                <Controller
+                                                    name="tdDose2"
+                                                    control={control}
+                                                    render={({ field }) =>
+                                                        (!isFullProfile && field.value) ? (
+                                                            <input
+                                                                type="text"
+                                                                className="input input-bordered input-sm w-full bg-base-200 cursor-not-allowed"
+                                                                value={field.value || ''}
+                                                                readOnly
+                                                            />
+                                                        ) : (
+                                                            <>
+                                                                <NepaliDatePicker
+                                                                    {...field}
+                                                                    inputClassName="input input-bordered input-sm w-full pr-8"
+                                                                    value={field.value || ''}
+                                                                    onChange={field.onChange}
+                                                                    className="w-full"
+                                                                    placeholder={t('date_placeholder')}
+                                                                />
+                                                                {field.value && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setValue('tdDose2', '')}
+                                                                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                                                                        title={t('clear_date')}
+                                                                    >
+                                                                        ✕
+                                                                    </button>
+                                                                )}
+                                                            </>
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="pt-2 border-t border-gray-200">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTdDoseRemarksOpen(prev => ({ ...prev, 2: !prev[2] }))}
+                                                    className="btn btn-sm w-full justify-between p-2 bg-base-200 hover:bg-base-300"
+                                                >
+                                                    <span className="flex items-center text-xs">
+                                                        <FaClipboardList className="w-3 h-3 mr-1" />
+                                                        {t('remarks')}
+                                                    </span>
+                                                    <span className={`text-xs transform transition-transform ${tdDoseRemarksOpen[2] ? 'rotate-180' : ''}`}>
+                                                        ▼
+                                                    </span>
+                                                </button>
+                                                {tdDoseRemarksOpen[2] && (
+                                                    <div className="mt-2">
+                                                        <textarea
+                                                            {...register('tdDose2Remarks')}
+                                                            className="textarea textarea-bordered textarea-xs w-full"
+                                                            placeholder={t('remarks_placeholder')}
+                                                            rows={2}
+                                                            readOnly={!isFullProfile && tdDoseIsServerDate[2]}
+                                                        />
+                                                    </div>
                                                 )}
-                                            />
+                                            </div>
                                         </div>
                                     </div>
                                     {/* TD Dose 2+ / Booster */}
-                                    <div className="form-control">
-                                        <label className="label" htmlFor="tdDose2Plus">
-                                            <span className="label-text">{t('td_dose_2_plus')}</span>
-                                        </label>
-                                        <div className="relative">
-                                            <Controller
-                                                name="tdDose2Plus"
-                                                control={control}
-                                                render={({ field }) => (
-                                                    <NepaliDatePicker
-                                                        {...field}
-                                                        inputClassName="input input-bordered w-full pr-8"
-                                                        value={field.value || ''}
-                                                        onChange={
-                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 3)?.dateGiven
-                                                                ? undefined
-                                                                : field.onChange
-                                                        }
-                                                        className="w-full"
-                                                        style={{
-                                                            cursor:
-                                                                !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 3)?.dateGiven
-                                                                    ? 'not-allowed'
-                                                                    : 'pointer',
-                                                        }}
-                                                        readOnly={
-                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 3)?.dateGiven
-                                                        }
-                                                        disabled={
-                                                            !isFullProfile && fetchedMother?.tdDoses?.find(d => d.doseNumber === 3)?.dateGiven
-                                                        }
-                                                        placeholder={t('date_placeholder')}
-                                                    />
+                                    <div className="p-4 border rounded-lg bg-base-100 border-base-300 border-l-4">
+                                        <div className="space-y-3">
+                                            <div>
+                                                <h4 className="font-medium text-base-content">
+                                                    {t('td_dose_2_plus')}
+                                                </h4>
+                                            </div>
+                                            <div className="relative">
+                                                <Controller
+                                                    name="tdDose2Plus"
+                                                    control={control}
+                                                    render={({ field }) =>
+                                                        (!isFullProfile && field.value) ? (
+                                                            <input
+                                                                type="text"
+                                                                className="input input-bordered input-sm w-full bg-base-200 cursor-not-allowed"
+                                                                value={field.value || ''}
+                                                                readOnly
+                                                            />
+                                                        ) : (
+                                                            <>
+                                                                <NepaliDatePicker
+                                                                    {...field}
+                                                                    inputClassName="input input-bordered input-sm w-full pr-8"
+                                                                    value={field.value || ''}
+                                                                    onChange={field.onChange}
+                                                                    className="w-full"
+                                                                    placeholder={t('date_placeholder')}
+                                                                />
+                                                                {field.value && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setValue('tdDose2Plus', '')}
+                                                                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                                                                        title={t('clear_date')}
+                                                                    >
+                                                                        ✕
+                                                                    </button>
+                                                                )}
+                                                            </>
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="pt-2 border-t border-gray-200">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTdDoseRemarksOpen(prev => ({ ...prev, 3: !prev[3] }))}
+                                                    className="btn btn-sm w-full justify-between p-2 bg-base-200 hover:bg-base-300"
+                                                >
+                                                    <span className="flex items-center text-xs">
+                                                        <FaClipboardList className="w-3 h-3 mr-1" />
+                                                        {t('remarks')}
+                                                    </span>
+                                                    <span className={`text-xs transform transition-transform ${tdDoseRemarksOpen[3] ? 'rotate-180' : ''}`}>
+                                                        ▼
+                                                    </span>
+                                                </button>
+                                                {tdDoseRemarksOpen[3] && (
+                                                    <div className="mt-2">
+                                                        <textarea
+                                                            {...register('tdDose2PlusRemarks')}
+                                                            className="textarea textarea-bordered textarea-xs w-full"
+                                                            placeholder={t('remarks_placeholder')}
+                                                            rows={2}
+                                                            readOnly={!isFullProfile && tdDoseIsServerDate[3]}
+                                                        />
+                                                    </div>
                                                 )}
-                                            />
+                                            </div>
                                         </div>
                                     </div>
                                     {/* Administered By */}
