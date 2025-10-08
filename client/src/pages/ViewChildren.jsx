@@ -1,3 +1,4 @@
+
 import { useMemo, useState, useEffect } from 'react';
 import axiosClient from '../api/axiosClient';
 import {
@@ -18,6 +19,8 @@ import {
   FaExclamationTriangle,
   FaTimesCircle,
   FaChartLine,
+  FaExpand,
+  FaCompress
 } from 'react-icons/fa';
 import {
   safeFormatDate,
@@ -45,11 +48,11 @@ export default function ViewChildren() {
   const [loadingVaccineTypes, setLoadingVaccineTypes] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [expandedSections, setExpandedSections] = useState({});
+  const [allExpanded, setAllExpanded] = useState(false);
 
   // Primary compact search functionality
   const [filters, setFilters] = useState({
     name: '',
-
     serviceRegistrationNumber: '',
     phoneNumber: '',
     createdByMe: false,
@@ -272,10 +275,21 @@ export default function ViewChildren() {
 
   // Toggle section expansion
   const toggleSection = (sectionKey) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [sectionKey]: !prev[sectionKey]
-    }));
+    setExpandedSections(prev => {
+      const next = { ...prev, [sectionKey]: !prev[sectionKey] };
+      return next;
+    });
+  };
+
+  const expandAll = (expand) => {
+    if (!selectedChild) return;
+    const template = createVaccinationTemplate(selectedChild);
+    const newState = {};
+    Object.keys(template).forEach(k => {
+      newState[`vaccine-${k}`] = expand;
+    });
+    setExpandedSections(newState);
+    setAllExpanded(expand);
   };
 
   // Organize vaccines by type
@@ -408,6 +422,10 @@ export default function ViewChildren() {
             }
           }
 
+          // createdOn/createdBy for dose (prefer actual vaccination metadata)
+          const createdOn = actualVaccination?.createdAt || dueVaccine?.createdAt || null;
+          const createdByName = actualVaccination?.createdBy?.name || dueVaccine?.createdBy?.name || null;
+
           return {
             doseNumber: scheduleDose.doseNumber,
             scheduleInfo: {
@@ -430,7 +448,8 @@ export default function ViewChildren() {
             dateGiven: actualVaccination?.dateGiven || null,
             dueDate: dueVaccine?.dueDate || null,
             administeredBy: actualVaccination?.administeredBy?.name || null,
-            createdBy: actualVaccination?.createdBy?.name || null,
+            createdBy: createdByName || null,
+            createdOn: createdOn || null,
             isCatchUp: dueVaccine?.isCatchUp || scheduleDose.isBooster || false,
             overdueDays: dueVaccine && new Date(dueVaccine.dueDate) < new Date()
               ? Math.floor((new Date() - new Date(dueVaccine.dueDate)) / (1000 * 60 * 60 * 24))
@@ -832,6 +851,58 @@ export default function ViewChildren() {
       navigate(`/profile/${userId}`);
     };
 
+    // Helper for status icon used in compact row
+    const getStatusIcon = (status) => {
+      switch (status) {
+        case "completed":
+          return <FaCheckCircle className="text-success" title="Given" />;
+        case "overdue":
+          return <FaExclamationTriangle className="text-error" title="Overdue" />;
+        case "missed":
+          return <FaTimesCircle className="text-error" title="Missed" />;
+        case "due":
+          return <FaClock className="text-warning" title="Due Soon" />;
+        default:
+          return <FaClock className="text-base-content/40" title="Pending" />;
+      }
+    };
+
+    // Helper to render full status badge inside expanded table
+    const renderStatusBadge = (dose) => {
+      switch (dose.status) {
+        case "completed":
+          return (
+            <span className="badge badge-success gap-1">
+              <FaCheckCircle /> Given
+            </span>
+          );
+        case "overdue":
+          return (
+            <span className="badge badge-error gap-1">
+              <FaExclamationTriangle /> Overdue
+            </span>
+          );
+        case "missed":
+          return (
+            <span className="badge badge-secondary gap-1">
+              <FaTimesCircle /> Missed
+            </span>
+          );
+        case "due":
+          return (
+            <span className="badge badge-warning gap-1">
+              <FaClock /> Due
+            </span>
+          );
+        default:
+          return (
+            <span className="badge badge-ghost gap-1">
+              <FaClock /> Pending
+            </span>
+          );
+      }
+    };
+
     return (
       <div className="min-h-screen bg-base-200">
         {/* Top Navigation */}
@@ -841,9 +912,14 @@ export default function ViewChildren() {
               <FaChevronLeft /> Back to List
             </button>
             <h1 className="text-xl font-semibold">Child Details</h1>
-            <button onClick={() => window.print()} className="btn btn-primary">
-              <FaPrint /> Print
-            </button>
+            <div className="flex items-center space-x-2">
+              <button onClick={() => expandAll(!allExpanded)} className="btn btn-sm btn-outline">
+                {allExpanded ? <><FaCompress className="mr-1" /> Collapse All</> : <><FaExpand className="mr-1" /> Expand All</>}
+              </button>
+              <button onClick={() => window.print()} className="btn btn-primary">
+                <FaPrint /> Print
+              </button>
+            </div>
           </div>
         </div>
 
@@ -911,6 +987,14 @@ export default function ViewChildren() {
                       </button>
                     </div>
                   </div>
+                  {child.remarks && (
+                    <div className="pt-2 border-t border-base-300">
+                      <label className="text-xs text-base-content/60">General Remarks</label>
+                      <div className="mt-1 p-3 bg-warning/10 border border-warning/20 rounded-lg text-sm">
+                        <p className="text-base-content">{child.remarks}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -987,217 +1071,217 @@ export default function ViewChildren() {
             {/* Vaccination Records */}
             <div className="xl:col-span-8">
               <div className="bg-base-100 rounded-lg shadow-sm border border-base-300">
-                <div className="bg-primary text-primary-content px-6 py-4 rounded-t-lg">
+                <div className="bg-primary text-primary-content px-6 py-4 rounded-t-lg print:hidden">
                   <h2 className="text-lg font-semibold flex items-center">
                     <FaSyringe className="mr-2" /> Vaccination Records
                   </h2>
                 </div>
 
                 <div className="p-6 space-y-6">
-                  {/* === Print Compact Header === */}
-                  <div className="print:block hidden text-xs mb-6">
-                    <table className="w-full border text-xs">
+                  {/* === OPTIMIZED Print Layout === */}
+                  <div className="hidden print:block">
+                    {/* Compact Header - 2 columns */}
+                    <div className="grid grid-cols-2 gap-2 mb-3 text-[10px] border-2 border-black p-2">
+                      <div>
+                        <p><strong>Child:</strong> {child.fullName} {child.lastName || ""}</p>
+                        <p><strong>Parent:</strong> {child.parentName}</p>
+                        <p><strong>Birth (BS):</strong> {safeAdToBs(child.birthDate)}</p>
+                      </div>
+                      <div>
+                        <p><strong>Age:</strong> {age.formatted} | <strong>Ward:</strong> {child.wardNumber}</p>
+                        <p><strong>Birth (AD):</strong> {safeFormatDate(child.birthDate)}</p>
+                        <p><strong>Weight:</strong> {child.weightRecords?.[0]?.weight ? `${child.weightRecords[0].weight} kg` : "-"}</p>
+                      </div>
+                    </div>
+
+                    {/* Single Unified Vaccination Table with Better Separation */}
+                    <table className="w-full border-collapse text-[9px] mb-2">
+                      <thead>
+                        <tr className="bg-gray-200 border-2 border-black">
+                          <th className="border border-black px-1 py-0.5">Vaccine</th>
+                          <th className="border border-black px-1 py-0.5">D#</th>
+                          <th className="border border-black px-1 py-0.5">Typ</th>
+                          <th className="border border-black px-1 py-0.5">Stat</th>
+                          <th className="border border-black px-1 py-0.5">Date (BS)</th>
+                          <th className="border border-black px-1 py-0.5">Date (AD)</th>
+                          <th className="border border-black px-1 py-0.5">Given By</th>
+                          <th className="border border-black px-1 py-0.5">Remarks</th>
+                        </tr>
+                      </thead>
                       <tbody>
-                        <tr>
-                          <td className="border px-2 py-1 font-semibold">Child</td>
-                          <td className="border px-2 py-1">{child.fullName} {child.lastName || ""}</td>
-                          <td className="border px-2 py-1 font-semibold">Age</td>
-                          <td className="border px-2 py-1">{age.formatted}</td>
-                        </tr>
-                        <tr>
-                          <td className="border px-2 py-1 font-semibold">Parent</td>
-                          <td className="border px-2 py-1">{child.parentName}</td>
-                          <td className="border px-2 py-1 font-semibold">Ward</td>
-                          <td className="border px-2 py-1">{child.wardNumber}</td>
-                        </tr>
-                        <tr>
-                          <td className="border px-2 py-1 font-semibold">Birth</td>
-                          <td className="border px-2 py-1">
-                            BS: {safeAdToBs(child.birthDate)} | AD: {safeFormatDate(child.birthDate)}
-                          </td>
-                          <td className="border px-2 py-1 font-semibold">Weight</td>
-                          <td className="border px-2 py-1">
-                            {child.weightRecords?.[0]?.weight
-                              ? `${child.weightRecords[0].weight} kg`
-                              : "-"}
-                          </td>
-                        </tr>
+                        {Object.entries(vaccinationTemplate).map(([vType, vData], typeIndex) =>
+                          vData.doses.map((dose, idx) => {
+                            const isGiven = !!dose.actualVaccination;
+                            let statusText = "Pend";
+                            if (isGiven) statusText = "✓";
+                            else if (dose.status === "missed") statusText = "Miss";
+                            else if (dose.status === "overdue") statusText = `OD${dose.overdueDays ? `(${dose.overdueDays}d)` : ''}`;
+                            else if (dose.status === "due") statusText = `Due${dose.daysUntilDue ? `(${dose.daysUntilDue}d)` : ''}`;
+
+                            return (
+                              <tr
+                                key={`${vType}-${dose.doseNumber}`}
+                                className={`border border-black ${idx === 0 && typeIndex > 0 ? 'border-t-2' : ''}`}
+                              >
+                                {idx === 0 && (
+                                  <td
+                                    rowSpan={vData.doses.length}
+                                    className="border-r-2 border-black px-1 py-1 font-bold align-top bg-gray-100 text-[10px]"
+                                  >
+                                    {vType}
+                                  </td>
+                                )}
+                                <td className="border border-black px-1 py-0.5 text-center">{dose.doseNumber}</td>
+                                <td className="border border-black px-1 py-0.5 text-center">{dose.scheduleInfo.isPrimary ? "P" : "C"}</td>
+                                <td className="border border-black px-1 py-0.5 text-center font-semibold">{statusText}</td>
+                                <td className="border border-black px-1 py-0.5">
+                                  {isGiven ? safeAdToBs(dose.dateGiven) : dose.dueDate ? safeAdToBs(dose.dueDate) : "-"}
+                                </td>
+                                <td className="border border-black px-1 py-0.5">
+                                  {isGiven ? safeFormatDate(dose.dateGiven) : dose.dueDate ? safeFormatDate(dose.dueDate) : "-"}
+                                </td>
+                                <td className="border border-black px-1 py-0.5">{dose.actualVaccination?.administeredBy?.name || "-"}</td>
+                                <td className="border border-black px-1 py-0.5 text-[8px]">
+                                  {dose.actualVaccination?.remarks || dose.dueVaccine?.notes || "-"}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
                       </tbody>
                     </table>
-                  </div>
 
-                  {/* === Print Vaccination Tables === */}
-                  <div className="hidden print:block space-y-6 text-sm">
-                    {Object.entries(vaccinationTemplate).map(([vType, vData]) => (
-                      <div key={vType} className="break-inside-avoid">
-                        <h3 className="font-semibold text-lg mb-2 border-b pb-1">{vType}</h3>
-                        <table className="w-full border text-xs">
-                          <thead className="bg-base-200">
-                            <tr>
-                              <th className="border px-2 py-1">Dose</th>
-                              <th className="border px-2 py-1">Type</th>
-                              <th className="border px-2 py-1">Status</th>
-                              <th className="border px-2 py-1">Date (BS)</th>
-                              <th className="border px-2 py-1">Date (AD)</th>
-                              <th className="border px-2 py-1">Given By</th>
-                              <th className="border px-2 py-1">Remarks</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {vData.doses.map((dose) => {
-                              const isGiven = !!dose.actualVaccination;
-                              let statusDisplay;
-                              if (isGiven) {
-                                statusDisplay = <><FaCheckCircle className="text-success inline" /> Given</>;
-                              } else if (dose.status === "missed") {
-                                statusDisplay = <><FaExclamationTriangle className="text-error inline" /> Missed {dose.overdueDays && `(by ${dose.overdueDays} days)`}</>;
-                              } else if (dose.status === "overdue") {
-                                statusDisplay = <><FaExclamationTriangle className="text-error inline" /> Overdue {dose.overdueDays && `(${dose.overdueDays} days)`}</>;
-                              } else if (dose.status === "due") {
-                                statusDisplay = <><FaClock className="text-warning inline" /> Due {dose.daysUntilDue && `(in ${dose.daysUntilDue} days)`}</>;
-                              } else {
-                                statusDisplay = "Pending";
-                              }
+                    {/* Legend */}
+                    <div className="text-[8px] mb-2 flex gap-3 border-t border-black pt-1">
+                      <span><strong>D#:</strong> Dose Number</span>
+                      <span><strong>Typ:</strong> P=Primary, C=Catchup</span>
+                      <span><strong>Stat:</strong> ✓=Given, OD=Overdue, Miss=Missed, Pend=Pending</span>
+                    </div>
 
-                              return (
-                                <tr key={`${vType}-${dose.doseNumber}`}>
-                                  <td className="border px-2 py-1">Dose {dose.doseNumber}</td>
-                                  <td className="border px-2 py-1">{dose.scheduleInfo.isPrimary ? "Primary" : "Catchup"}</td>
-                                  <td className="border px-2 py-1">{statusDisplay}</td>
-                                  <td className="border px-2 py-1">{isGiven ? safeAdToBs(dose.dateGiven) : dose.dueDate ? safeAdToBs(dose.dueDate) : "-"}</td>
-                                  <td className="border px-2 py-1">{isGiven ? safeFormatDate(dose.dateGiven) : dose.dueDate ? safeFormatDate(dose.dueDate) : "-"}</td>
-                                  <td className="border px-2 py-1">{dose.actualVaccination?.administeredBy?.name || "-"}</td>
-                                  <td className="border px-2 py-1">{dose.actualVaccination?.notes || dose.dueVaccine?.notes || "-"}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                    {/* General Remarks */}
+                    {child.remarks && (
+                      <div className="border-t-2 border-black pt-1 mt-2">
+                        <p className="text-[9px]"><strong>General Remarks:</strong> {child.remarks}</p>
                       </div>
-                    ))}
+                    )}
                   </div>
 
-                  {/* === Onscreen Vaccination === */}
-                  <div className="print:hidden space-y-8">
+                  {/* === NEW ONSCREEN VACCINATION DISPLAY (compact + single-toggle, with CreatedOn/By in rows) === */}
+                  <div className="print:hidden space-y-4">
                     {Object.entries(vaccinationTemplate).map(([vType, vData]) => {
-                      const primaryDoses = vData.doses.filter((d) => d.scheduleInfo.isPrimary);
-                      const catchupDoses = vData.doses.filter((d) => d.scheduleInfo.isBooster || d.isCatchUp);
-                      const primaryCompleted = primaryDoses.filter((d) => d.status === "completed").length;
-                      const catchupCompleted = catchupDoses.filter((d) => d.status === "completed").length;
+                      const totalDoses = vData.doses.length;
+                      const primaryTotal = vData.doses.filter(d => d.scheduleInfo.isPrimary).length;
+                      const primaryCompleted = vData.doses.filter(d => d.scheduleInfo.isPrimary && d.status === 'completed').length;
+                      const boosterTotal = vData.doses.filter(d => d.scheduleInfo.isBooster || d.isCatchUp).length;
+                      const boosterCompleted = vData.doses.filter(d => (d.scheduleInfo.isBooster || d.isCatchUp) && d.status === 'completed').length;
+                      const completedCount = vData.doses.filter(d => d.status === 'completed').length;
+                      const sectionKey = `vaccine-${vType}`;
 
                       return (
-                        <div key={vType} className="rounded-xl border shadow-md overflow-hidden">
-                          <div className="px-4 py-3 flex items-center justify-between bg-primary/10 border-l-4 border-primary">
-                            <h4 className="font-semibold text-lg text-primary">{vType}</h4>
-                            <div className="text-xs flex space-x-2">
-                              <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
-                                Primary: {primaryCompleted}/{primaryDoses.length}
-                              </span>
-                              <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 font-medium">
-                                Catchup: {catchupCompleted}/{catchupDoses.length}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="p-4 space-y-4">
-                            {vData.doses.map((dose) => {
-                              const key = `${vType}-${dose.doseNumber}`;
-                              const isGiven = !!dose.actualVaccination;
-                              let icon = <FaClock className="text-warning" />;
-                              if (isGiven) icon = <FaCheckCircle className="text-success" />;
-                              else if (dose.status === "overdue" || dose.status === "missed") icon = <FaExclamationTriangle className="text-error" />;
-
-                              return (
-                                <div key={key} className="bg-base-100 border rounded-lg p-4 hover:shadow-sm transition">
-                                  <div className="flex justify-between items-center">
-                                    <div className="flex items-center space-x-3">
-                                      {icon}
-                                      <div>
-                                        <div className="font-medium">
-                                          Dose {dose.doseNumber} ({dose.scheduleInfo.isPrimary ? "Primary" : "Catchup"})
-                                        </div>
-                                        <div className="text-sm text-base-content/70">
-                                          {isGiven
-                                            ? `Given: ${safeFormatDate(dose.dateGiven)}`
-                                            : dose.dueDate
-                                              ? `Due: ${safeFormatDate(dose.dueDate)}`
-                                              : "Pending"}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <button
-                                      className="btn btn-outline btn-xs"
-                                      onClick={() => toggleDose(vType, dose.doseNumber)}
-                                    >
-                                      {expandedDoses[key] ? "Hide" : "Details"}
-                                    </button>
-                                  </div>
-
-                                  {expandedDoses[key] && (
-                                    <div className="mt-3 text-sm grid grid-cols-1 md:grid-cols-2 gap-4 bg-base-200/40 p-3 rounded-lg">
-                                      {isGiven ? (
-                                        <>
-                                          <div>
-                                            <p><strong>BS:</strong> {safeAdToBs(dose.dateGiven)}</p>
-                                            <p><strong>AD:</strong> {safeFormatDate(dose.dateGiven)}</p>
-                                            <p><strong>Given By:</strong>{" "}
-                                              {dose.actualVaccination?.administeredBy?.id ? (
-                                                <button
-                                                  onClick={() => goToProfile(dose.actualVaccination.administeredBy.id)}
-                                                  className="text-primary hover:underline"
-                                                >
-                                                  {dose.actualVaccination.administeredBy.name}
-                                                </button>
-                                              ) : "-"}
-                                            </p>
-                                            <p><strong>Created By:</strong>{" "}
-                                              {dose.actualVaccination?.createdBy?.id ? (
-                                                <button
-                                                  onClick={() => goToProfile(dose.actualVaccination.createdBy.id)}
-                                                  className="text-primary hover:underline"
-                                                >
-                                                  {dose.actualVaccination.createdBy.name}
-                                                </button>
-                                              ) : "-"}
-                                            </p>
-                                          </div>
-                                          <div>
-                                            <p><strong>Recorded:</strong>{" "}
-                                              {dose.actualVaccination?.createdAt ? safeFormatDate(dose.actualVaccination.createdAt) : "-"}
-                                            </p>
-                                            {dose.actualVaccination?.notes && (
-                                              <p><strong>Remarks:</strong> {dose.actualVaccination.notes}</p>
-                                            )}
-                                          </div>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <div>
-                                            <p><strong>Due BS:</strong> {dose.dueDate ? safeAdToBs(dose.dueDate) : "-"}</p>
-                                            <p><strong>Due AD:</strong> {dose.dueDate ? safeFormatDate(dose.dueDate) : "-"}</p>
-                                            {dose.overdueDays !== null && (
-                                              <p className="text-error"><strong>Overdue by:</strong> {dose.overdueDays} days</p>
-                                            )}
-                                            {dose.daysUntilDue !== null && (
-                                              <p className="text-warning"><strong>Due in:</strong> {dose.daysUntilDue} days</p>
-                                            )}
-                                            <p><strong>Status:</strong> {dose.status}</p>
-                                          </div>
-                                          {dose.dueVaccine?.notes && (
-                                            <div><strong>Remarks:</strong> {dose.dueVaccine.notes}</div>
-                                          )}
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
+                        <div key={vType} className="border border-base-300 rounded-lg overflow-hidden shadow-sm bg-base-100">
+                          {/* Summary Row */}
+                          <button
+                            onClick={() => toggleSection(sectionKey)}
+                            className="w-full flex items-center justify-between px-4 py-3 hover:bg-base-200 transition-colors"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div>
+                                <h4 className="font-semibold text-base-content">{vType}</h4>
+                                <div className="text-xs text-base-content/60 mt-1">
+                                  <span className="mr-2">{primaryCompleted}/{primaryTotal} Primary</span>
+                                  <span className="mr-2">{boosterCompleted}/{boosterTotal} Booster</span>
+                                  <span className="text-[12px] text-base-content/50">• {completedCount}/{totalDoses} total</span>
                                 </div>
-                              );
-                            })}
-                          </div>
+                              </div>
+
+                              {/* Inline dose icons */}
+                              <div className="flex items-center space-x-2 ml-4">
+                                {vData.doses.map(d => (
+                                  <div key={d.doseNumber} className="flex items-center justify-center">
+                                    <span className="text-lg" title={`Dose ${d.doseNumber}`}>
+                                      {getStatusIcon(d.status)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-3">
+                              <span className="text-sm text-base-content/60">{completedCount}/{totalDoses}</span>
+                              <span className={`transform transition-transform duration-200 ${expandedSections[sectionKey] ? 'rotate-90' : ''}`}>▶</span>
+                            </div>
+                          </button>
+
+                          {/* Expanded details (single level) */}
+                          {expandedSections[sectionKey] && (
+                            <div className="p-4 overflow-x-auto">
+                              <table className="table table-zebra w-full text-sm">
+                                <thead>
+                                  <tr className="bg-base-200 text-base-content/70 text-xs">
+                                    <th className="px-2 py-2 text-left">Dose</th>
+                                    <th className="px-2 py-2 text-left">Type</th>
+                                    <th className="px-2 py-2 text-left">Status</th>
+                                    <th className="px-2 py-2 text-left">Date (AD)</th>
+                                    <th className="px-2 py-2 text-left">Date (BS)</th>
+                                    <th className="px-2 py-2 text-left">Given By</th>
+                                    <th className="px-2 py-2 text-left">Created By</th>
+                                    <th className="px-2 py-2 text-left">Created On</th>
+                                    <th className="px-2 py-2 text-left">Remarks</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {vData.doses.map((dose) => {
+                                    const isGiven = !!dose.actualVaccination;
+                                    return (
+                                      <tr key={`${vType}-${dose.doseNumber}`}>
+                                        <td className="px-2 py-2 font-semibold">
+                                          #{dose.doseNumber}
+                                        </td>
+                                        <td className="px-2 py-2">
+                                          <span className={`badge badge-xs ${dose.scheduleInfo.isPrimary ? 'badge-primary' : 'badge-info'}`}>
+                                            {dose.scheduleInfo.isPrimary ? 'Primary' : (dose.scheduleInfo.isBooster ? 'Booster' : (dose.isCatchUp ? 'Catchup' : 'Other'))}
+                                          </span>
+                                        </td>
+                                        <td className="px-2 py-2">{renderStatusBadge(dose)}</td>
+                                        <td className="px-2 py-2">
+                                          {isGiven ? safeFormatDate(dose.dateGiven) : dose.dueDate ? safeFormatDate(dose.dueDate) : "-"}
+                                        </td>
+                                        <td className="px-2 py-2">
+                                          {isGiven ? safeAdToBs(dose.dateGiven) : dose.dueDate ? safeAdToBs(dose.dueDate) : "-"}
+                                        </td>
+                                        <td className="px-2 py-2">
+                                          {isGiven && dose.actualVaccination?.administeredBy ? (
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); navigate(`/profile/${dose.actualVaccination.administeredBy.id}`); }}
+                                              className="text-primary hover:underline"
+                                            >
+                                              {dose.actualVaccination.administeredBy.name}
+                                            </button>
+                                          ) : '-'}
+                                        </td>
+                                        <td className="px-2 py-2">
+                                          {dose.createdBy ? (
+                                            <>{dose.createdBy}</>
+                                          ) : '-'}
+                                        </td>
+                                        <td className="px-2 py-2">
+                                          {dose.createdOn ? safeFormatDate(dose.createdOn) : '-'}
+                                        </td>
+                                        <td className="px-2 py-2 text-xs max-w-[180px] truncate">
+                                          {dose.actualVaccination?.remarks || dose.dueVaccine?.notes || '-'}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
+
                 </div>
               </div>
             </div>
@@ -1206,9 +1290,6 @@ export default function ViewChildren() {
       </div>
     );
   };
-
-
-
 
   // Main view
   return (
@@ -1310,8 +1391,6 @@ export default function ViewChildren() {
                   </select>
                 </div>
               </div>
-
-
 
               {hasActiveFilters && (
                 <div className="flex justify-between items-center mt-4 pt-4 border-t border-base-300">

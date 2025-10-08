@@ -178,6 +178,7 @@ export default function EditMother() {
                         limit: resultsPerPage,
                     },
                 });
+                console.log('resposne search', res)
                 setSearchResults(Array.isArray(res.data.mothers) ? res.data.mothers : []);
             } catch (err) {
                 console.error('Search failed:', err);
@@ -203,12 +204,7 @@ export default function EditMother() {
     ];
 
     // --- Cross-ward protection logic ---
-    console.log('fetchedMother ward ', fetchedMother);
-    console.log('fetchedMother ward ', fetchedMother?.wardNumber);
-    console.log('user', user)
-    console.log('user ward', user?.wardId);
     const isFullProfile = fetchedMother && user && fetchedMother.wardNumber === user.wardId;
-    console.log('isFullProfile', isFullProfile);
 
     // Only allow saving if:
     // - Editable (isFullProfile), OR
