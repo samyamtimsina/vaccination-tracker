@@ -8,7 +8,8 @@ const PARTIAL_UPDATE_FIELDS = [
     'vaccinations',
     'weightRecords',
     'administeredById', // Add this
-    'remarks' // Add this
+    'remarks', // Add this
+    'removedVaccinations'
     // You can add more fields here if needed.
 ];
 
@@ -101,9 +102,7 @@ export const filterChildData = (user, child) => {
     console.log('=== DATA FILTERING DEBUG ===');
     const { role, wardId } = user;
     const childWardId = child.wardNumber;
-    console.log('User role:', role);
-    console.log('User wardId:', wardId);
-    console.log('Child wardId:', childWardId);
+
 
     // SUPER_ADMIN gets full access
     if (role === 'SUPER_ADMIN') return child;

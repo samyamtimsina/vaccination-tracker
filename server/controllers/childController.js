@@ -698,20 +698,51 @@ export const updateChild = async (req, res) => {
 
     await prisma.$transaction(async (tx) => {
       // --- Update demographic data ---
+      // In the updateChild function, modify the demographic data update section:
+
+      // --- Update demographic data ---
       const isSameWard = existingChild.wardNumber === currentUser.wardId;
-      if (isSameWard || currentUser.role === 'SUPER_ADMIN', 'WARD_OFFICER') {
-        const updateData = {
-          fullName: `${firstName || ''} ${lastName || ''}`.trim(),
-          ...(demographicData.birthDate ? { birthDate: parseBsDateString(demographicData.birthDate) } : {}),
-          ...(demographicData.phoneNumber ? { phoneNumber: demographicData.phoneNumber } : {}),
-          ...(demographicData.gender ? { gender: demographicData.gender } : {}),
-          ...(demographicData.wardNumber ? { wardNumber: demographicData.wardNumber } : {}),
-          ...(demographicData.casteCode ? { casteCode: demographicData.casteCode } : {}),
-          ...(demographicData.parentName ? { parentName: demographicData.parentName } : {}),
-          ...(demographicData.tole ? { tole: demographicData.tole } : {}),
-          ...(typeof demographicData.isFromOtherMunicipality === 'boolean' ? { isFromOtherMunicipality: demographicData.isFromOtherMunicipality } : {}),
-        };
-        await tx.child.update({ where: { sewaDartaNumber }, data: updateData });
+      if (isSameWard || currentUser.role === 'SUPER_ADMIN') {
+        const updateData = {};
+
+        // Only build updateData with fields that are actually provided
+        if (firstName !== undefined || lastName !== undefined) {
+          updateData.fullName = `${firstName || ''} ${lastName || ''}`.trim();
+        }
+
+        // Only include fields that are explicitly provided in the request
+        if (demographicData.birthDate !== undefined) {
+          updateData.birthDate = parseBsDateString(demographicData.birthDate);
+        }
+        if (demographicData.phoneNumber !== undefined) {
+          updateData.phoneNumber = demographicData.phoneNumber;
+        }
+        if (demographicData.gender !== undefined) {
+          updateData.gender = demographicData.gender;
+        }
+        if (demographicData.wardNumber !== undefined) {
+          updateData.wardNumber = demographicData.wardNumber;
+        }
+        if (demographicData.casteCode !== undefined) {
+          updateData.casteCode = demographicData.casteCode;
+        }
+        if (demographicData.parentName !== undefined) {
+          updateData.parentName = demographicData.parentName;
+        }
+        if (demographicData.tole !== undefined) {
+          updateData.tole = demographicData.tole;
+        }
+        if (demographicData.isFromOtherMunicipality !== undefined) {
+          updateData.isFromOtherMunicipality = demographicData.isFromOtherMunicipality;
+        }
+        if (demographicData.remarks !== undefined) {
+          updateData.remarks = demographicData.remarks;
+        }
+
+        // Only perform update if there are actual fields to update
+        if (Object.keys(updateData).length > 0) {
+          await tx.child.update({ where: { sewaDartaNumber }, data: updateData });
+        }
       }
 
       // --- Vaccinations ---
