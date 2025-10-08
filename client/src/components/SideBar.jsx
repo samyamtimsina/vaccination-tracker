@@ -50,6 +50,13 @@ const menuItems = [
     icon: <FaFemale />,
     type: 'link',
   },
+  // ✅ New edit-mother link
+  {
+    to: '/edit-mother',
+    label: 'menu.edit_mother.label',
+    icon: <FaEdit />,
+    type: 'link',
+  },
   {
     to: '/search-records',
     label: 'menu.search_records.label',
@@ -96,7 +103,6 @@ export default function SidebarNav() {
     );
   };
 
-  // Mobile menu toggle (consistent button style)
   const MobileMenuToggle = () => (
     <button
       onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -121,7 +127,6 @@ export default function SidebarNav() {
         style={{ width: SNAP_POINTS.EXPANDED }}
       >
         <div className="flex flex-col h-full">
-          {/* Header with toggle button */}
           <div className="flex items-center justify-between p-4 border-b border-base-300">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-content">
@@ -137,7 +142,6 @@ export default function SidebarNav() {
             </button>
           </div>
 
-          {/* Nav items */}
           <nav className="flex-1 p-4 space-y-1">
             {menuItems.map(({ to, label, icon, type }) => {
               const isActive = location.pathname === to;
@@ -181,7 +185,6 @@ export default function SidebarNav() {
       className="hidden md:flex flex-col bg-base-100 border-r border-base-300 transition-all duration-300 ease-in-out"
       style={{ width: `${sidebarWidth}px` }}
     >
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-base-300">
         {showText && (
           <div className="flex items-center gap-3">
@@ -199,7 +202,6 @@ export default function SidebarNav() {
         </button>
       </div>
 
-      {/* Menu */}
       <nav className="flex-1 p-2 space-y-1">
         {menuItems.map(({ to, label, icon, type }) => {
           const isActive = location.pathname === to;
