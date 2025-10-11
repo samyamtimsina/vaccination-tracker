@@ -444,7 +444,7 @@ export const getChild = async (req, res) => {
             dateGiven: true,
             doseNumber: true,
             remarks: true,
-            isExternallyAdministered: true, // 👈 add
+            isExternallyAdministered: true,
             externalAdministeredBy: true,
           },
         },
