@@ -11,35 +11,19 @@ import {
 async function prepareVaccinationCreateData(vaccines, user, administeredByUserId) {
   if (!vaccines) return [];
 
-  // 1. Get latest vaccine schedule version
-  //    Include the vaccineType relation to access the name and id
   const scheduleVersion = await prisma.vaccineScheduleVersion.findFirst({
     orderBy: { id: 'desc' },
-    include: {
-      doses: {
-        include: {
-          vaccineType: true // Include the related VaccineType model
-        }
-      }
-    },
+    include: { doses: { include: { vaccineType: true } } },
   });
-  if (!scheduleVersion) throw new Error('No vaccine schedule found in the database');
+  if (!scheduleVersion) throw new Error('No vaccine schedule found');
 
-  // 2. Fetch all vaccine types to create a name-to-ID map
   const vaccineTypes = await prisma.vaccineType.findMany();
-  const vaccineNameToIdMap = new Map(vaccineTypes.map(vt => [vt.name, vt.id]));
+  const nameToId = new Map(vaccineTypes.map(vt => [vt.name, vt.id]));
 
   return Object.entries(vaccines).flatMap(([vaccineName, doses]) => {
-    // 3. Find the ID for the current vaccine name
-    const vaccineTypeId = vaccineNameToIdMap.get(vaccineName);
+    const vaccineTypeId = nameToId.get(vaccineName);
+    if (!vaccineTypeId) return [];
 
-    // If the vaccine name from the payload doesn't exist in the database, skip it
-    if (!vaccineTypeId) {
-      console.warn(`Vaccine type '${vaccineName}' not found in database. Skipping.`);
-      return [];
-    }
-
-    // 4. Get valid doses from schedule using the vaccineTypeId
     const validDoseNumbers = scheduleVersion.doses
       .filter(d => d.vaccineTypeId === vaccineTypeId)
       .map(d => d.doseNumber);
@@ -48,23 +32,25 @@ async function prepareVaccinationCreateData(vaccines, user, administeredByUserId
       .map((doseObj) => {
         if (!doseObj?.date) return null;
         if (!['current', 'booster'].includes(doseObj.type)) return null;
-
-        const doseNumber = doseObj.doseNumber;
-        if (!validDoseNumbers.includes(doseNumber)) return null; // Reject invalid doseNumber
+        if (!validDoseNumbers.includes(doseObj.doseNumber)) return null;
 
         const dateGiven = parseBsDateString(doseObj.date);
         if (!dateGiven) return null;
 
-        // 5. Create the data object with the correct vaccineTypeId
+        const isExternal = !!doseObj.isExternallyAdministered;
+        const externalBy = doseObj.externalAdministeredBy?.trim() || null;
+
         return {
-          vaccineTypeId: vaccineTypeId, // <-- Use the correct ID here
-          doseNumber,
+          vaccineTypeId,
+          doseNumber: doseObj.doseNumber,
           dateGiven,
           isComplete: true,
           remarks: doseObj.remarks || null,
           type: doseObj.type,
           createdById: user.id,
-          administeredById: administeredByUserId,
+          administeredById: isExternal ? null : administeredByUserId,
+          isExternallyAdministered: isExternal,
+          externalAdministeredBy: externalBy,
         };
       })
       .filter(Boolean);
@@ -72,7 +58,7 @@ async function prepareVaccinationCreateData(vaccines, user, administeredByUserId
 }
 
 
-// --- Calculate ChildDueVaccine entries based on schedule + catch-up rules
+
 // --- Calculate ChildDueVaccine entries based on schedule + catch-up rules
 export async function prepareChildDueVaccines(birthDateBs, scheduleVersionId = null) {
   const birthDate = parseBsDateString(birthDateBs);
@@ -142,12 +128,16 @@ export const createChild = async (req, res) => {
         validatedData.administeredById
       );
 
+
       if (vaccinationCreateData.length) {
-        const vaccinationsWithChildId = vaccinationCreateData.map((v) => ({
+        const vaccinationsWithChildId = vaccinationCreateData.map(v => ({
           ...v,
           citizenId: child.id,
           wardOfVaccination: req.user.wardId,
+          isExternallyAdministered: v.isExternallyAdministered || false,
+          externalAdministeredBy: v.externalAdministeredBy || null,
         }));
+
         await tx.vaccinationRecord.createMany({ data: vaccinationsWithChildId });
       }
 
@@ -454,6 +444,8 @@ export const getChild = async (req, res) => {
             dateGiven: true,
             doseNumber: true,
             remarks: true,
+            isExternallyAdministered: true, // 👈 add
+            externalAdministeredBy: true,
           },
         },
         dueVaccines: {
@@ -652,17 +644,15 @@ async function prepareVaccinationUpdateData(childId, vaccinations, administeredB
   const scheduleVersion = await getLatestSchedule();
 
   return vaccinations
-    .filter((v) => v.vaccineTypeId && v.doseNumber && v.dateGiven) // Ensure required fields exist
-    .map((v) => {
-      // Find the scheduled dose in the vaccine schedule
+    .filter(v => v.vaccineTypeId && v.doseNumber && v.dateGiven)
+    .map(v => {
       const scheduledDose = scheduleVersion.doses.find(
-        (d) => d.vaccineTypeId === v.vaccineTypeId && d.doseNumber === v.doseNumber
+        d => d.vaccineTypeId === v.vaccineTypeId && d.doseNumber === v.doseNumber
       );
+      if (!scheduledDose) return null;
 
-      if (!scheduledDose) {
-        console.warn(`Invalid dose: vaccineTypeId=${v.vaccineTypeId}, doseNumber=${v.doseNumber}`);
-        return null; // Skip invalid doses
-      }
+      const isExternal = !!v.isExternallyAdministered;
+      const externalBy = v.externalAdministeredBy?.trim() || null;
 
       return {
         vaccineTypeId: v.vaccineTypeId,
@@ -670,12 +660,16 @@ async function prepareVaccinationUpdateData(childId, vaccinations, administeredB
         dateGiven: parseBsDateString(v.dateGiven),
         remarks: v.remarks || null,
         citizenId: childId,
-        administeredById,
-        createdById: v.id ? undefined : administeredById, // Use administeredById for new records
+        administeredById: isExternal ? null : administeredById,
+        createdById: v.id ? undefined : administeredById,
+        isExternallyAdministered: isExternal,
+        externalAdministeredBy: externalBy,
+        isComplete: true,
       };
     })
-    .filter(Boolean); // Remove null entries
+    .filter(Boolean);
 }
+
 
 // --- Controller ---
 export const updateChild = async (req, res) => {
@@ -754,7 +748,16 @@ export const updateChild = async (req, res) => {
         );
 
         if (existingVaccine) {
-          await tx.vaccinationRecord.update({ where: { id: existingVaccine.id }, data: { ...v, isComplete: true } });
+          await tx.vaccinationRecord.update({
+            where: { id: existingVaccine.id },
+            data: {
+              ...v,
+              isComplete: true,
+              isExternallyAdministered: v.isExternallyAdministered || false,
+              externalAdministeredBy: v.externalAdministeredBy || null,
+            },
+          });
+
         } else if (v.dateGiven) {
           await tx.vaccinationRecord.create({
             data: {

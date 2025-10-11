@@ -390,6 +390,35 @@ const VaccineCard = ({
               </div>
             )}
           />
+          {/* External Administered Toggle */}
+          <div className="mt-3 flex flex-col gap-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                {...register(
+                  `vaccines.${vaccineName}.${displayStatus.doseIndex}.isExternallyAdministered`
+                )}
+                className="checkbox checkbox-sm checkbox-primary"
+              />
+              <span className="text-sm text-base-content/80">Externally administered (outside this ward)</span>
+            </label>
+
+            {/* Text input only when checked */}
+            {useWatch({
+              control,
+              name: `vaccines.${vaccineName}.${displayStatus.doseIndex}.isExternallyAdministered`,
+            }) && (
+                <input
+                  type="text"
+                  {...register(
+                    `vaccines.${vaccineName}.${displayStatus.doseIndex}.externalAdministeredBy`
+                  )}
+                  placeholder="Enter hospital, center, or person name"
+                  className="input input-bordered input-sm w-full"
+                />
+              )}
+          </div>
+
 
           {/* Remarks Section */}
           {dose.status !== "NOT_YET_ELIGIBLE" && (
@@ -752,6 +781,15 @@ export default function EditChild() {
                 `vaccines.${vaccineName}.${doseIndex}.isServerDate`,
                 true
               );
+              setValue(
+                `vaccines.${vaccineName}.${doseIndex}.isExternallyAdministered`,
+                vac.isExternallyAdministered || false
+              );
+              setValue(
+                `vaccines.${vaccineName}.${doseIndex}.externalAdministeredBy`,
+                vac.externalAdministeredBy || ''
+              );
+
             }
 
           }
@@ -827,21 +865,26 @@ export default function EditChild() {
             .map((dose, index) => {
               const scheduleDose = vaccineSchedule.doses[vaccineName][index];
               const vaccineTypeId = vaccineTypeIdToName[vaccineName];
-
               if (!vaccineTypeId) {
                 console.error(`Vaccine type ID not found for ${vaccineName}`);
                 return null;
               }
 
+              const isExternal = !!dose.isExternallyAdministered;
+              const externalBy = dose.externalAdministeredBy?.trim() || null;
+
               return {
-                vaccineTypeId: vaccineTypeId,
+                vaccineTypeId,
                 doseNumber: scheduleDose.doseNumber,
                 dateGiven: dose.date,
                 remarks: dose.remarks || null,
-                type: scheduleDose.isBooster ? 'booster' : 'current'
+                type: scheduleDose.isBooster ? 'booster' : 'current',
+                isExternallyAdministered: isExternal,
+                externalAdministeredBy: externalBy,
               };
             })
-        ).filter(vac => vac !== null); // Remove any null entries
+        )
+        .filter(Boolean);
 
       const administeredById = data.administeredById;
 
@@ -868,7 +911,15 @@ export default function EditChild() {
         payload = {
           weightRecords: filteredWeightRecords,
           vaccinations: filteredVaccinations,
-          administeredById: parseInt(administeredById),
+          administeredById:
+            data.administeredById && data.administeredById !== 'outside'
+              ? parseInt(data.administeredById)
+              : null,
+          externalAdministeredBy:
+            data.administeredById === 'outside'
+              ? data.externalAdministeredBy?.trim() || null
+              : null,
+
           remarks: data.remarks || null,
         };
       }

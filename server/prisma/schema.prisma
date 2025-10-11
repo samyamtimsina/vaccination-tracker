@@ -152,6 +152,10 @@ model VaccinationRecord {
   createdBy         User        @relation(name: "CreatedByVaccination", fields: [createdById], references: [id])
   administeredById  Int?
   administeredBy    User?       @relation(name: "AdministeredByVaccination", fields: [administeredById], references: [id])
+
+  isExternallyAdministered Boolean @default(false)
+  externalAdministeredBy   String?
+
   createdAt         DateTime    @default(now())
   wardOfVaccination Int
 
@@ -190,11 +194,11 @@ model Dose {
   maxAgeMonths        Float?
   maxAgeYears         Float?
 
-  requiredGender    String?   // "male", "female", or null = any
-  minSchoolClass    Int?      // e.g., 6
+  requiredGender    String?   
+  minSchoolClass    Int?      
   maxSchoolClass    Int?
-  minBirthYear      Int?      // if needed
-  otherCriteria     Json?     // for future extensibility (like chronic conditions)
+  minBirthYear      Int?      
+  otherCriteria     Json?     
 
   scheduleVersionId   Int @default(1)
   scheduleVersion     VaccineScheduleVersion @relation(fields: [scheduleVersionId], references: [id])
