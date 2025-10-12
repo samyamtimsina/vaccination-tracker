@@ -25,7 +25,9 @@ const dateSchema = z
       const month = val.getUTCMonth();
       const day = val.getUTCDate();
       const nepDate = new NepaliDate(year, month, day);
-      return `${nepDate.getYear()}-${String(nepDate.getMonth() + 1).padStart(2, '0')}-${String(nepDate.getDate()).padStart(2, '0')}`;
+      return `${nepDate.getYear()}-${String(nepDate.getMonth() + 1).padStart(2, '0')}-${String(
+        nepDate.getDate(),
+      ).padStart(2, '0')}`;
     }
     return val;
   })
@@ -37,35 +39,22 @@ const dateSchema = z
         /^\d{4}-\d{2}-\d{2}$/,
         "मितिले 'YYYY-MM-DD' ढाँचा पछ्याउनुपर्छ (जस्तै: २०८०-०१-१५)",
       )
-      .refine(
-        (val) => {
-          const parts = val.split('-');
-          if (parts.length !== 3) return false;
-          const [year, month, day] = parts.map(Number);
-          return (
-            year >= 2000 && month >= 1 && month <= 12 && day >= 1 && day <= 32
-          );
-        },
-        {
-          message: 'मितिको वर्ष, महिना वा दिन अमान्य छ',
-        },
-      )
-      .refine(
-        (val) => {
-          try {
-            const [year, month, day] = val.split('-').map(Number);
-            new NepaliDate(year, month - 1, day);
-            return true;
-          } catch {
-            return false;
-          }
-        },
-        {
-          message: 'अमान्य बिक्रम सम्बत मिति',
-        },
-      ),
+      .refine((val) => {
+        const [year, month, day] = val.split('-').map(Number);
+        return year >= 2000 && month >= 1 && month <= 12 && day >= 1 && day <= 32;
+      }, { message: 'मितिको वर्ष, महिना वा दिन अमान्य छ' })
+      .refine((val) => {
+        try {
+          const [year, month, day] = val.split('-').map(Number);
+          new NepaliDate(year, month - 1, day);
+          return true;
+        } catch {
+          return false;
+        }
+      }, { message: 'अमान्य बिक्रम सम्बत मिति' }),
   );
 
+// ✅ Updated vaccine dose schema
 const vaccineDoseSchema = z.object({
   date: z
     .string()
@@ -75,6 +64,8 @@ const vaccineDoseSchema = z.object({
     .optional()
     .transform((val) => (val === '' ? null : val)),
   remarks: z.string().optional().nullable(),
+  isExternallyAdministered: z.boolean().optional().default(false), // ✅ new field
+  externalAdministeredBy: z.string().optional().nullable(),        // ✅ new field
 });
 
 const weightRecordSchema = z.object({
@@ -82,6 +73,7 @@ const weightRecordSchema = z.object({
   weight: numericString,
 });
 
+// ✅ CREATE schema
 export const createChildSchema = z.object({
   firstName: z.string().min(1, 'पहिलो नाम आवश्यक छ'),
   lastName: z.string().optional().nullable(),
@@ -95,18 +87,23 @@ export const createChildSchema = z.object({
   casteCode: numericString,
   birthDate: dateSchema,
   isFromOtherMunicipality: z.boolean().default(false),
-  administeredById: numericString, // नयाँ: प्रशासकको ID
+
+  // ✅ allow null or missing
+  administeredById: z.union([numericString, z.null()]).optional(),
+  externalAdministeredBy: z.string().optional().nullable(), // ✅ added
+
   gender: z
     .string()
     .min(1, 'लिङ्ग आवश्यक छ')
     .transform((val) => val.toUpperCase().trim())
     .pipe(
       z.enum(['MALE', 'FEMALE', 'OTHER'], {
-        errorMap: (issue, ctx) => ({
+        errorMap: () => ({
           message: 'लिङ्ग पुरुष, महिला वा अन्य हुनुपर्छ',
         }),
       }),
     ),
+
   phoneNumber: z
     .string()
     .optional()
@@ -115,33 +112,38 @@ export const createChildSchema = z.object({
       message:
         'फोन नम्बर 7-15 अंकको हुनुपर्छ, वैकल्पिक रूपमा + बाट सुरु हुन सक्छ',
     }),
+
   remarks: z.string().optional().nullable(),
-  vaccines: z
-    .record(z.string(), z.array(vaccineDoseSchema))
-    .optional(),
+  vaccines: z.record(z.string(), z.array(vaccineDoseSchema)).optional(),
   weightRecords: z.array(weightRecordSchema).optional(),
 });
+
+// ✅ UPDATE schema
 export const updateChildSchema = z.object({
-  firstName: z.string().min(1, 'पहिलो नाम आवश्यक छ').optional(),
+  firstName: z.string().min(1).optional(),
   lastName: z.string().optional().nullable(),
-  parentName: z.string().min(1, 'अभिभावकको नाम आवश्यक छ').optional(),
-  tole: z.string().min(1, 'टोल आवश्यक छ').optional(),
+  parentName: z.string().min(1).optional(),
+  tole: z.string().min(1).optional(),
   wardNumber: numericString.optional(),
   casteCode: numericString.optional(),
   birthDate: dateSchema.optional(),
   isFromOtherMunicipality: z.boolean().optional(),
-  administeredById: numericString.optional(),
+
+  administeredById: z.union([numericString, z.null()]).optional(),
+  externalAdministeredBy: z.string().optional().nullable(),
+
   gender: z
     .string()
     .transform((val) => val.toUpperCase().trim())
     .pipe(
       z.enum(['MALE', 'FEMALE', 'OTHER'], {
-        errorMap: (issue, ctx) => ({
+        errorMap: () => ({
           message: 'लिङ्ग पुरुष, महिला वा अन्य हुनुपर्छ',
         }),
-      })
+      }),
     )
     .optional(),
+
   phoneNumber: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
   vaccines: z.record(z.string(), z.array(vaccineDoseSchema)).optional(),

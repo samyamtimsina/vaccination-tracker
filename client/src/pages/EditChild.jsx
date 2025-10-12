@@ -399,8 +399,11 @@ const VaccineCard = ({
                   `vaccines.${vaccineName}.${displayStatus.doseIndex}.isExternallyAdministered`
                 )}
                 className="checkbox checkbox-sm checkbox-primary"
+                disabled={!isFullProfile && isServerDate}
               />
-              <span className="text-sm text-base-content/80">Externally administered (outside this ward)</span>
+              <span className={`text-sm ${!isFullProfile && isServerDate ? 'text-base-content/50' : 'text-base-content/80'}`}>
+                Externally administered (outside this ward)
+              </span>
             </label>
 
             {/* Text input only when checked */}
@@ -414,7 +417,9 @@ const VaccineCard = ({
                     `vaccines.${vaccineName}.${displayStatus.doseIndex}.externalAdministeredBy`
                   )}
                   placeholder="Enter hospital, center, or person name"
-                  className="input input-bordered input-sm w-full"
+                  className={`input input-bordered input-sm w-full ${!isFullProfile && isServerDate ? 'bg-base-200 cursor-not-allowed' : ''
+                    }`}
+                  readOnly={!isFullProfile && isServerDate}
                 />
               )}
           </div>

@@ -632,7 +632,6 @@ export default function AddChild() {
 
             const scheduleDose = scheduleVaccine[index];
 
-            // ✅ Handle external vs local administration
             const isExternal = !!dose.isExternallyAdministered;
             const externalBy = dose.externalAdministeredBy?.trim() || null;
             const administeredById =
@@ -690,7 +689,6 @@ export default function AddChild() {
 
   const onErrors = (errors) => {
     const errorMessage = getFirstErrorMessage(errors);
-
     console.log('Validation errors:', errors);
     toast.error(t('toast.validation_error', { message: errorMessage }));
   };
