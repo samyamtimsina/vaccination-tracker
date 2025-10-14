@@ -1,31 +1,37 @@
 import express from 'express';
 import {
     analyticsLimiter,
-    getCoverage,
-    getDropoff,
-    getTimeliness,
-    getMissed,
-    getTrends,
-    getWorkerPerformance,
-    getMotherCoverage,
-    getAgeBasedAnalysis,
-    getScheduleAdherence,
-    getWardComparison,
-    getDefaulters,
-    getCatchUpAnalysis,
-    getTDAnalysis,
-    getNotificationAnalysis,
-    getWeightAnalysis,
-    getWeightInsights,
-    getRegistrationTrends,
-    getUserProductivity,
-    getDataQuality,
-    getDoseCompletionAnalysis,
-    getDueVaccineAnalysis,
-    getAuditAnalysis,
-    getSecurityAnalysis,
-    getCertificateAnalysis,
-    getCorrectionAnalysis
+
+    // Core vaccination analytics
+    getVaccineCoverage,
+    getZeroDoseChildren,
+    getDropoutRates,
+    getVaccinationTimeliness,
+
+    // Growth & nutrition analytics
+    getWeightCoverage,
+    getGrowthTrajectories,
+    getGrowthFaltering,
+
+    // Maternal & TD analytics
+    getTDCompletion,
+    getMotherChildLinkage,
+
+    // Default tracking & follow-up
+    getDefaulterTracking,
+
+    // Cohort & trend analysis
+    getCohortAnalysis,
+    getYearlyTrends,
+
+    // Data quality & monitoring
+    getDataCompleteness,
+    // getRecordTimeliness, // Removed as it is not exported from analyticsController.js
+
+    // Predictive analytics & alerts
+    getDefaultRiskPrediction,
+    getSystemOverview
+
 } from '../controllers/analyticsController.js';
 
 import { authenticate, authorize } from '../middlewares/auth.js';
@@ -40,69 +46,66 @@ const ALLOWED_ROLES = ['ADMIN', 'SUPER_ADMIN', 'WARD_OFFICER'];
 
 /**
  * ===============================
- *   CHILD & VACCINE ANALYTICS
+ * DASHBOARD & OVERVIEW ROUTES
  * ===============================
  */
-router.get('/coverage', authenticate, authorize(...ALLOWED_ROLES), getCoverage);
-router.get('/dropoff', authenticate, authorize(...ALLOWED_ROLES), getDropoff);
-router.get('/timeliness', authenticate, authorize(...ALLOWED_ROLES), getTimeliness);
-router.get('/missed', authenticate, authorize(...ALLOWED_ROLES), getMissed);
-router.get('/trends', authenticate, authorize(...ALLOWED_ROLES), getTrends);
-router.get('/age-analysis', authenticate, authorize(...ALLOWED_ROLES), getAgeBasedAnalysis);
-router.get('/schedule-adherence', authenticate, authorize(...ALLOWED_ROLES), getScheduleAdherence);
-router.get('/ward-comparison', authenticate, authorize(...ALLOWED_ROLES), getWardComparison);
-router.get('/defaulters', authenticate, authorize(...ALLOWED_ROLES), getDefaulters);
-router.get('/catchup-analysis', authenticate, authorize(...ALLOWED_ROLES), getCatchUpAnalysis); // renamed to match controller
-router.get('/certificate-analysis', authenticate, authorize(...ALLOWED_ROLES), getCertificateAnalysis);
-router.get('/correction-analysis', authenticate, authorize(...ALLOWED_ROLES), getCorrectionAnalysis);
+router.get('/system-overview', authenticate, authorize(...ALLOWED_ROLES), getSystemOverview);
 
 /**
  * ===============================
- *   MOTHER & TD ANALYTICS
+ * VACCINATION ANALYTICS
  * ===============================
  */
-router.get('/mother-coverage', authenticate, authorize(...ALLOWED_ROLES), getMotherCoverage);
-router.get('/td-analysis', authenticate, authorize(...ALLOWED_ROLES), getTDAnalysis);
+router.get('/vaccine-coverage', authenticate, authorize(...ALLOWED_ROLES), getVaccineCoverage);
+router.get('/zero-dose-children', authenticate, authorize(...ALLOWED_ROLES), getZeroDoseChildren);
+router.get('/dropout-rates', authenticate, authorize(...ALLOWED_ROLES), getDropoutRates);
+router.get('/vaccination-timeliness', authenticate, authorize(...ALLOWED_ROLES), getVaccinationTimeliness);
 
 /**
  * ===============================
- *   NOTIFICATION & PERFORMANCE
+ * GROWTH & NUTRITION ANALYTICS
  * ===============================
  */
-router.get('/notification-analysis', authenticate, authorize(...ALLOWED_ROLES), getNotificationAnalysis);
-router.get('/worker-performance', authenticate, authorize(...ALLOWED_ROLES), getWorkerPerformance);
+router.get('/weight-coverage', authenticate, authorize(...ALLOWED_ROLES), getWeightCoverage);
+router.get('/growth-trajectories', authenticate, authorize(...ALLOWED_ROLES), getGrowthTrajectories);
+router.get('/growth-faltering', authenticate, authorize(...ALLOWED_ROLES), getGrowthFaltering);
 
 /**
  * ===============================
- *   WEIGHT & GROWTH ANALYTICS
+ * MATERNAL & TD ANALYTICS
  * ===============================
  */
-router.get('/weight-analysis', authenticate, authorize(...ALLOWED_ROLES), getWeightAnalysis);
-router.get('/weight-insights', authenticate, authorize(...ALLOWED_ROLES), getWeightInsights);
+router.get('/td-completion', authenticate, authorize(...ALLOWED_ROLES), getTDCompletion);
+router.get('/mother-child-linkage', authenticate, authorize(...ALLOWED_ROLES), getMotherChildLinkage);
 
 /**
  * ===============================
- *   REGISTRATION & USER ANALYTICS
+ * DEFAULT TRACKING & FOLLOW-UP
  * ===============================
  */
-router.get('/registration-trends', authenticate, authorize(...ALLOWED_ROLES), getRegistrationTrends);
-router.get('/user-productivity', authenticate, authorize(...ALLOWED_ROLES), getUserProductivity);
-router.get('/data-quality', authenticate, authorize(...ALLOWED_ROLES), getDataQuality);
+router.get('/defaulter-tracking', authenticate, authorize(...ALLOWED_ROLES), getDefaulterTracking);
 
 /**
  * ===============================
- *   PROGRAM COMPLETION ANALYTICS
+ * COHORT & TREND ANALYSIS
  * ===============================
  */
-router.get('/dose-completion', authenticate, authorize(...ALLOWED_ROLES), getDoseCompletionAnalysis);
-router.get('/due-vaccine-analysis', authenticate, authorize(...ALLOWED_ROLES), getDueVaccineAnalysis);
+router.get('/cohort-analysis', authenticate, authorize(...ALLOWED_ROLES), getCohortAnalysis);
+router.get('/yearly-trends', authenticate, authorize(...ALLOWED_ROLES), getYearlyTrends);
 
 /**
  * ===============================
- *   SYSTEM & SECURITY ANALYTICS
+ * DATA QUALITY & MONITORING
  * ===============================
  */
-router.get('/audit-analysis', authenticate, authorize(...ALLOWED_ROLES), getAuditAnalysis);
-router.get('/security-analysis', authenticate, authorize(...ALLOWED_ROLES), getSecurityAnalysis);
+router.get('/data-completeness', authenticate, authorize(...ALLOWED_ROLES), getDataCompleteness);
+// Removed: router.get('/record-timeliness', authenticate, authorize(...ALLOWED_ROLES), getRecordTimeliness);
+
+/**
+ * ===============================
+ * PREDICTIVE ANALYTICS & ALERTS
+ * ===============================
+ */
+router.get('/default-risk-prediction', authenticate, authorize(...ALLOWED_ROLES), getDefaultRiskPrediction);
 
 export default router;

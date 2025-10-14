@@ -49,7 +49,7 @@ model RefreshToken {
   token     String   @unique
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
-  device    String?  // optional: track device/browser
+  device    String? // optional: track device/browser
   expiresAt DateTime
   createdAt DateTime @default(now())
 }
@@ -87,12 +87,17 @@ model Child {
   NotificationLog           NotificationLog[]
   isFromOtherMunicipality   Boolean             @default(false)
   weightRecords             WeightRecord[]
+
+  // --- Optimized Indexes (NEW) ---
+  // Composite: For filtering children by Ward and registration date (Analytics Trends)
+  @@index([wardNumber, createdAt]) 
+  // Existing indexes:
   @@index([wardNumber])
   @@index([phoneNumber])
-  @@index([fullName])        // fast prefix search (or FULLTEXT/trigram if substrings)
-  @@index([parentName])      // same as above
-  @@index([birthDate])       // useful for age filtering
-  @@index([createdAt])       // for sorting/pagination
+  @@index([fullName])        
+  @@index([parentName])      
+  @@index([birthDate])       
+  @@index([createdAt])       
 }
 
 model Mother {
@@ -114,6 +119,10 @@ model Mother {
   NotificationLog           NotificationLog[]
   tdDoses                   TDDose[]
 
+  // --- Optimized Indexes (NEW) ---
+  // Composite: For filtering mother registrations by Ward and Time (Analytics)
+  @@index([wardNumber, createdAt]) 
+  // Existing indexes:
   @@index([sewaDartaNumber])
   @@index([name])
   @@index([wardNumber])
@@ -138,7 +147,7 @@ model TDDose {
 
 model VaccinationRecord {
   id                String      @id @default(uuid())
-  citizenId         String
+  citizenId         String      // This refers to Child.id
   vaccineTypeId     Int
   vaccineType       VaccineType @relation(fields: [vaccineTypeId], references: [id])
   doseNumber        Int
@@ -155,10 +164,15 @@ model VaccinationRecord {
 
   isExternallyAdministered Boolean @default(false)
   externalAdministeredBy   String?
-
   createdAt         DateTime    @default(now())
   wardOfVaccination Int
 
+  // --- Optimized Composite Indexes (NEW) ---
+  // PRIMARY ANALYTIC INDEX: Filters by ward AND date (Critical for seasonal/ward-based analytics)
+  @@index([wardOfVaccination, dateGiven]) 
+  // Composite: For querying all records of a specific vaccine type over time
+  @@index([vaccineTypeId, dateGiven])
+  // Existing indexes:
   @@index([dateGiven])
   @@index([vaccineTypeId])
   @@index([citizenId, dateGiven])
@@ -178,30 +192,29 @@ model VaccineType {
 }
 
 model Dose {
-  id                  Int      @id @default(autoincrement())
-  vaccineTypeId       Int
-  vaccineType         VaccineType @relation(fields: [vaccineTypeId], references: [id])
-  doseNumber          Int
+  id                        Int      @id @default(autoincrement())
+  vaccineTypeId             Int
+  vaccineType               VaccineType @relation(fields: [vaccineTypeId], references: [id])
+  doseNumber                Int
 
-  recommendedAtDays   Float?
-  recommendedAtWeeks  Float?
-  recommendedAtMonths Float?
-  recommendedAtYears  Float?
-  isBooster           Boolean   @default(false)
-  isPrimary           Boolean   @default(true)
-  maxAgeDays          Float?
-  maxAgeWeeks         Float?
-  maxAgeMonths        Float?
-  maxAgeYears         Float?
+  recommendedAtDays         Float?
+  recommendedAtWeeks        Float?
+  recommendedAtMonths       Float?
+  recommendedAtYears        Float?
+  isBooster                 Boolean   @default(false)
+  isPrimary                 Boolean   @default(true)
+  maxAgeDays                Float?
+  maxAgeWeeks               Float?
+  maxAgeMonths              Float?
+  maxAgeYears               Float?
 
-  requiredGender    String?   
-  minSchoolClass    Int?      
-  maxSchoolClass    Int?
-  minBirthYear      Int?      
-  otherCriteria     Json?     
-
-  scheduleVersionId   Int @default(1)
-  scheduleVersion     VaccineScheduleVersion @relation(fields: [scheduleVersionId], references: [id])
+  requiredGender            String?   
+  minSchoolClass            Int?
+  maxSchoolClass            Int?
+  minBirthYear              Int?      
+  otherCriteria             Json?
+  scheduleVersionId         Int @default(1)
+  scheduleVersion           VaccineScheduleVersion @relation(fields: [scheduleVersionId], references: [id])
   @@unique([vaccineTypeId, doseNumber, scheduleVersionId])
 }
 
@@ -233,19 +246,27 @@ model ChildDueVaccine {
   catchUpLocked    Boolean     @default(false)
   isCatchUp        Boolean     @default(false)
 
+  // --- Optimized Composite Indexes ---
+  // Composite: Crucial for fast due date checks and transactional updates
+  @@index([childId, dueDate]) 
+  // Existing indexes (kept):
   @@index([dueDate, isCompleted, notificationSent])
   @@index([childId, isCompleted])
   @@index([childId, vaccineTypeId, doseNumber])
 }
 
 model NotificationLog {
-  id          Int      @id @default(autoincrement())
-  childId     String?
-  motherId    String?
-  message     String
-  sentAt      DateTime @default(now())
-  child       Child?   @relation(fields: [childId], references: [id])
-  mother      Mother?  @relation(fields: [motherId], references: [id])
+  id                Int      @id @default(autoincrement())
+  childId           String?
+  motherId          String?
+  message           String
+  sentAt            DateTime @default(now())
+  child             Child?   @relation(fields: [childId], references: [id])
+  mother            Mother?  @relation(fields: [motherId], references: [id])
+
+  // --- New Indexes for Outreach Analytics ---
+  @@index([motherId, sentAt]) // To link notifications to mother responses by time
+  @@index([childId, sentAt])  // To link notifications to child responses by time
 }
 
 model AuditLog {
@@ -293,4 +314,77 @@ model WeightRecord {
 
   @@index([childId, date])
   @@index([wardOfVaccination])
+}
+
+/// Tracks when each analytics domain was last updated
+model AnalyticsMeta {
+  domain                   String   @id
+  lastProcessedTimestamptz DateTime
+}
+
+/// Cached child-immunization analytics
+model ChildAnalyticsFact {
+  id                     Int      @id @default(autoincrement())
+  day                    DateTime
+  ward                   Int
+  vaccineTypeId          Int?
+  doseNumber             Int?
+  gender                 String?
+  ageGroup               String?
+  isExternal             Boolean  @default(false)
+
+  totalRegisteredChildren Int     @default(0)
+  vaccinatedChildren       Int     @default(0)
+  zeroDoseChildren         Int     @default(0)
+  dueToday                 Int     @default(0)
+  overdue                  Int     @default(0)
+  upcomingDue              Int     @default(0)
+  onTime                   Int     @default(0)
+  late                     Int     @default(0)
+  dropoutFirstLast         Int     @default(0)
+  dropoutRate              Float   @default(0)
+
+  @@index([day])
+  @@index([ward])
+  @@index([vaccineTypeId])
+  @@index([ageGroup])
+}
+
+/// Cached maternal-immunization analytics
+model MotherAnalyticsFact {
+  id                     Int      @id @default(autoincrement())
+  day                    DateTime
+  ward                   Int
+  ageGroup               String?
+
+  totalRegisteredMothers Int     @default(0)
+  td1Given               Int     @default(0)
+  td2Given               Int     @default(0)
+  td2plusGiven           Int     @default(0)
+  tdDropoutFirstLast     Int     @default(0)
+  tdDropoutRate          Float   @default(0)
+  td2OnTime              Int     @default(0)
+  td2Late                Int     @default(0)
+
+  @@index([day])
+  @@index([ward])
+}
+
+/// Cached growth / nutrition analytics
+model GrowthAnalyticsFact {
+  id                       Int      @id @default(autoincrement())
+  day                      DateTime
+  ward                     Int
+  ageGroup                 String?
+  gender                   String?
+
+  underweightCount          Int     @default(0)
+  severelyUnderweightCount  Int     @default(0)
+  normalWeightCount         Int     @default(0)
+  overweightCount           Int     @default(0)
+  avgWeight                 Float   @default(0)
+  recordsCount              Int     @default(0)
+
+  @@index([day])
+  @@index([ward])
 }
