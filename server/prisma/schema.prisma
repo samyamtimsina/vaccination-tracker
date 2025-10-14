@@ -387,4 +387,6 @@ model GrowthAnalyticsFact {
 
   @@index([day])
   @@index([ward])
+  @@unique([day, ward, gender, ageGroup], name: "day_ward_gender_ageGroup")
+
 }
