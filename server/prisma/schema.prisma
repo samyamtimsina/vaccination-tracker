@@ -315,78 +315,96 @@ model WeightRecord {
   @@index([childId, date])
   @@index([wardOfVaccination])
 }
+// Confirmed Fix for Schema: Ensure this exact block in schema.prisma (Prisma 5+ supports @db.Date).
+// If validation fails, check Prisma version (npx prisma --version >=5.0), or use String for day ('YYYY-MM-DD').
 
-/// Tracks when each analytics domain was last updated
 model AnalyticsMeta {
-  domain                   String   @id
-  lastProcessedTimestamptz DateTime
+  id                    Int      @id @default(autoincrement())
+  lastProcessedChild    DateTime @default(now())
+  lastProcessedMother   DateTime @default(now())
+  lastProcessedGrowth   DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([id])
 }
 
-/// Cached child-immunization analytics
 model ChildAnalyticsFact {
-  id                     Int      @id @default(autoincrement())
-  day                    DateTime
-  ward                   Int
-  vaccineTypeId          Int?
-  doseNumber             Int?
-  gender                 String?
-  ageGroup               String?
-  isExternal             Boolean  @default(false)
+  id                       Int      @id @default(autoincrement())
+  day                      DateTime @db.Date
+  ward                     Int
+  vaccineTypeId            Int?
+  doseNumber               Int      @default(0)
+  gender                   String?
+  ageGroup                 String?
+  casteCode                Int
+  totalRegisteredChildren  Int      @default(0)
+  vaccinatedChildren       Int      @default(0)
+  zeroDoseChildren         Int      @default(0)
+  dueToday                 Int      @default(0)
+  overdue                  Int      @default(0)
+  onTime                   Int      @default(0)
+  late                     Int      @default(0)
+  dropoutRate              Float?   @default(0)
 
-  totalRegisteredChildren Int     @default(0)
-  vaccinatedChildren       Int     @default(0)
-  zeroDoseChildren         Int     @default(0)
-  dueToday                 Int     @default(0)
-  overdue                  Int     @default(0)
-  upcomingDue              Int     @default(0)
-  onTime                   Int     @default(0)
-  late                     Int     @default(0)
-  dropoutFirstLast         Int     @default(0)
-  dropoutRate              Float   @default(0)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
+  @@unique([day, ward, vaccineTypeId, doseNumber, gender, ageGroup, casteCode])
   @@index([day])
   @@index([ward])
   @@index([vaccineTypeId])
+  @@index([casteCode])
+  @@index([gender])
   @@index([ageGroup])
 }
 
-/// Cached maternal-immunization analytics
 model MotherAnalyticsFact {
-  id                     Int      @id @default(autoincrement())
-  day                    DateTime
-  ward                   Int
-  ageGroup               String?
+  id                      Int      @id @default(autoincrement())
+  day                     DateTime @db.Date
+  ward                    Int
+  doseNumber              Int      @default(0)
+  casteCode               Int
+  totalRegisteredMothers  Int      @default(0)
+  tdDosesGiven            Int      @default(0)
+  mothersWithZeroTD       Int      @default(0)
+  mothersWithFullTD       Int      @default(0)
+  dueToday                Int      @default(0)
+  overdue                 Int      @default(0)
 
-  totalRegisteredMothers Int     @default(0)
-  td1Given               Int     @default(0)
-  td2Given               Int     @default(0)
-  td2plusGiven           Int     @default(0)
-  tdDropoutFirstLast     Int     @default(0)
-  tdDropoutRate          Float   @default(0)
-  td2OnTime              Int     @default(0)
-  td2Late                Int     @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
+  @@unique([day, ward, doseNumber, casteCode])
   @@index([day])
   @@index([ward])
+  @@index([casteCode])
 }
 
-/// Cached growth / nutrition analytics
 model GrowthAnalyticsFact {
   id                       Int      @id @default(autoincrement())
-  day                      DateTime
+  day                      DateTime @db.Date
   ward                     Int
-  ageGroup                 String?
   gender                   String?
+  ageGroup                 String?
+  casteCode                Int
+  totalWeightRecords       Int      @default(0)
+  avgWeightKg              Float?   @default(0)
+  underweightCount         Int      @default(0)
+  normalWeightCount        Int      @default(0)
+  overweightCount          Int      @default(0)
 
-  underweightCount          Int     @default(0)
-  severelyUnderweightCount  Int     @default(0)
-  normalWeightCount         Int     @default(0)
-  overweightCount           Int     @default(0)
-  avgWeight                 Float   @default(0)
-  recordsCount              Int     @default(0)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
+  @@unique([day, ward, gender, ageGroup, casteCode])
   @@index([day])
   @@index([ward])
-  @@unique([day, ward, gender, ageGroup], name: "day_ward_gender_ageGroup")
-
+  @@index([casteCode])
+  @@index([gender])
+  @@index([ageGroup])
 }
+
+// Apply: npx prisma validate (should pass).
+// If "Date" error persists, upgrade Prisma: npm i prisma@latest @prisma/client@latest
+// Then npx prisma generate && npx prisma db push

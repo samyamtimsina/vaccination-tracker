@@ -71,7 +71,12 @@ function App() {
                   <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><SuperAdminLayout /></ProtectedRoute>}>
                     <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
                     <Route path="/super-admin/users" element={<UsersManagementPage />} />
-                    <Route path="/super-admin/analytics" element={<Analytics />} />
+                    <Route
+                      path="/super-admin/analytics"
+                      element={
+                        <Analytics />
+                      }
+                    />
                     <Route path="/super-admin/schedule" element={<Schedule />} />
                   </Route>
 

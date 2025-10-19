@@ -114,7 +114,7 @@ const generateMotherData = async (totalMothers, batchSize = 1000) => {
 };
 
 // --- Run generator ---
-generateMotherData(50000, 500).catch((err) => {
+generateMotherData(500000, 500).catch((err) => {
     console.error('❌ Error generating data:', err);
     prisma.$disconnect();
 });
