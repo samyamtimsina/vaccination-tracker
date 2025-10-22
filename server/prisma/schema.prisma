@@ -404,7 +404,3 @@ model GrowthAnalyticsFact {
   @@index([gender])
   @@index([ageGroup])
 }
-
-// Apply: npx prisma validate (should pass).
-// If "Date" error persists, upgrade Prisma: npm i prisma@latest @prisma/client@latest
-// Then npx prisma generate && npx prisma db push

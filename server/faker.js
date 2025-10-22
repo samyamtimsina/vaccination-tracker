@@ -112,7 +112,7 @@ const generateData = async (totalChildren, batchSize = 1000) => {
             for (let k = 0; k < numWeights; k++) {
                 weightRecords.push({
                     childId: child.id,
-                    weight: faker.number.float({ min: 2.5, max: 15, precision: 0.1 }),
+                    weight: faker.number.float({ min: 2.5, max: 15, precision: 0.01, fixed: 2 }),
                     date: getRandomDate(child.birthDate, new Date()),
                     createdById: creatorUser.id,
                     administeredById: creatorUser.id,

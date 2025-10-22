@@ -133,15 +133,23 @@ export const getWardMothers = async (req, res) => {
     if (!req.user || !req.user.wardId) {
       return res.status(401).json({ error: 'Unauthorized. User or wardId not found.' });
     }
+
     const { wardId } = req.user;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
+    // FIX: Make sure we're using the correct field name and value
     const [total, mothers] = await Promise.all([
-      prisma.mother.count({ where: { wardNumber: wardId } }),
+      prisma.mother.count({
+        where: {
+          wardNumber: parseInt(wardId) // Ensure it's a number
+        }
+      }),
       prisma.mother.findMany({
-        where: { wardNumber: wardId },
+        where: {
+          wardNumber: parseInt(wardId) // Ensure it's a number
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -164,8 +172,11 @@ export const getWardMothers = async (req, res) => {
         }
       })
     ]);
+
+    console.log(`Found ${mothers.length} mothers for ward ${wardId}`); // Debug log
     res.status(200).json({ mothers, total, page, limit });
   } catch (error) {
+    console.error('Error in getWardMothers:', error);
     res.status(500).json({ error: 'Failed to fetch mothers', details: error.message });
   }
 };

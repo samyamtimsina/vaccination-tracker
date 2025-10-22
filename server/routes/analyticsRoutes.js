@@ -1,35 +1,62 @@
 // File: server/routes/analyticsRoutes.js
 import express from 'express';
 import {
+    // Core analytics
     getSystemOverview,
     getVaccineCoverage,
     getDropoutRates,
     getZeroDoseChildren,
     getGrowthMonitoring,
     getTDCoverage,
-    refreshCache,
+    getDueOverdue,
+
+    // Advanced analytics
+    getTrends,
+    getWardPerformance,
+    getDisparities,
+    getComparison,
+    exportAnalytics,
+
+    // Utility + system
     getFactsStatusController,
-    getDueOverdue
+    refreshCache,
 } from '../controllers/analyticsController.js';
 
 const router = express.Router();
 
-// --- Legacy / backward-compatible routes ---
+/* -------------------------------------------------------------------------- */
+/* Legacy (backward-compatible) routes                                        */
+/* -------------------------------------------------------------------------- */
 router.get('/child/summary', getSystemOverview);
 router.get('/child/trends', getVaccineCoverage);
 router.get('/mother/summary', getTDCoverage);
 router.get('/growth/summary', getGrowthMonitoring);
 
-// --- Dashboard / full analytics routes ---
-router.get('/overview', getSystemOverview);         // System overview (children, mothers, nutrition)
-router.get('/coverage', getVaccineCoverage);       // Vaccine coverage by filters
-router.get('/dropout', getDropoutRates);           // Dropout rates
-router.get('/zero-dose', getZeroDoseChildren);     // Zero-dose children
-router.get('/growth', getGrowthMonitoring);        // Growth/nutrition monitoring
-router.get('/td-coverage', getTDCoverage);         // Mothers TD coverage
-router.get('/status', getFactsStatusController);   // Analytics facts status
-router.post('/refresh-cache', refreshCache);       // Clear cache
-router.get('/due-overdue', getDueOverdue);  // Add this line
+/* -------------------------------------------------------------------------- */
+/* Main analytics routes (for dashboard)                                      */
+/* -------------------------------------------------------------------------- */
+router.get('/overview', getSystemOverview);            // System overview
+router.get('/coverage', getVaccineCoverage);          // Vaccine coverage
+router.get('/dropout', getDropoutRates);              // Dropout rates
+router.get('/zero-dose', getZeroDoseChildren);        // Zero-dose count
+router.get('/growth', getGrowthMonitoring);           // Growth & nutrition
+router.get('/td-coverage', getTDCoverage);            // Mothers TD coverage
+router.get('/due-overdue', getDueOverdue);            // Due vs overdue summary
 
+/* -------------------------------------------------------------------------- */
+/* Advanced analytics routes                                                  */
+/* -------------------------------------------------------------------------- */
+router.get('/trends', getTrends);                     // Time-series trends
+router.get('/ward-performance', getWardPerformance);  // Ward rankings
+router.get('/disparities', getDisparities);           // Gender/caste disparities
+router.get('/comparison', getComparison);             // Period comparison
+router.get('/export', exportAnalytics);               // Export CSVs
 
+/* -------------------------------------------------------------------------- */
+/* System + cache management                                                  */
+/* -------------------------------------------------------------------------- */
+router.get('/status', getFactsStatusController);       // Data health + last processed info
+router.get('/refresh-cache', refreshCache);            // Clear cache (GET for easier triggering)
+
+/* -------------------------------------------------------------------------- */
 export default router;

@@ -6,14 +6,13 @@ import { prisma } from './utils/prisma.js';
 const getRandomDate = (start, end) =>
     new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
 
-// --- Helper to generate TD Doses for a Mother ---
+// --- Helper to generate TD Doses for a Mother (0–3 doses) ---
 const generateTDDoses = (motherBirthDate, creatorUser, administeredByUser, motherId) => {
     const tdDoses = [];
-    const maxDoses = faker.number.int({ min: 0, max: 5 });
+    const maxDoses = faker.number.int({ min: 0, max: 3 }); // 0 to 3 doses
 
     for (let i = 1; i <= maxDoses; i++) {
         const dateGiven = getRandomDate(motherBirthDate, new Date());
-
         tdDoses.push({
             motherId,
             doseNumber: i,
@@ -31,24 +30,23 @@ const generateTDDoses = (motherBirthDate, creatorUser, administeredByUser, mothe
 const generateMotherData = async (totalMothers, batchSize = 1000) => {
     console.log(`Generating ${totalMothers} mothers in batches of ${batchSize}...`);
 
-    // Get users eligible for data creation
+    // Fetch eligible users
     const users = await prisma.user.findMany({
         where: { role: { in: ['ADMIN', 'WARD_OFFICER'] } },
     });
     if (!users.length) throw new Error('No eligible users found (ADMIN or WARD_OFFICER).');
 
-    // Find last sewaDartaNumber
+    // Get last sewaDartaNumber
     const lastMother = await prisma.mother.findFirst({
         orderBy: { sewaDartaNumber: 'desc' },
         select: { sewaDartaNumber: true },
     });
-
     let nextSewaDartaNumber = lastMother ? lastMother.sewaDartaNumber + 1 : 10000;
+
     let createdCount = 0;
 
     while (createdCount < totalMothers) {
         const motherBatch = [];
-        const tdDoseBatch = [];
 
         for (let i = 0; i < Math.min(batchSize, totalMothers - createdCount); i++) {
             const creatorUser = faker.helpers.arrayElement(users);
@@ -72,37 +70,24 @@ const generateMotherData = async (totalMothers, batchSize = 1000) => {
             });
         }
 
-        // Insert mothers
-        await prisma.mother.createMany({ data: motherBatch });
-
-        // Fetch back to get IDs
-        const mothers = await prisma.mother.findMany({
-            where: {
-                sewaDartaNumber: {
-                    gte: nextSewaDartaNumber - motherBatch.length,
-                    lt: nextSewaDartaNumber,
-                },
-            },
-            orderBy: { sewaDartaNumber: 'asc' },
-        });
-
-        // Generate and insert TDDoses
-        for (const mother of mothers) {
+        // Insert mothers individually with nested TD doses
+        for (const motherData of motherBatch) {
             const creatorUser = faker.helpers.arrayElement(users);
             const administeredByUser = faker.helpers.arrayElement(users);
 
-            const tdDoses = generateTDDoses(
-                mother.dateOfBirth,
-                creatorUser,
-                administeredByUser,
-                mother.id
-            );
-
-            tdDoseBatch.push(...tdDoses);
-        }
-
-        if (tdDoseBatch.length) {
-            await prisma.tDDose.createMany({ data: tdDoseBatch });
+            await prisma.mother.create({
+                data: {
+                    ...motherData,
+                    tdDoses: {
+                        create: generateTDDoses(
+                            motherData.dateOfBirth,
+                            creatorUser,
+                            administeredByUser,
+                            undefined // Prisma will set motherId automatically
+                        ),
+                    },
+                },
+            });
         }
 
         createdCount += motherBatch.length;

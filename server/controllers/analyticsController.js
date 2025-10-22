@@ -1,448 +1,1012 @@
-// File: server/controllers/analyticsController.js
 import { prisma } from '../utils/prisma.js';
 import { cachedAnalytics, clearCache, getFactsStatus } from '../utils/analyticsCache.js';
-import { format } from 'date-fns';
-// Add this debug function
-async function debugFactsData() {
-    console.log('🔍 DEBUGGING FACTS DATA:');
+import { format, startOfWeek, startOfMonth, eachDayOfInterval, parseISO } from 'date-fns';
 
-    // Check Child Facts
-    const childFacts = await prisma.childAnalyticsFact.findMany({
-        where: { day: new Date(), vaccineTypeId: 0 },
-        take: 5
-    });
-    console.log('CHILD FACTS (vaccineTypeId=0):', childFacts);
+/* ========================================================================== */
+/* UTILITY FUNCTIONS */
+/* ========================================================================== */
 
-    // Check Mother Facts
-    const motherFacts = await prisma.motherAnalyticsFact.findMany({
-        where: { day: new Date(), doseNumber: 0 },
-        take: 5
-    });
-    console.log('MOTHER FACTS (doseNumber=0):', motherFacts);
-
-    // Check Growth Facts
-    const growthFacts = await prisma.growthAnalyticsFact.findMany({
-        where: { day: new Date() },
-        take: 5
-    });
-    console.log('GROWTH FACTS:', growthFacts);
-
-    // Check raw counts
-    const [childCount, motherCount, growthCount] = await Promise.all([
-        prisma.childAnalyticsFact.aggregate({
-            _sum: { totalRegisteredChildren: true },
-            where: { day: new Date(), vaccineTypeId: 0 }
-        }),
-        prisma.motherAnalyticsFact.aggregate({
-            _sum: { totalRegisteredMothers: true },
-            where: { day: new Date(), doseNumber: 0 }
-        }),
-        prisma.growthAnalyticsFact.aggregate({
-            _sum: { totalWeightRecords: true },
-            where: { day: new Date() }
-        })
-    ]);
-
-    console.log('TOTALS - Children:', childCount._sum.totalRegisteredChildren, 'Mothers:', motherCount._sum.totalRegisteredMothers, 'Growth:', growthCount._sum.totalWeightRecords);
+/**
+ * Parse date string or return default
+ */
+function parseDateOrDefault(d, def) {
+    try {
+        return d ? new Date(d) : def;
+    } catch {
+        return def;
+    }
 }
 
-// Helper: today’s delta vaccinations (children)
+/**
+ * Build Prisma where filters from query params
+ */
+function buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate }) {
+    const where = {};
+    if (ward) where.ward = Number(ward);
+    if (casteCode) where.casteCode = Number(casteCode);
+    if (gender && gender !== 'ALL') where.gender = gender;
+    if (ageGroup && ageGroup !== 'ALL') where.ageGroup = ageGroup;
+
+    const start = parseDateOrDefault(startDate, new Date('2020-01-01'));
+    const end = parseDateOrDefault(endDate, new Date());
+    end.setHours(23, 59, 59, 999);
+    where.day = { gte: start, lte: end };
+    return where;
+}
+
+/**
+ * Get today's delta for child vaccinations (real-time data not yet in facts)
+ */
 async function getTodayChildDelta(ward, casteCode, gender, ageGroup) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const meta = await getFactsStatus();
-    if (meta?.lastProcessedChild >= today) return 0;
+    if (meta?.lastProcessedChild && new Date(meta.lastProcessedChild) >= today) return 0;
+
+    const childFilter = {};
+    if (ward) childFilter.wardNumber = Number(ward);
+    if (casteCode) childFilter.casteCode = Number(casteCode);
+    if (gender && gender !== 'ALL') childFilter.gender = gender;
+    if (ageGroup && ageGroup !== 'ALL') {
+        const now = new Date();
+        if (ageGroup === '0-1y') childFilter.birthDate = { gte: new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()) };
+        else if (ageGroup === '1-5y') childFilter.birthDate = { gte: new Date(now.getFullYear() - 5, now.getMonth(), now.getDate()) };
+    }
 
     return prisma.vaccinationRecord.count({
         where: {
             dateGiven: { gte: today },
             isComplete: true,
-            child: {
-                ...(ward ? { wardNumber: Number(ward) } : {}),
-                ...(casteCode ? { casteCode: Number(casteCode) } : {}),
-                ...(gender ? { gender } : {}),
-                ...(ageGroup ? {
-                    birthDate: {
-                        gte: (() => {
-                            const now = new Date();
-                            if (ageGroup === '0-1y') return new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-                            if (ageGroup === '1-5y') return new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
-                            return new Date(0);
-                        })()
-                    }
-                } : {})
-            }
-        }
+            child: childFilter,
+        },
     });
 }
 
-// 1. System Overview: Children, Mothers, Nutrition, Coverage
-// 1. System Overview: Children, Mothers, Nutrition, Coverage
-// 1. System Overview: Children, Mothers, Nutrition, Coverage
+/**
+ * Aggregate by time granularity (day, week, month)
+ */
+function aggregateByGranularity(data, granularity, startDate, endDate) {
+    if (granularity === 'day') return data;
+
+    const grouped = {};
+    data.forEach(item => {
+        let key;
+        const date = parseISO(item.day);
+
+        if (granularity === 'week') {
+            key = format(startOfWeek(date, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+        } else if (granularity === 'month') {
+            key = format(startOfMonth(date), 'yyyy-MM-dd');
+        }
+
+        if (!grouped[key]) {
+            grouped[key] = { day: key, count: 0, sum: {} };
+        }
+
+        // Aggregate numeric fields
+        Object.keys(item).forEach(field => {
+            if (field !== 'day' && typeof item[field] === 'number') {
+                grouped[key].sum[field] = (grouped[key].sum[field] || 0) + item[field];
+            }
+        });
+        grouped[key].count++;
+    });
+
+    return Object.values(grouped).map(g => ({
+        day: g.day,
+        ...Object.keys(g.sum).reduce((acc, key) => {
+            acc[key] = key.includes('Rate') || key.includes('Pct')
+                ? g.sum[key] / g.count
+                : g.sum[key];
+            return acc;
+        }, {})
+    }));
+}
+
+/**
+ * Fill missing dates in time series with zeros
+ */
+function fillMissingDates(data, startDate, endDate, granularity = 'day') {
+    const start = parseDateOrDefault(startDate, new Date('2020-01-01'));
+    const end = parseDateOrDefault(endDate, new Date());
+
+    const allDays = eachDayOfInterval({ start, end });
+    const dataMap = new Map(data.map(d => [d.day, d]));
+
+    return allDays.map(date => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        return dataMap.get(dateStr) || { day: dateStr, ...getZeroDefaults() };
+    });
+}
+
+function getZeroDefaults() {
+    return {
+        coveragePct: 0,
+        vaccinated: 0,
+        total: 0,
+        dropoutRate: 0,
+        onTime: 0,
+        late: 0,
+        timelinessRate: 0,
+        avgWeightKg: 0,
+        underweightRate: 0
+    };
+}
+
+/**
+ * Convert array to CSV string
+ */
+function arrayToCSV(data, headers) {
+    if (!data || data.length === 0) return headers.join(',') + '\n';
+
+    const csvRows = [headers.join(',')];
+    data.forEach(row => {
+        const values = headers.map(header => {
+            const value = row[header];
+            return typeof value === 'string' && value.includes(',')
+                ? `"${value}"`
+                : value ?? '';
+        });
+        csvRows.push(values.join(','));
+    });
+
+    return csvRows.join('\n');
+}
+
+/* ========================================================================== */
+/* EXISTING ENDPOINTS (KEPT AS-IS) */
+/* ========================================================================== */
+
 export const getSystemOverview = async (req, res) => {
     const {
         ward, casteCode, gender, ageGroup,
         startDate = format(new Date(Date.now() - 30 * 864e5), 'yyyy-MM-dd'),
-        endDate = format(new Date(), 'yyyy-MM-dd')
+        endDate = format(new Date(), 'yyyy-MM-dd'),
     } = req.query;
 
     const cacheKey = `overview:${ward}:${casteCode}:${gender}:${ageGroup}:${startDate}:${endDate}`;
 
-    const data = await cachedAnalytics(cacheKey, async () => {
-        console.log('🔄 Generating fresh overview data...');
-
-        // Children - ONLY get overall summary records (vaccineTypeId = 0)
-        const childWhere = {
-            day: { gte: new Date(startDate), lte: new Date(endDate) },
-            vaccineTypeId: 0, // CRITICAL: Only overall summary records
-            doseNumber: 0,    // CRITICAL: Only overall summary records  
-            ...(ward ? { ward: Number(ward) } : {}),
-            ...(casteCode ? { casteCode: Number(casteCode) } : {}),
-            ...(gender ? { gender } : {}),
-            ...(ageGroup ? { ageGroup } : {})
-        };
-
-        const childAgg = await prisma.childAnalyticsFact.aggregate({
-            _sum: {
-                totalRegisteredChildren: true,
-                vaccinatedChildren: true,
-                zeroDoseChildren: true,
-                dueToday: true,
-                overdue: true,
-                onTime: true,
-                late: true
-            },
-            _avg: { dropoutRate: true },
-            where: childWhere
-        });
-
-        console.log('🔍 CHILD DATA:', {
-            total: childAgg._sum.totalRegisteredChildren,
-            vaccinated: childAgg._sum.vaccinatedChildren,
-            zeroDose: childAgg._sum.zeroDoseChildren,
-            dropout: childAgg._avg.dropoutRate
-        });
-
-        const deltaVacc = await getTodayChildDelta(ward, casteCode, gender, ageGroup);
-        const totalVaccinated = (childAgg._sum.vaccinatedChildren || 0) + deltaVacc;
-        const totalChildren = childAgg._sum.totalRegisteredChildren || 1;
-
-        // Mothers - ONLY get overall summary records (doseNumber = 0)
-        const motherWhere = {
-            day: { gte: new Date(startDate), lte: new Date(endDate) },
-            doseNumber: 0, // CRITICAL: Only overall summary records
-            ...(ward ? { ward: Number(ward) } : {}),
-            ...(casteCode ? { casteCode: Number(casteCode) } : {}),
-            // Note: Mother facts don't have gender/ageGroup in your schema
-        };
-
-        const motherAgg = await prisma.motherAnalyticsFact.aggregate({
-            _sum: {
-                totalRegisteredMothers: true,
-                tdDosesGiven: true,
-                mothersWithZeroTD: true,
-                mothersWithFullTD: true,
-                overdue: true
-            },
-            where: motherWhere
-        });
-
-        console.log('🔍 MOTHER DATA:', {
-            total: motherAgg._sum.totalRegisteredMothers,
-            tdDoses: motherAgg._sum.tdDosesGiven,
-            zeroTD: motherAgg._sum.mothersWithZeroTD,
-            fullTD: motherAgg._sum.mothersWithFullTD
-        });
-
-        // Nutrition / growth
-        const growthWhere = {
-            day: { gte: new Date(startDate), lte: new Date(endDate) },
-            ...(ward ? { ward: Number(ward) } : {}),
-            ...(casteCode ? { casteCode: Number(casteCode) } : {}),
-            ...(gender ? { gender } : {}),
-            ...(ageGroup ? { ageGroup } : {})
-        };
-
-        const growthAgg = await prisma.growthAnalyticsFact.aggregate({
-            _sum: {
-                totalWeightRecords: true,
-                underweightCount: true,
-                normalWeightCount: true,
-                overweightCount: true
-            },
-            _avg: { avgWeightKg: true },
-            where: growthWhere
-        });
-
-        console.log('🔍 GROWTH DATA:', {
-            totalRecords: growthAgg._sum.totalWeightRecords,
-            avgWeight: growthAgg._avg.avgWeightKg,
-            underweight: growthAgg._sum.underweightCount,
-            normal: growthAgg._sum.normalWeightCount,
-            overweight: growthAgg._sum.overweightCount
-        });
-
-        return {
-            children: {
-                totalRegistered: childAgg._sum.totalRegisteredChildren || 0,
-                vaccinated: totalVaccinated,
-                zeroDose: childAgg._sum.zeroDoseChildren || 0,
-                coverageRate: (totalVaccinated / totalChildren) * 100,
-                dropoutRate: childAgg._avg.dropoutRate || 0,
-                dueToday: childAgg._sum.dueToday || 0,
-                overdue: childAgg._sum.overdue || 0,
-                onTime: childAgg._sum.onTime || 0,
-                late: childAgg._sum.late || 0
-            },
-            mothers: {
-                totalRegistered: motherAgg._sum.totalRegisteredMothers || 0,
-                tdDosesGiven: motherAgg._sum.tdDosesGiven || 0,
-                zeroTD: motherAgg._sum.mothersWithZeroTD || 0,
-                fullTD: motherAgg._sum.mothersWithFullTD || 0,
-                tdCoverage: ((motherAgg._sum.mothersWithFullTD || 0) / (motherAgg._sum.totalRegisteredMothers || 1)) * 100,
-                overdue: motherAgg._sum.overdue || 0
-            },
-            nutrition: {
-                totalRecords: growthAgg._sum.totalWeightRecords || 0,
-                avgWeightKg: growthAgg._avg.avgWeightKg || 0,
-                underweightRate: ((growthAgg._sum.underweightCount || 0) / (growthAgg._sum.totalWeightRecords || 1)) * 100,
-                normalRate: ((growthAgg._sum.normalWeightCount || 0) / (growthAgg._sum.totalWeightRecords || 1)) * 100,
-                overweightRate: ((growthAgg._sum.overweightCount || 0) / (growthAgg._sum.totalWeightRecords || 1)) * 100
-            }
-        };
-    });
-
-    res.json({ success: true, data });
-};
-// 2. Coverage per vaccine
-export const getVaccineCoverage = async (req, res) => {
-    const { ward, casteCode, gender, ageGroup, vaccineTypeId, doseNumber, startDate = '2020-01-01', endDate = format(new Date(), 'yyyy-MM-dd') } = req.query;
-    const cacheKey = `coverage:${ward}:${casteCode}:${gender}:${ageGroup}:${vaccineTypeId}:${doseNumber}:${startDate}:${endDate}`;
-
-    const data = await cachedAnalytics(cacheKey, async () => {
-        const where = {
-            day: { gte: new Date(startDate), lte: new Date(endDate) },
-            ...(ward ? { ward: Number(ward) } : {}),
-            ...(casteCode ? { casteCode: Number(casteCode) } : {}),
-            ...(gender ? { gender } : {}),
-            ...(ageGroup ? { ageGroup } : {}),
-            ...(vaccineTypeId ? { vaccineTypeId: Number(vaccineTypeId) } : {}),
-            ...(doseNumber ? { doseNumber: Number(doseNumber) } : {})
-        };
-
-        const facts = await prisma.childAnalyticsFact.groupBy({
-            by: ['vaccineTypeId', 'doseNumber', 'ward', 'gender', 'ageGroup', 'casteCode'],
-            _sum: { vaccinatedChildren: true, totalRegisteredChildren: true, zeroDoseChildren: true },
-            where
-        });
-
-        return facts.map(f => ({
-            vaccineTypeId: f.vaccineTypeId,
-            doseNumber: f.doseNumber,
-            ward: f.ward,
-            gender: f.gender,
-            ageGroup: f.ageGroup,
-            casteCode: f.casteCode,
-            vaccinated: f._sum.vaccinatedChildren || 0,
-            total: f._sum.totalRegisteredChildren || 0,
-            zeroDose: f._sum.zeroDoseChildren || 0,
-            coverage: ((f._sum.vaccinatedChildren || 0) / (f._sum.totalRegisteredChildren || 1)) * 100
-        }));
-    });
-
-    res.json({ success: true, data });
-};
-
-// 3. Dropout rates
-export const getDropoutRates = async (req, res) => {
-    const { ward, casteCode, gender, ageGroup, vaccineTypeId, startDate = '2020-01-01', endDate = format(new Date(), 'yyyy-MM-dd') } = req.query;
-    const cacheKey = `dropout:${ward}:${casteCode}:${gender}:${ageGroup}:${vaccineTypeId}:${startDate}:${endDate}`;
-
-    const data = await cachedAnalytics(cacheKey, async () => {
-        const where = {
-            day: { gte: new Date(startDate), lte: new Date(endDate) },
-            ...(ward ? { ward: Number(ward) } : {}),
-            ...(casteCode ? { casteCode: Number(casteCode) } : {}),
-            ...(gender ? { gender } : {}),
-            ...(ageGroup ? { ageGroup } : {}),
-            ...(vaccineTypeId ? { vaccineTypeId: Number(vaccineTypeId) } : {})
-        };
-
-        const facts = await prisma.childAnalyticsFact.groupBy({
-            by: ['vaccineTypeId', 'ward', 'casteCode', 'gender', 'ageGroup'],
-            _avg: { dropoutRate: true },
-            where
-        });
-
-        return facts.map(f => ({
-            vaccineTypeId: f.vaccineTypeId,
-            ward: f.ward,
-            casteCode: f.casteCode,
-            gender: f.gender,
-            ageGroup: f.ageGroup,
-            dropoutRate: (f._avg.dropoutRate || 0) * 100
-        }));
-    });
-
-    res.json({ success: true, data });
-};
-
-// 4. Zero-dose children
-// 4. Zero-dose children
-export const getZeroDoseChildren = async (req, res) => {
-    const { ward, casteCode, gender, ageGroup, startDate = '2020-01-01', endDate = format(new Date(), 'yyyy-MM-dd') } = req.query;
-    const cacheKey = `zerodose:${ward}:${casteCode}:${gender}:${ageGroup}:${startDate}:${endDate}`;
-
-    const data = await cachedAnalytics(cacheKey, async () => {
-        const where = {
-            day: { gte: new Date(startDate), lte: new Date(endDate) },
-            vaccineTypeId: 0, // ONLY overall summary records
-            doseNumber: 0,    // ONLY overall summary records
-            ...(ward ? { ward: Number(ward) } : {}),
-            ...(casteCode ? { casteCode: Number(casteCode) } : {}),
-            ...(gender ? { gender } : {}),
-            ...(ageGroup ? { ageGroup } : {})
-        };
-
-        const agg = await prisma.childAnalyticsFact.aggregate({
-            _sum: { zeroDoseChildren: true, totalRegisteredChildren: true },
-            where
-        });
-
-        return {
-            zeroDoseCount: agg._sum.zeroDoseChildren || 0,
-            zeroDoseRate: ((agg._sum.zeroDoseChildren || 0) / (agg._sum.totalRegisteredChildren || 1)) * 100
-        };
-    });
-
-    res.json({ success: true, data });
-};
-// 5. Growth/Nutrition monitoring
-export const getGrowthMonitoring = async (req, res) => {
-    const { ward, casteCode, gender, ageGroup, startDate = '2020-01-01', endDate = format(new Date(), 'yyyy-MM-dd') } = req.query;
-    const cacheKey = `growth:${ward}:${casteCode}:${gender}:${ageGroup}:${startDate}:${endDate}`;
-
-    const data = await cachedAnalytics(cacheKey, async () => {
-        const where = {
-            day: { gte: new Date(startDate), lte: new Date(endDate) },
-            ...(ward ? { ward: Number(ward) } : {}),
-            ...(casteCode ? { casteCode: Number(casteCode) } : {}),
-            ...(gender ? { gender } : {}),
-            ...(ageGroup ? { ageGroup } : {})
-        };
-
-        const agg = await prisma.growthAnalyticsFact.aggregate({
-            _sum: { totalWeightRecords: true, underweightCount: true, normalWeightCount: true, overweightCount: true },
-            _avg: { avgWeightKg: true },
-            where
-        });
-
-        return {
-            totalRecords: agg._sum.totalWeightRecords || 0,
-            avgWeightKg: agg._avg.avgWeightKg || 0,
-            underweightRate: ((agg._sum.underweightCount || 0) / (agg._sum.totalWeightRecords || 1)) * 100,
-            normalRate: ((agg._sum.normalWeightCount || 0) / (agg._sum.totalWeightRecords || 1)) * 100,
-            overweightRate: ((agg._sum.overweightCount || 0) / (agg._sum.totalWeightRecords || 1)) * 100
-        };
-    });
-
-    res.json({ success: true, data });
-};
-
-// 6. Mothers TD coverage
-export const getTDCoverage = async (req, res) => {
-    const { ward, casteCode, doseNumber, startDate = '2020-01-01', endDate = format(new Date(), 'yyyy-MM-dd') } = req.query;
-    const cacheKey = `tdcoverage:${ward}:${casteCode}:${doseNumber}:${startDate}:${endDate}`;
-
-    const data = await cachedAnalytics(cacheKey, async () => {
-        const where = {
-            day: { gte: new Date(startDate), lte: new Date(endDate) },
-            ...(ward ? { ward: Number(ward) } : {}),
-            ...(casteCode ? { casteCode: Number(casteCode) } : {}),
-            ...(doseNumber ? { doseNumber: Number(doseNumber) } : {})
-        };
-
-        const facts = await prisma.motherAnalyticsFact.groupBy({
-            by: ['ward', 'casteCode', 'doseNumber'],
-            _sum: { tdDosesGiven: true, totalRegisteredMothers: true, mothersWithFullTD: true },
-            where
-        });
-
-        return facts.map(f => ({
-            ward: f.ward,
-            casteCode: f.casteCode,
-            doseNumber: f.doseNumber,
-            tdDosesGiven: f._sum.tdDosesGiven || 0,
-            totalMothers: f._sum.totalRegisteredMothers || 0,
-            fullTD: f._sum.mothersWithFullTD || 0,
-            coverage: ((f._sum.tdDosesGiven || 0) / (f._sum.totalRegisteredMothers || 1)) * 100
-        }));
-    });
-
-    res.json({ success: true, data });
-};
-
-// 7. Cache refresh
-export const refreshCache = async (req, res) => {
-    clearCache();
-    res.json({ success: true, message: 'Cache cleared' });
-};
-
-// 8. Facts status
-export const getFactsStatusController = async (req, res) => {
-    const data = await getFactsStatus();
-    res.json({ success: true, data });
-};
-
-export const getDueOverdue = async (req, res) => {
     try {
-        const {
-            ward,
-            casteCode,
-            gender,
-            ageGroup,
-            startDate = format(new Date(), 'yyyy-MM-dd'),
-            endDate = format(new Date(), 'yyyy-MM-dd'),
-        } = req.query;
-
-        const cacheKey = `dueoverdue:${ward}:${casteCode}:${gender}:${ageGroup}:${startDate}:${endDate}`;
-
         const data = await cachedAnalytics(cacheKey, async () => {
-            const where = {
-                day: { gte: new Date(startDate), lte: new Date(endDate) },
-                vaccineTypeId: 0, // ONLY overall summary records
-                doseNumber: 0,    // ONLY overall summary records
-                ...(ward ? { ward: Number(ward) } : {}),
-                ...(casteCode ? { casteCode: Number(casteCode) } : {}),
-                ...(gender ? { gender } : {}),
-                ...(ageGroup ? { ageGroup } : {}),
-            };
+            const childWhere = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
+            childWhere.vaccineTypeId = 0;
+            childWhere.doseNumber = 0;
 
-            const agg = await prisma.childAnalyticsFact.aggregate({
+            const childAgg = await prisma.childAnalyticsFact.aggregate({
                 _sum: {
+                    totalRegisteredChildren: true,
+                    vaccinatedChildren: true,
+                    zeroDoseChildren: true,
                     dueToday: true,
                     overdue: true,
                     onTime: true,
                     late: true,
                 },
-                where,
+                _avg: { dropoutRate: true },
+                where: childWhere,
+            });
+
+            const dropoutAvg = await prisma.childAnalyticsFact.aggregate({
+                _avg: { dropoutRate: true },
+                where: { ...buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate }), vaccineTypeId: { not: 0 } },
+            });
+
+            const deltaVacc = await getTodayChildDelta(ward, casteCode, gender, ageGroup);
+            const totalVaccinated = (childAgg._sum.vaccinatedChildren || 0) + deltaVacc;
+            const totalChildren = childAgg._sum.totalRegisteredChildren || 1;
+
+            const motherWhere = buildWhereFilters({ ward, casteCode, startDate, endDate });
+            delete motherWhere.gender; delete motherWhere.ageGroup;
+            motherWhere.doseNumber = 0;
+            const motherAgg = await prisma.motherAnalyticsFact.aggregate({
+                _sum: {
+                    totalRegisteredMothers: true,
+                    tdDosesGiven: true,
+                    mothersWithZeroTD: true,
+                    mothersWithFullTD: true,
+                    overdue: true,
+                },
+                where: motherWhere,
+            });
+
+            const growthAgg = await prisma.growthAnalyticsFact.aggregate({
+                _sum: {
+                    totalWeightRecords: true,
+                    underweightCount: true,
+                    normalWeightCount: true,
+                    overweightCount: true,
+                },
+                _avg: { avgWeightKg: true },
+                where: buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate }),
             });
 
             return {
+                children: {
+                    totalRegistered: childAgg._sum.totalRegisteredChildren || 0,
+                    vaccinated: totalVaccinated,
+                    zeroDose: childAgg._sum.zeroDoseChildren || 0,
+                    coverageRate: (totalVaccinated / totalChildren) * 100,
+                    dropoutRate: Number((dropoutAvg._avg.dropoutRate ?? childAgg._avg.dropoutRate ?? 0)),
+                    dueToday: childAgg._sum.dueToday || 0,
+                    overdue: childAgg._sum.overdue || 0,
+                    onTime: childAgg._sum.onTime || 0,
+                    late: childAgg._sum.late || 0,
+                },
+                mothers: {
+                    totalRegistered: motherAgg._sum.totalRegisteredMothers || 0,
+                    tdDosesGiven: motherAgg._sum.tdDosesGiven || 0,
+                    zeroTD: motherAgg._sum.mothersWithZeroTD || 0,
+                    fullTD: motherAgg._sum.mothersWithFullTD || 0,
+                    tdCoverage: ((motherAgg._sum.mothersWithFullTD || 0) / (motherAgg._sum.totalRegisteredMothers || 1)) * 100,
+                    overdue: motherAgg._sum.overdue || 0,
+                },
+                nutrition: {
+                    totalRecords: growthAgg._sum.totalWeightRecords || 0,
+                    avgWeightKg: growthAgg._avg.avgWeightKg || 0,
+                    underweightRate: ((growthAgg._sum.underweightCount || 0) / (growthAgg._sum.totalWeightRecords || 1)) * 100,
+                    normalRate: ((growthAgg._sum.normalWeightCount || 0) / (growthAgg._sum.totalWeightRecords || 1)) * 100,
+                    overweightRate: ((growthAgg._sum.overweightCount || 0) / (growthAgg._sum.totalWeightRecords || 1)) * 100,
+                    underweightCount: growthAgg._sum.underweightCount || 0,
+                    normalWeightCount: growthAgg._sum.normalWeightCount || 0,
+                    overweightCount: growthAgg._sum.overweightCount || 0,
+                },
+            };
+        });
+
+        return res.json({ success: true, data });
+    } catch (err) {
+        console.error('getSystemOverview error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message || err });
+    }
+};
+
+export const getVaccineCoverage = async (req, res) => {
+    const { ward, casteCode, gender, ageGroup, startDate, endDate, groupBy } = req.query;
+    const cacheKey = `coverage:${ward}:${casteCode}:${gender}:${ageGroup}:${startDate}:${endDate}:${groupBy}`;
+
+    try {
+        const data = await cachedAnalytics(cacheKey, async () => {
+            const where = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
+
+            const byVaccine = await prisma.childAnalyticsFact.groupBy({
+                by: ['vaccineTypeId'],
+                _sum: { vaccinatedChildren: true, totalRegisteredChildren: true, zeroDoseChildren: true },
+                where,
+            });
+
+            const mappedVaccine = byVaccine.map(v => ({
+                vaccineTypeId: v.vaccineTypeId ?? 0,
+                vaccinated: v._sum.vaccinatedChildren || 0,
+                total: v._sum.totalRegisteredChildren || 0,
+                zeroDose: v._sum.zeroDoseChildren || 0,
+                coverage: ((v._sum.vaccinatedChildren || 0) / (v._sum.totalRegisteredChildren || 1)) * 100,
+            }));
+
+            let byWard = [];
+            if (groupBy === 'ward') {
+                byWard = await prisma.childAnalyticsFact.groupBy({
+                    by: ['ward'],
+                    _sum: { vaccinatedChildren: true, totalRegisteredChildren: true },
+                    where,
+                });
+            }
+
+            return { byVaccine: mappedVaccine, byWard };
+        });
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error('getVaccineCoverage error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+export const getDropoutRates = async (req, res) => {
+    const { ward, casteCode, gender, ageGroup, startDate, endDate } = req.query;
+    try {
+        const where = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
+        where.vaccineTypeId = { not: 0 };
+        const facts = await prisma.childAnalyticsFact.groupBy({
+            by: ['vaccineTypeId'],
+            _avg: { dropoutRate: true },
+            where,
+        });
+        const mapped = facts.map(f => ({ vaccineTypeId: f.vaccineTypeId, dropoutRate: f._avg.dropoutRate || 0 }));
+        res.json({ success: true, data: mapped });
+    } catch (err) {
+        console.error('getDropoutRates error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+export const getZeroDoseChildren = async (req, res) => {
+    const { ward, casteCode, gender, ageGroup, startDate, endDate } = req.query;
+    try {
+        const where = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
+        where.vaccineTypeId = 0;
+        const agg = await prisma.childAnalyticsFact.aggregate({
+            _sum: { zeroDoseChildren: true, totalRegisteredChildren: true },
+            where,
+        });
+        const zero = agg._sum.zeroDoseChildren || 0;
+        const total = agg._sum.totalRegisteredChildren || 1;
+        res.json({ success: true, data: { zeroDoseCount: zero, zeroDoseRate: (zero / total) * 100 } });
+    } catch (err) {
+        console.error('getZeroDoseChildren error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+export const getGrowthMonitoring = async (req, res) => {
+    const { ward, casteCode, gender, ageGroup, startDate, endDate } = req.query;
+    try {
+        const where = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
+        const agg = await prisma.growthAnalyticsFact.aggregate({
+            _sum: { totalWeightRecords: true, underweightCount: true, normalWeightCount: true, overweightCount: true },
+            _avg: { avgWeightKg: true },
+            where,
+        });
+        const total = agg._sum.totalWeightRecords || 1;
+        res.json({
+            success: true,
+            data: {
+                totalRecords: total,
+                avgWeightKg: agg._avg.avgWeightKg || 0,
+                underweightRate: ((agg._sum.underweightCount || 0) / total) * 100,
+                normalRate: ((agg._sum.normalWeightCount || 0) / total) * 100,
+                overweightRate: ((agg._sum.overweightCount || 0) / total) * 100,
+            },
+        });
+    } catch (err) {
+        console.error('getGrowthMonitoring error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+export const getTDCoverage = async (req, res) => {
+    const { ward, casteCode, startDate, endDate } = req.query;
+    try {
+        const where = buildWhereFilters({ ward, casteCode, startDate, endDate });
+        delete where.gender; delete where.ageGroup;
+        const facts = await prisma.motherAnalyticsFact.groupBy({
+            by: ['doseNumber'],
+            _sum: { tdDosesGiven: true, totalRegisteredMothers: true, mothersWithFullTD: true },
+            where,
+        });
+        const mapped = facts.map(f => ({
+            doseNumber: f.doseNumber,
+            tdDosesGiven: f._sum.tdDosesGiven || 0,
+            totalMothers: f._sum.totalRegisteredMothers || 0,
+            coverage: ((f._sum.mothersWithFullTD || 0) / (f._sum.totalRegisteredMothers || 1)) * 100,
+        }));
+        res.json({ success: true, data: mapped });
+    } catch (err) {
+        console.error('getTDCoverage error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+export const getDueOverdue = async (req, res) => {
+    const { ward, casteCode, gender, ageGroup, startDate, endDate } = req.query;
+    try {
+        const where = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
+        where.vaccineTypeId = 0;
+        const agg = await prisma.childAnalyticsFact.aggregate({
+            _sum: { dueToday: true, overdue: true, onTime: true, late: true },
+            where,
+        });
+        const on = agg._sum.onTime || 0;
+        const late = agg._sum.late || 0;
+        res.json({
+            success: true,
+            data: {
                 dueToday: agg._sum.dueToday || 0,
                 overdue: agg._sum.overdue || 0,
-                onTime: agg._sum.onTime || 0,
-                late: agg._sum.late || 0,
-                timelinessRate:
-                    ((agg._sum.onTime || 0) /
-                        ((agg._sum.onTime || 0) + (agg._sum.late || 0) || 1)) *
-                    100,
+                onTime: on,
+                late,
+                timelinessRate: (on / ((on + late) || 1)) * 100,
+            },
+        });
+    } catch (err) {
+        console.error('getDueOverdue error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+/* ========================================================================== */
+/* NEW ENDPOINTS */
+/* ========================================================================== */
+
+/**
+ * GET /api/analytics/trends
+ * Returns time-series data for coverage, dropout, timeliness, and nutrition
+ */
+export const getTrends = async (req, res) => {
+    const {
+        ward, casteCode, gender, ageGroup,
+        startDate, endDate,
+        granularity = 'day'
+    } = req.query;
+
+    const cacheKey = `trends:${ward}:${casteCode}:${gender}:${ageGroup}:${startDate}:${endDate}:${granularity}`;
+
+    try {
+        console.log(`[CACHE] Checking trends cache: ${cacheKey}`);
+
+        const data = await cachedAnalytics(cacheKey, async () => {
+            console.log('[CACHE] Cache miss - computing trends');
+
+            const where = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
+            where.vaccineTypeId = 0;
+            where.doseNumber = 0;
+
+            // Fetch child facts by day
+            const childFacts = await prisma.childAnalyticsFact.findMany({
+                where,
+                select: {
+                    day: true,
+                    vaccinatedChildren: true,
+                    totalRegisteredChildren: true,
+                    dropoutRate: true,
+                    onTime: true,
+                    late: true,
+                },
+                orderBy: { day: 'asc' }
+            });
+
+            // Fetch growth facts by day
+            const growthWhere = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
+            const growthFacts = await prisma.growthAnalyticsFact.findMany({
+                where: growthWhere,
+                select: {
+                    day: true,
+                    avgWeightKg: true,
+                    underweightCount: true,
+                    totalWeightRecords: true,
+                },
+                orderBy: { day: 'asc' }
+            });
+
+            // Map to time series
+            const childMap = new Map(childFacts.map(f => [format(f.day, 'yyyy-MM-dd'), f]));
+            const growthMap = new Map(growthFacts.map(f => [format(f.day, 'yyyy-MM-dd'), f]));
+
+            // Combine data
+            let combinedData = [];
+            const start = parseDateOrDefault(startDate, new Date('2020-01-01'));
+            const end = parseDateOrDefault(endDate, new Date());
+            const allDays = eachDayOfInterval({ start, end });
+
+            allDays.forEach(date => {
+                const dateStr = format(date, 'yyyy-MM-dd');
+                const child = childMap.get(dateStr);
+                const growth = growthMap.get(dateStr);
+
+                const vaccinated = child?.vaccinatedChildren || 0;
+                const total = child?.totalRegisteredChildren || 1;
+                const onTime = child?.onTime || 0;
+                const late = child?.late || 0;
+                const underweight = growth?.underweightCount || 0;
+                const totalWeight = growth?.totalWeightRecords || 1;
+
+                combinedData.push({
+                    day: dateStr,
+                    coveragePct: (vaccinated / total) * 100,
+                    vaccinated,
+                    total,
+                    dropoutRate: child?.dropoutRate || 0,
+                    onTime,
+                    late,
+                    timelinessRate: (onTime / ((onTime + late) || 1)) * 100,
+                    avgWeightKg: growth?.avgWeightKg || 0,
+                    underweightRate: (underweight / totalWeight) * 100
+                });
+            });
+
+            // Aggregate by granularity
+            if (granularity !== 'day') {
+                combinedData = aggregateByGranularity(combinedData, granularity, startDate, endDate);
+            }
+
+            return {
+                days: combinedData.map(d => d.day),
+                coverage: combinedData.map(d => ({
+                    day: d.day,
+                    coveragePct: Number(d.coveragePct.toFixed(2)),
+                    vaccinated: d.vaccinated,
+                    total: d.total
+                })),
+                dropout: combinedData.map(d => ({
+                    day: d.day,
+                    dropoutRate: Number(d.dropoutRate.toFixed(2))
+                })),
+                timeliness: combinedData.map(d => ({
+                    day: d.day,
+                    onTime: d.onTime,
+                    late: d.late,
+                    timelinessRate: Number(d.timelinessRate.toFixed(2))
+                })),
+                nutrition: combinedData.map(d => ({
+                    day: d.day,
+                    avgWeightKg: Number(d.avgWeightKg.toFixed(2)),
+                    underweightRate: Number(d.underweightRate.toFixed(2))
+                }))
             };
         });
 
         res.json({ success: true, data });
-    } catch (error) {
-        console.error('Error in getDueOverdue:', error);
-        res.status(500).json({ success: false, message: 'Server error', error });
+    } catch (err) {
+        console.error('getTrends error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
     }
+};
+
+/**
+ * GET /api/analytics/ward-performance
+ * Returns ward rankings for coverage, overdue, dropout, underweight
+ */
+export const getWardPerformance = async (req, res) => {
+    const {
+        startDate, endDate,
+        limit = '10',
+        sortBy = 'coverage' // coverage, overdue, dropoutRate, underweightRate
+    } = req.query;
+
+    const cacheKey = `ward-performance:${startDate}:${endDate}:${limit}:${sortBy}`;
+
+    try {
+        console.log(`[CACHE] Checking ward-performance cache: ${cacheKey}`);
+
+        const data = await cachedAnalytics(cacheKey, async () => {
+            console.log('[CACHE] Cache miss - computing ward performance');
+
+            const where = buildWhereFilters({ startDate, endDate });
+            where.vaccineTypeId = 0;
+            where.doseNumber = 0;
+
+            // Child data by ward
+            const childByWard = await prisma.childAnalyticsFact.groupBy({
+                by: ['ward'],
+                _sum: {
+                    vaccinatedChildren: true,
+                    totalRegisteredChildren: true,
+                    overdue: true,
+                },
+                _avg: { dropoutRate: true },
+                where,
+            });
+
+            // Growth data by ward
+            const growthWhere = buildWhereFilters({ startDate, endDate });
+            const growthByWard = await prisma.growthAnalyticsFact.groupBy({
+                by: ['ward'],
+                _sum: {
+                    underweightCount: true,
+                    totalWeightRecords: true,
+                },
+                where: growthWhere,
+            });
+
+            const growthMap = new Map(growthByWard.map(g => [
+                g.ward,
+                {
+                    underweightCount: g._sum.underweightCount || 0,
+                    totalWeightRecords: g._sum.totalWeightRecords || 0
+                }
+            ]));
+
+            // Combine and calculate metrics
+            let wardData = childByWard.map(w => {
+                const growth = growthMap.get(w.ward) || { underweightCount: 0, totalWeightRecords: 1 };
+                const vaccinated = w._sum.vaccinatedChildren || 0;
+                const total = w._sum.totalRegisteredChildren || 1;
+
+                return {
+                    ward: w.ward,
+                    coverage: (vaccinated / total) * 100,
+                    overdue: w._sum.overdue || 0,
+                    dropoutRate: w._avg.dropoutRate || 0,
+                    underweightRate: (growth.underweightCount / growth.totalWeightRecords) * 100
+                };
+            });
+
+            // Sort based on sortBy parameter
+            wardData.sort((a, b) => {
+                if (sortBy === 'coverage') return b.coverage - a.coverage;
+                if (sortBy === 'overdue') return a.overdue - b.overdue;
+                if (sortBy === 'dropoutRate') return a.dropoutRate - b.dropoutRate;
+                if (sortBy === 'underweightRate') return a.underweightRate - b.underweightRate;
+                return 0;
+            });
+
+            // Limit results
+            wardData = wardData.slice(0, parseInt(limit));
+
+            return wardData.map(w => ({
+                ward: w.ward,
+                coverage: Number(w.coverage.toFixed(2)),
+                overdue: w.overdue,
+                dropoutRate: Number(w.dropoutRate.toFixed(2)),
+                underweightRate: Number(w.underweightRate.toFixed(2))
+            }));
+        });
+
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error('getWardPerformance error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+/**
+ * GET /api/analytics/disparities
+ * Returns coverage and nutrition breakdown by gender or caste
+ */
+export const getDisparities = async (req, res) => {
+    const {
+        startDate, endDate,
+        breakdown = 'gender' // gender or casteCode
+    } = req.query;
+
+    const cacheKey = `disparities:${startDate}:${endDate}:${breakdown}`;
+
+    try {
+        const data = await cachedAnalytics(cacheKey, async () => {
+            const where = buildWhereFilters({ startDate, endDate });
+            where.vaccineTypeId = 0;
+            where.doseNumber = 0;
+
+            const groupByField = breakdown === 'gender' ? 'gender' : 'casteCode';
+
+            // Child data by breakdown
+            const childByGroup = await prisma.childAnalyticsFact.groupBy({
+                by: [groupByField],
+                _sum: {
+                    vaccinatedChildren: true,
+                    totalRegisteredChildren: true,
+                    zeroDoseChildren: true,
+                },
+                _avg: { dropoutRate: true },
+                where,
+            });
+
+            // Growth data by breakdown
+            const growthWhere = buildWhereFilters({ startDate, endDate });
+            const growthByGroup = await prisma.growthAnalyticsFact.groupBy({
+                by: [groupByField],
+                _sum: {
+                    underweightCount: true,
+                    normalWeightCount: true,
+                    overweightCount: true,
+                    totalWeightRecords: true,
+                },
+                where: growthWhere,
+            });
+
+            const growthMap = new Map(growthByGroup.map(g => [
+                g[groupByField],
+                {
+                    underweightCount: g._sum.underweightCount || 0,
+                    normalWeightCount: g._sum.normalWeightCount || 0,
+                    overweightCount: g._sum.overweightCount || 0,
+                    totalWeightRecords: g._sum.totalWeightRecords || 0
+                }
+            ]));
+
+            return childByGroup
+                .filter(g => g[groupByField]) // Exclude null groups
+                .map(g => {
+                    const growth = growthMap.get(g[groupByField]) || {
+                        underweightCount: 0,
+                        normalWeightCount: 0,
+                        overweightCount: 0,
+                        totalWeightRecords: 1
+                    };
+                    const vaccinated = g._sum.vaccinatedChildren || 0;
+                    const total = g._sum.totalRegisteredChildren || 1;
+
+                    return {
+                        group: g[groupByField],
+                        coverage: Number(((vaccinated / total) * 100).toFixed(2)),
+                        dropoutRate: Number((g._avg.dropoutRate || 0).toFixed(2)),
+                        zeroDose: g._sum.zeroDoseChildren || 0,
+                        underweightRate: Number(((growth.underweightCount / growth.totalWeightRecords) * 100).toFixed(2)),
+                        normalRate: Number(((growth.normalWeightCount / growth.totalWeightRecords) * 100).toFixed(2)),
+                        overweightRate: Number(((growth.overweightCount / growth.totalWeightRecords) * 100).toFixed(2)),
+                        totalChildren: total,
+                        vaccinatedChildren: vaccinated
+                    };
+                });
+        });
+
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error('getDisparities error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+/**
+ * GET /api/analytics/comparison
+ * Compare two date ranges for key KPIs
+ */
+export const getComparison = async (req, res) => {
+    const {
+        startDate, endDate,
+        compareStartDate, compareEndDate,
+        ward, casteCode, gender, ageGroup
+    } = req.query;
+
+    if (!compareStartDate || !compareEndDate) {
+        return res.status(400).json({
+            success: false,
+            message: 'compareStartDate and compareEndDate are required'
+        });
+    }
+
+    const cacheKey = `comparison:${startDate}:${endDate}:${compareStartDate}:${compareEndDate}:${ward}:${casteCode}:${gender}:${ageGroup}`;
+
+    try {
+        const data = await cachedAnalytics(cacheKey, async () => {
+            // Current period
+            const currentWhere = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
+            currentWhere.vaccineTypeId = 0;
+            currentWhere.doseNumber = 0;
+
+            const currentChild = await prisma.childAnalyticsFact.aggregate({
+                _sum: {
+                    vaccinatedChildren: true,
+                    totalRegisteredChildren: true,
+                    zeroDoseChildren: true,
+                    overdue: true,
+                    onTime: true,
+                    late: true,
+                },
+                _avg: { dropoutRate: true },
+                where: currentWhere,
+            });
+
+            const currentGrowthWhere = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
+            const currentGrowth = await prisma.growthAnalyticsFact.aggregate({
+                _sum: {
+                    underweightCount: true,
+                    totalWeightRecords: true,
+                },
+                _avg: { avgWeightKg: true },
+                where: currentGrowthWhere,
+            });
+
+            // Previous period
+            const previousWhere = buildWhereFilters({
+                ward, casteCode, gender, ageGroup,
+                startDate: compareStartDate,
+                endDate: compareEndDate
+            });
+            previousWhere.vaccineTypeId = 0;
+            previousWhere.doseNumber = 0;
+
+            const previousChild = await prisma.childAnalyticsFact.aggregate({
+                _sum: {
+                    vaccinatedChildren: true,
+                    totalRegisteredChildren: true,
+                    zeroDoseChildren: true,
+                    overdue: true,
+                    onTime: true,
+                    late: true,
+                },
+                _avg: { dropoutRate: true },
+                where: previousWhere,
+            });
+
+            const previousGrowthWhere = buildWhereFilters({
+                ward, casteCode, gender, ageGroup,
+                startDate: compareStartDate,
+                endDate: compareEndDate
+            });
+            const previousGrowth = await prisma.growthAnalyticsFact.aggregate({
+                _sum: {
+                    underweightCount: true,
+                    totalWeightRecords: true,
+                },
+                _avg: { avgWeightKg: true },
+                where: previousGrowthWhere,
+            });
+
+            // Calculate metrics
+            const calcMetric = (curr, prev) => {
+                const changePct = prev !== 0 ? ((curr - prev) / prev) * 100 : 0;
+                return {
+                    current: Number(curr.toFixed(2)),
+                    previous: Number(prev.toFixed(2)),
+                    changePct: Number(changePct.toFixed(2))
+                };
+            };
+
+            const currentCoverage = (currentChild._sum.vaccinatedChildren || 0) / (currentChild._sum.totalRegisteredChildren || 1) * 100;
+            const previousCoverage = (previousChild._sum.vaccinatedChildren || 0) / (previousChild._sum.totalRegisteredChildren || 1) * 100;
+
+            const currentTimeliness = (currentChild._sum.onTime || 0) / ((currentChild._sum.onTime + currentChild._sum.late) || 1) * 100;
+            const previousTimeliness = (previousChild._sum.onTime || 0) / ((previousChild._sum.onTime + previousChild._sum.late) || 1) * 100;
+
+            const currentUnderweight = (currentGrowth._sum.underweightCount || 0) / (currentGrowth._sum.totalWeightRecords || 1) * 100;
+            const previousUnderweight = (previousGrowth._sum.underweightCount || 0) / (previousGrowth._sum.totalWeightRecords || 1) * 100;
+
+            return {
+                coverage: calcMetric(currentCoverage, previousCoverage),
+                dropoutRate: calcMetric(currentChild._avg.dropoutRate || 0, previousChild._avg.dropoutRate || 0),
+                zeroDose: calcMetric(currentChild._sum.zeroDoseChildren || 0, previousChild._sum.zeroDoseChildren || 0),
+                overdue: calcMetric(currentChild._sum.overdue || 0, previousChild._sum.overdue || 0),
+                timeliness: calcMetric(currentTimeliness, previousTimeliness),
+                underweightRate: calcMetric(currentUnderweight, previousUnderweight),
+                avgWeight: calcMetric(currentGrowth._avg.avgWeightKg || 0, previousGrowth._avg.avgWeightKg || 0)
+            };
+        });
+
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error('getComparison error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+/**
+ * GET /api/analytics/export
+ * Export analytics data as CSV
+ */
+export const exportAnalytics = async (req, res) => {
+    const { type, ...filters } = req.query;
+
+    try {
+        let data = [];
+        let headers = [];
+        let filename = 'analytics-export.csv';
+
+        switch (type) {
+            case 'overview': {
+                const overviewReq = { query: filters };
+                const overviewRes = {
+                    json: (result) => { data = [result.data]; }
+                };
+                await getSystemOverview(overviewReq, overviewRes);
+
+                headers = ['metric', 'children', 'mothers', 'nutrition'];
+                data = [
+                    { metric: 'Total Registered', children: data[0]?.children?.totalRegistered, mothers: data[0]?.mothers?.totalRegistered, nutrition: data[0]?.nutrition?.totalRecords },
+                    { metric: 'Vaccinated/TD', children: data[0]?.children?.vaccinated, mothers: data[0]?.mothers?.tdDosesGiven, nutrition: '-' },
+                    { metric: 'Coverage %', children: data[0]?.children?.coverageRate?.toFixed(2), mothers: data[0]?.mothers?.tdCoverage?.toFixed(2), nutrition: '-' },
+                    { metric: 'Dropout %', children: data[0]?.children?.dropoutRate?.toFixed(2), mothers: '-', nutrition: '-' },
+                    { metric: 'Overdue', children: data[0]?.children?.overdue, mothers: data[0]?.mothers?.overdue, nutrition: '-' },
+                ];
+                filename = 'overview-export.csv';
+                break;
+            }
+
+            case 'coverage': {
+                const coverageReq = { query: filters };
+                const coverageRes = {
+                    json: (result) => { data = result.data.byVaccine; }
+                };
+                await getVaccineCoverage(coverageReq, coverageRes);
+
+                headers = ['vaccineTypeId', 'vaccinated', 'total', 'zeroDose', 'coverage'];
+                filename = 'coverage-export.csv';
+                break;
+            }
+
+            case 'trends': {
+                const trendsReq = { query: filters };
+                const trendsRes = {
+                    json: (result) => {
+                        const trends = result.data;
+                        data = trends.days.map((day, i) => ({
+                            day,
+                            coveragePct: trends.coverage[i]?.coveragePct,
+                            vaccinated: trends.coverage[i]?.vaccinated,
+                            total: trends.coverage[i]?.total,
+                            dropoutRate: trends.dropout[i]?.dropoutRate,
+                            timelinessRate: trends.timeliness[i]?.timelinessRate,
+                            avgWeightKg: trends.nutrition[i]?.avgWeightKg,
+                            underweightRate: trends.nutrition[i]?.underweightRate
+                        }));
+                    }
+                };
+                await getTrends(trendsReq, trendsRes);
+
+                headers = ['day', 'coveragePct', 'vaccinated', 'total', 'dropoutRate', 'timelinessRate', 'avgWeightKg', 'underweightRate'];
+                filename = 'trends-export.csv';
+                break;
+            }
+
+            case 'ward-performance': {
+                const wardReq = { query: filters };
+                const wardRes = {
+                    json: (result) => { data = result.data; }
+                };
+                await getWardPerformance(wardReq, wardRes);
+
+                headers = ['ward', 'coverage', 'overdue', 'dropoutRate', 'underweightRate'];
+                filename = 'ward-performance-export.csv';
+                break;
+            }
+
+            case 'disparities': {
+                const dispReq = { query: filters };
+                const dispRes = {
+                    json: (result) => { data = result.data; }
+                };
+                await getDisparities(dispReq, dispRes);
+
+                headers = ['group', 'coverage', 'dropoutRate', 'zeroDose', 'underweightRate', 'totalChildren', 'vaccinatedChildren'];
+                filename = 'disparities-export.csv';
+                break;
+            }
+
+            default:
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid export type. Valid types: overview, coverage, trends, ward-performance, disparities'
+                });
+        }
+
+        const csv = arrayToCSV(data, headers);
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(csv);
+    } catch (err) {
+        console.error('exportAnalytics error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+/**
+ * GET /api/analytics/status (Enhanced)
+ * Returns processing status and data health metrics
+ */
+export const getFactsStatusController = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const meta = await getFactsStatus();
+
+        // Count processed rows in date range
+        let counts = { childFacts: 0, motherFacts: 0, growthFacts: 0 };
+
+        if (startDate && endDate) {
+            const where = buildWhereFilters({ startDate, endDate });
+
+            const [childCount, motherCount, growthCount] = await Promise.all([
+                prisma.childAnalyticsFact.count({ where }),
+                prisma.motherAnalyticsFact.count({ where }),
+                prisma.growthAnalyticsFact.count({ where })
+            ]);
+
+            counts = {
+                childFacts: childCount,
+                motherFacts: motherCount,
+                growthFacts: growthCount
+            };
+        }
+
+        res.json({
+            success: true,
+            data: {
+                lastProcessedChild: meta?.lastProcessedChild,
+                lastProcessedMother: meta?.lastProcessedMother,
+                lastProcessedGrowth: meta?.lastProcessedGrowth,
+                counts
+            }
+        });
+    } catch (err) {
+        console.error('getFactsStatusController error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+/**
+ * POST /api/analytics/refresh-cache
+ * Clear analytics cache
+ */
+export const refreshCache = (_, res) => {
+    console.log('[CACHE] Clearing all analytics cache');
+    clearCache();
+    res.json({ success: true, message: 'Cache cleared' });
 };
