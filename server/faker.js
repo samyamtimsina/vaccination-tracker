@@ -135,3 +135,99 @@ const generateData = async (totalChildren, batchSize = 1000) => {
 
 // --- Run generator ---
 generateData(1000000, 1000);
+
+// // File: prisma/seed_debug_schedule.js
+// // import { prisma } from "../utils/prisma.js";
+
+// import { prisma } from './utils/prisma.js';
+
+// const today = new Date();
+
+// async function main() {
+//     console.log("🧩 Seeding precise debug dataset with real schedule…");
+
+//     // --- Clean previous test data (safe for dev only) ---
+//     await prisma.vaccinationRecord.deleteMany();
+//     await prisma.childDueVaccine.deleteMany();
+//     await prisma.child.deleteMany();
+
+//     const admin = await prisma.user.findFirst({ where: { role: "SUPER_ADMIN" } });
+//     const schedule = await prisma.vaccineScheduleVersion.findFirst({
+//         include: { doses: { include: { vaccineType: true } } },
+//     });
+
+//     const children = await prisma.child.createManyAndReturn({
+//         data: Array.from({ length: 10 }, (_, i) => ({
+//             fullName: `Child_${i + 1}`,
+//             wardNumber: 1,
+//             gender: i % 2 === 0 ? "MALE" : "FEMALE",
+//             birthDate: new Date(2023, 0, 1),
+//             createdById: admin.id,
+//             casteCode: 1,
+//             isFromOtherMunicipality: false,
+//             parentName: "Parent",
+//             phoneNumber: `98000000${i}`,
+//             email: `child${i + 1}@test.com`,
+//             tole: "Central Tole",
+//         })),
+//     });
+
+//     const vaccs = [];
+//     const dues = [];
+
+//     for (const child of children) {
+//         const index = parseInt(child.fullName.split("_")[1]);
+//         const allDoses = schedule.doses;
+
+//         // Each child gets a unique pattern
+//         for (const d of allDoses) {
+//             const give = (() => {
+//                 if (index <= 3) return true; // fully vaccinated
+//                 if (index <= 6) return d.doseNumber <= 2; // partial (early doses only)
+//                 if (index <= 8) return false; // zero-dose
+//                 if (index >= 9) {
+//                     // 10-year-old girl scenario (HPV only)
+//                     if (child.gender === "FEMALE" && d.vaccineType.name === "HPV")
+//                         return d.doseNumber === 1;
+//                     return false;
+//                 }
+//             })();
+
+//             dues.push({
+//                 childId: child.id,
+//                 vaccineTypeId: d.vaccineTypeId,
+//                 doseNumber: d.doseNumber,
+//                 dueDate: today,
+//                 isCompleted: give,
+//                 scheduleVersion: schedule.id,
+//             });
+
+//             if (give) {
+//                 vaccs.push({
+//                     citizenId: child.id,
+//                     vaccineTypeId: d.vaccineTypeId,
+//                     doseNumber: d.doseNumber,
+//                     dateGiven: today,
+//                     isComplete: true,
+//                     type: "current",
+//                     createdById: admin.id,
+//                     administeredById: admin.id,
+//                     wardOfVaccination: 1,
+//                 });
+//             }
+//         }
+//     }
+
+//     await prisma.childDueVaccine.createMany({ data: dues });
+//     await prisma.vaccinationRecord.createMany({ data: vaccs });
+
+//     console.log("✅ Seeded 10 children:");
+//     console.log("- 3 fully vaccinated");
+//     console.log("- 3 partial");
+//     console.log("- 2 zero-dose");
+//     console.log("- 2 HPV-only (age/gender test)");
+// }
+
+// main()
+//     .catch(console.error)
+//     .finally(() => prisma.$disconnect());

@@ -14,89 +14,86 @@ async function updateChildFacts() {
     console.time('⏱️ ChildAnalyticsFact Duration');
 
     try {
-        // 🧮 STEP 0️⃣: Base counts
         log('Counting base tables...');
         const [{ count: childCount }] = await prisma.$queryRaw`
-            SELECT COUNT(*)::int AS count FROM "Child"
-        `;
+      SELECT COUNT(*)::int AS count FROM "Child"
+    `;
         const [{ count: vaxCount }] = await prisma.$queryRaw`
-            SELECT COUNT(*)::int AS count FROM "VaccinationRecord" WHERE "isComplete" = true
-        `;
+      SELECT COUNT(*)::int AS count FROM "VaccinationRecord" WHERE "isComplete" = true
+    `;
         log(`Counts → Child: ${childCount}, Completed Vaccinations: ${vaxCount}`);
 
-        // 🧹 STEP 1️⃣: Clear today's facts
         await prisma.$executeRawUnsafe(`
-            DELETE FROM "ChildAnalyticsFact" WHERE "day" = CURRENT_DATE;
-        `);
+      DELETE FROM "ChildAnalyticsFact" WHERE "day" = CURRENT_DATE;
+    `);
         log('Cleared existing ChildAnalyticsFact data for today.');
 
         console.time('⏱️ ChildAnalyticsFact Insert Time');
 
         // 👶 STEP 2️⃣: Insert overall per-ward child summary
         await prisma.$executeRawUnsafe(`
-            INSERT INTO "ChildAnalyticsFact" (
-                "day", "ward", "vaccineTypeId", "doseNumber",
-                "gender", "ageGroup", "casteCode",
-                "totalRegisteredChildren", "vaccinatedChildren",
-                "zeroDoseChildren", "dueToday", "overdue",
-                "onTime", "late", "dropoutRate",
-                "createdAt", "updatedAt"
-            )
-            WITH child_stats AS (
-                SELECT 
-                    c.id,
-                    COALESCE(c."wardNumber", 1) AS ward,
-                    COALESCE(NULLIF(c."gender", ''), 'ALL') AS gender,
-                    COALESCE(c."casteCode", 0) AS casteCode,
-                    CASE
-                        WHEN c."birthDate" IS NULL THEN 'ALL'
-                        WHEN EXTRACT(YEAR FROM AGE(c."birthDate")) < 1 THEN '0-1y'
-                        WHEN EXTRACT(YEAR FROM AGE(c."birthDate")) < 5 THEN '1-5y'
-                        ELSE '5y+'
-                    END AS ageGroup,
-                    EXISTS (
-                        SELECT 1 FROM "VaccinationRecord" vr 
-                        WHERE vr."citizenId" = c.id AND vr."isComplete" = true
-                    ) AS is_vaccinated,
-                    (SELECT COUNT(*) FROM "ChildDueVaccine" cdv 
-                        WHERE cdv."childId" = c.id AND cdv."dueDate" = CURRENT_DATE AND cdv."isCompleted" = false
-                    ) AS due_today,
-                    (SELECT COUNT(*) FROM "ChildDueVaccine" cdv 
-                        WHERE cdv."childId" = c.id AND cdv."dueDate" < CURRENT_DATE AND cdv."isCompleted" = false
-                    ) AS overdue_count
-                FROM "Child" c
-            )
-            SELECT
-                CURRENT_DATE,
-                cs.ward,
-                0 AS "vaccineTypeId",
-                0 AS "doseNumber",
-                cs.gender,
-                cs.ageGroup,
-                cs.casteCode,
-                COUNT(cs.id) AS totalRegisteredChildren,
-                COUNT(*) FILTER (WHERE cs.is_vaccinated) AS vaccinatedChildren,
-                COUNT(*) FILTER (WHERE NOT cs.is_vaccinated) AS zeroDoseChildren,
-                SUM(cs.due_today) AS dueToday,
-                SUM(cs.overdue_count) AS overdue,
-                0,0,0,
-                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-            FROM child_stats cs
-            GROUP BY cs.ward, cs.gender, cs.ageGroup, cs.casteCode;
-        `);
-
-        // 🧩 STEP 3.5️⃣: Insert per-vaccine summary rows (doseNumber = 0)
-        log('Inserting per-vaccine summary rows...', '📊');
-        await prisma.$executeRawUnsafe(`
-    INSERT INTO "ChildAnalyticsFact" (
+      INSERT INTO "ChildAnalyticsFact" (
         "day", "ward", "vaccineTypeId", "doseNumber",
         "gender", "ageGroup", "casteCode",
         "totalRegisteredChildren", "vaccinatedChildren",
         "zeroDoseChildren", "dueToday", "overdue",
         "onTime", "late", "dropoutRate",
         "createdAt", "updatedAt"
-    )
-    SELECT
+      )
+      WITH child_stats AS (
+        SELECT 
+          c.id,
+          COALESCE(c."wardNumber", 1) AS ward,
+          COALESCE(NULLIF(c."gender", ''), 'ALL') AS gender,
+          COALESCE(c."casteCode", 0) AS casteCode,
+          CASE
+            WHEN c."birthDate" IS NULL THEN 'ALL'
+            WHEN EXTRACT(YEAR FROM AGE(c."birthDate")) < 1 THEN '0-1y'
+            WHEN EXTRACT(YEAR FROM AGE(c."birthDate")) < 5 THEN '1-5y'
+            ELSE '5y+'
+          END AS ageGroup,
+          EXISTS (
+            SELECT 1 FROM "VaccinationRecord" vr 
+            WHERE vr."citizenId" = c.id AND vr."isComplete" = true
+          ) AS is_vaccinated,
+          (SELECT COUNT(*) FROM "ChildDueVaccine" cdv 
+            WHERE cdv."childId" = c.id AND cdv."dueDate" = CURRENT_DATE AND cdv."isCompleted" = false
+          ) AS due_today,
+          (SELECT COUNT(*) FROM "ChildDueVaccine" cdv 
+            WHERE cdv."childId" = c.id AND cdv."dueDate" < CURRENT_DATE AND cdv."isCompleted" = false
+          ) AS overdue_count
+        FROM "Child" c
+      )
+      SELECT
+        CURRENT_DATE,
+        cs.ward,
+        0 AS "vaccineTypeId",
+        0 AS "doseNumber",
+        cs.gender,
+        cs.ageGroup,
+        cs.casteCode,
+        COUNT(cs.id) AS totalRegisteredChildren,
+        COUNT(*) FILTER (WHERE cs.is_vaccinated) AS vaccinatedChildren,
+        COUNT(*) FILTER (WHERE NOT cs.is_vaccinated) AS zeroDoseChildren,
+        SUM(cs.due_today) AS dueToday,
+        SUM(cs.overdue_count) AS overdue,
+        0, 0, 0,
+        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      FROM child_stats cs
+      GROUP BY cs.ward, cs.gender, cs.ageGroup, cs.casteCode;
+    `);
+
+        // 🧩 STEP 3.5️⃣: Insert per-vaccine summary
+        await prisma.$executeRawUnsafe(`
+      INSERT INTO "ChildAnalyticsFact" (
+        "day", "ward", "vaccineTypeId", "doseNumber",
+        "gender", "ageGroup", "casteCode",
+        "totalRegisteredChildren", "vaccinatedChildren",
+        "zeroDoseChildren", "dueToday", "overdue",
+        "onTime", "late", "dropoutRate",
+        "createdAt", "updatedAt"
+      )
+      SELECT
         CURRENT_DATE,
         COALESCE(vr."wardOfVaccination", 1) AS ward,
         vr."vaccineTypeId",
@@ -109,90 +106,103 @@ async function updateChildFacts() {
         COUNT(DISTINCT CASE WHEN NOT vr."isComplete" THEN c.id END) AS zeroDoseChildren,
         0, 0, 0, 0, 0,
         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-    FROM "VaccinationRecord" vr
-    JOIN "Child" c ON c.id = vr."citizenId"
-    WHERE vr."vaccineTypeId" IS NOT NULL
-    GROUP BY COALESCE(vr."wardOfVaccination", 1), vr."vaccineTypeId";
-`);
+      FROM "VaccinationRecord" vr
+      JOIN "Child" c ON c.id = vr."citizenId"
+      WHERE vr."vaccineTypeId" IS NOT NULL
+      GROUP BY COALESCE(vr."wardOfVaccination", 1), vr."vaccineTypeId";
+    `);
+
         log('✅ Inserted per-vaccine summary rows.');
 
-
-        console.timeEnd('⏱️ ChildAnalyticsFact Insert Time');
-
-        // 📉 STEP 4️⃣: Compute dropout per vaccine type using first & last dose from Dose table
-        log('Calculating dropout rates per vaccine type (auto-detected)...', '📉');
+        // 📉 STEP 4️⃣: Compute dropout per vaccine type (only for multi-primary-dose vaccines)
+        log('Calculating dropout rates per vaccine type (multi-dose only)...', '📉');
         await prisma.$executeRawUnsafe(`
-    WITH dose_bounds AS (
-        SELECT 
-            "vaccineTypeId",
-            MIN("doseNumber") AS first_dose_no,
-            MAX("doseNumber") AS last_dose_no
+      WITH eligible_vaccines AS (
+        SELECT "vaccineTypeId"
         FROM "Dose"
+        WHERE "isPrimary" = true
         GROUP BY "vaccineTypeId"
-    ),
-    dose_counts AS (
+        HAVING COUNT(*) > 1
+      ),
+      dose_bounds AS (
         SELECT 
-            vr."vaccineTypeId",
-            COALESCE(vr."wardOfVaccination", 1) AS ward,
-            COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.first_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS first_dose,
-            COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.last_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS last_dose
+          d."vaccineTypeId",
+          MIN(d."doseNumber") AS first_dose_no,
+          MAX(d."doseNumber") AS last_dose_no
+        FROM "Dose" d
+        JOIN eligible_vaccines ev ON ev."vaccineTypeId" = d."vaccineTypeId"
+        WHERE d."isPrimary" = true
+        GROUP BY d."vaccineTypeId"
+      ),
+      dose_counts AS (
+        SELECT 
+          vr."vaccineTypeId",
+          COALESCE(vr."wardOfVaccination", 1) AS ward,
+          COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.first_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS first_dose,
+          COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.last_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS last_dose
         FROM "VaccinationRecord" vr
         JOIN dose_bounds db ON db."vaccineTypeId" = vr."vaccineTypeId"
         GROUP BY vr."vaccineTypeId", COALESCE(vr."wardOfVaccination", 1)
-    ),
-    dropout_calc AS (
+      ),
+      dropout_calc AS (
         SELECT
-            "vaccineTypeId",
-            ward,
-            first_dose,
-            last_dose,
-            CASE 
-                WHEN first_dose = 0 THEN 0  -- No first doses, no dropout calculation
-                WHEN last_dose > first_dose THEN 0  -- More last doses than first (data issue), treat as 0% dropout
-                ELSE ROUND(
-                    (1.0 - (last_dose::numeric / NULLIF(first_dose, 0))) * 100, 2
-                )
-            END AS dropout_rate
+          "vaccineTypeId",
+          ward,
+          first_dose,
+          last_dose,
+          CASE 
+            WHEN first_dose = 0 THEN 0
+            WHEN last_dose > first_dose THEN 0
+            ELSE ROUND((1.0 - (last_dose::numeric / NULLIF(first_dose, 0))) * 100, 2)
+          END AS dropout_rate
         FROM dose_counts
-    )
-    UPDATE "ChildAnalyticsFact" caf
-    SET "dropoutRate" = dc.dropout_rate
-    FROM dropout_calc dc
-    WHERE caf."ward" = dc.ward
-      AND caf."vaccineTypeId" = dc."vaccineTypeId"
-      AND caf."doseNumber" = 0
-      AND caf."day" = CURRENT_DATE;
-`);
+      )
+      UPDATE "ChildAnalyticsFact" caf
+      SET "dropoutRate" = dc.dropout_rate
+      FROM dropout_calc dc
+      WHERE caf."ward" = dc.ward
+        AND caf."vaccineTypeId" = dc."vaccineTypeId"
+        AND caf."doseNumber" = 0
+        AND caf."day" = CURRENT_DATE;
+    `);
+
         log('✅ Dropout rates computed successfully.');
-        // Add this after the dropout calculation to log data quality issues
+
+        // 🧾 STEP 5️⃣: Validate data quality
         const dataQualityCheck = await prisma.$queryRaw`
-    WITH dose_bounds AS (
-        SELECT 
-            "vaccineTypeId",
-            MIN("doseNumber") AS first_dose_no,
-            MAX("doseNumber") AS last_dose_no
+      WITH eligible_vaccines AS (
+        SELECT "vaccineTypeId"
         FROM "Dose"
+        WHERE "isPrimary" = true
         GROUP BY "vaccineTypeId"
-    ),
-    dose_counts AS (
+        HAVING COUNT(*) > 1
+      ),
+      dose_bounds AS (
         SELECT 
-            vr."vaccineTypeId",
-            vt.name as vaccine_name,
-            COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.first_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS first_dose,
-            COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.last_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS last_dose
+          d."vaccineTypeId",
+          MIN(d."doseNumber") AS first_dose_no,
+          MAX(d."doseNumber") AS last_dose_no
+        FROM "Dose" d
+        JOIN eligible_vaccines ev ON ev."vaccineTypeId" = d."vaccineTypeId"
+        WHERE d."isPrimary" = true
+        GROUP BY d."vaccineTypeId"
+      ),
+      dose_counts AS (
+        SELECT 
+          vr."vaccineTypeId",
+          vt.name AS vaccine_name,
+          COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.first_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS first_dose,
+          COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.last_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS last_dose
         FROM "VaccinationRecord" vr
         JOIN dose_bounds db ON db."vaccineTypeId" = vr."vaccineTypeId"
         JOIN "VaccineType" vt ON vt.id = vr."vaccineTypeId"
         GROUP BY vr."vaccineTypeId", vt.name
-    )
-    SELECT 
-        vaccine_name,
-        first_dose,
-        last_dose,
-        CASE WHEN last_dose > first_dose THEN 'DATA_ISSUE' ELSE 'OK' END as status
-    FROM dose_counts 
-    WHERE last_dose > first_dose;
-`;
+      )
+      SELECT vaccine_name, first_dose, last_dose,
+        CASE WHEN last_dose > first_dose THEN 'DATA_ISSUE' ELSE 'OK' END AS status
+      FROM dose_counts
+      WHERE last_dose > first_dose;
+    `;
 
         if (dataQualityCheck.length > 0) {
             log(`⚠️ Data quality issues found:`, '⚠️');
@@ -201,10 +211,9 @@ async function updateChildFacts() {
             });
         }
 
-        // 🧾 STEP 5️⃣: Debug summary
         const [{ count: factCount }] = await prisma.$queryRaw`
-            SELECT COUNT(*)::int AS count FROM "ChildAnalyticsFact" WHERE "day" = CURRENT_DATE
-        `;
+      SELECT COUNT(*)::int AS count FROM "ChildAnalyticsFact" WHERE "day" = CURRENT_DATE
+    `;
         log(`✅ ChildAnalyticsFact rows for today: ${factCount}`, '✅');
 
     } catch (err) {
@@ -215,13 +224,6 @@ async function updateChildFacts() {
         log('🏁 ChildAnalyticsFact update finished.');
     }
 }
-
-
-
-
-
-
-
 
 // ---- MOTHER FACTS (Optimized) ----
 async function updateMotherFacts() {
@@ -463,8 +465,8 @@ async function main() {
         log('analyticsMeta upsert successful.');
 
         await updateChildFacts();
-        // await updateMotherFacts();
-        // await updateGrowthFacts();
+        await updateMotherFacts();
+        await updateGrowthFacts();
 
         await validateDataConsistency();
 
