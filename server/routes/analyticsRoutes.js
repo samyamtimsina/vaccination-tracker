@@ -9,6 +9,7 @@ import {
     getGrowthMonitoring,
     getTDCoverage,
     getDueOverdue,
+    debugAnalyticsData,
 
     // Advanced analytics
     getTrends,
@@ -57,6 +58,7 @@ router.get('/export', exportAnalytics);               // Export CSVs
 /* -------------------------------------------------------------------------- */
 router.get('/status', getFactsStatusController);       // Data health + last processed info
 router.get('/refresh-cache', refreshCache);            // Clear cache (GET for easier triggering)
+router.get('/debug', debugAnalyticsData);
 
 /* -------------------------------------------------------------------------- */
 export default router;

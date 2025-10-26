@@ -182,6 +182,10 @@ export const createChild = async (req, res) => {
           });
         }
       }
+      await tx.child.update({
+        where: { id: child.id },
+        data: { updatedAt: new Date() },
+      });
 
       return await tx.child.findUnique({
         where: { id: child.id },
@@ -837,6 +841,11 @@ export const updateChild = async (req, res) => {
           });
         }
       }
+      await tx.child.update({
+        where: { id: existingChild.id },
+        data: { updatedAt: new Date() },
+      });
+
     });
 
     const updatedChild = await prisma.child.findUnique({

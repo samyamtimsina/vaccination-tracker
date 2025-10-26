@@ -20,7 +20,6 @@ export const getMe = (req, res) => {
 };
 export const getAllUsers = async (req, res) => {
   try {
-
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -30,16 +29,20 @@ export const getAllUsers = async (req, res) => {
         wardId: true,
         status: true,
         email: true,
-        Child: true,
-        Mother: true,
-        createdVaccinationRecords: true,
-        administeredVaccinations: true,
-        AuditLogs: true,
-        createdWeightRecords: true,
-        administeredWeightRecords: true,
-        verifiedChildren: true,
-        createdTDDoses: true,
-        administeredTDDoses: true
+        // Use counts instead of full relations - this fixes the 10GB RAM issue
+        _count: {
+          select: {
+            Child: true,
+            Mother: true,
+            createdVaccinationRecords: true,
+            administeredVaccinations: true,
+            createdWeightRecords: true,
+            administeredWeightRecords: true,
+            verifiedChildren: true,
+            createdTDDoses: true,
+            administeredTDDoses: true
+          }
+        }
       }
     });
     res.status(200).json({ users })

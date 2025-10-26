@@ -41,7 +41,13 @@ async function getTodayChildDelta(ward, casteCode, gender, ageGroup) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const meta = await getFactsStatus();
-    if (meta?.lastProcessedChild && new Date(meta.lastProcessedChild) >= today) return 0;
+
+    // FIX: If no analytics meta exists or lastProcessedChild is null/epoch, return 0
+    if (!meta?.lastProcessedChild || new Date(meta.lastProcessedChild).getTime() === 0) {
+        return 0;
+    }
+
+    if (new Date(meta.lastProcessedChild) >= today) return 0;
 
     const childFilter = {};
     if (ward) childFilter.wardNumber = Number(ward);
@@ -168,9 +174,18 @@ export const getSystemOverview = async (req, res) => {
 
     try {
         const data = await cachedAnalytics(cacheKey, async () => {
-            const childWhere = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
-            childWhere.vaccineTypeId = 0;
-            childWhere.doseNumber = 0;
+            // For overview totals, use ONLY the latest day to avoid summing across time
+            const latestDayWhere = {
+                day: new Date(endDate), // Use endDate only for totals
+                vaccineTypeId: 0,
+                doseNumber: 0
+            };
+
+            // Apply filters
+            if (ward) latestDayWhere.ward = Number(ward);
+            if (casteCode) latestDayWhere.casteCode = Number(casteCode);
+            if (gender && gender !== 'ALL') latestDayWhere.gender = gender;
+            if (ageGroup && ageGroup !== 'ALL') latestDayWhere.ageGroup = ageGroup;
 
             const childAgg = await prisma.childAnalyticsFact.aggregate({
                 _sum: {
@@ -183,21 +198,31 @@ export const getSystemOverview = async (req, res) => {
                     late: true,
                 },
                 _avg: { dropoutRate: true },
-                where: childWhere,
+                where: latestDayWhere,
             });
+
+            // For dropout rates, you can still use the full date range
+            const dropoutWhere = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
+            dropoutWhere.vaccineTypeId = { not: 0 };
 
             const dropoutAvg = await prisma.childAnalyticsFact.aggregate({
                 _avg: { dropoutRate: true },
-                where: { ...buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate }), vaccineTypeId: { not: 0 } },
+                where: dropoutWhere,
             });
 
             const deltaVacc = await getTodayChildDelta(ward, casteCode, gender, ageGroup);
             const totalVaccinated = (childAgg._sum.vaccinatedChildren || 0) + deltaVacc;
             const totalChildren = childAgg._sum.totalRegisteredChildren || 1;
 
-            const motherWhere = buildWhereFilters({ ward, casteCode, startDate, endDate });
-            delete motherWhere.gender; delete motherWhere.ageGroup;
-            motherWhere.doseNumber = 0;
+            // Similar fix for mothers - use latest day only for totals
+            const motherLatestWhere = {
+                day: new Date(endDate),
+                doseNumber: 0
+            };
+
+            if (ward) motherLatestWhere.ward = Number(ward);
+            if (casteCode) motherLatestWhere.casteCode = Number(casteCode);
+
             const motherAgg = await prisma.motherAnalyticsFact.aggregate({
                 _sum: {
                     totalRegisteredMothers: true,
@@ -206,9 +231,10 @@ export const getSystemOverview = async (req, res) => {
                     mothersWithFullTD: true,
                     overdue: true,
                 },
-                where: motherWhere,
+                where: motherLatestWhere,
             });
 
+            // Growth data can use full range since these are cumulative records
             const growthAgg = await prisma.growthAnalyticsFact.aggregate({
                 _sum: {
                     totalWeightRecords: true,
@@ -257,6 +283,84 @@ export const getSystemOverview = async (req, res) => {
     } catch (err) {
         console.error('getSystemOverview error:', err);
         res.status(500).json({ success: false, message: 'Server error', error: err.message || err });
+    }
+};
+/**
+ * DEBUG ENDPOINT - Check what's in the analytics facts
+ */
+export const debugAnalyticsData = async (req, res) => {
+    const { ward, casteCode, gender, ageGroup, startDate, endDate } = req.query;
+
+    try {
+        console.log('=== DEBUG ANALYTICS DATA ===');
+
+        // Check what aggregate rows exist
+        const aggregateRows = await prisma.childAnalyticsFact.findMany({
+            where: {
+                day: new Date(), // Today
+                vaccineTypeId: 0,
+                doseNumber: 0,
+                gender: 'ALL',
+                ageGroup: 'ALL',
+                casteCode: 0
+            },
+            select: {
+                ward: true,
+                totalRegisteredChildren: true,
+                vaccinatedChildren: true
+            }
+        });
+
+        console.log('Aggregate rows (ALL demographics):', aggregateRows);
+
+        // Check total sum across all demographic combinations
+        const totalSum = await prisma.childAnalyticsFact.aggregate({
+            _sum: {
+                totalRegisteredChildren: true,
+                vaccinatedChildren: true
+            },
+            where: {
+                day: new Date(),
+                vaccineTypeId: 0,
+                doseNumber: 0
+            }
+        });
+
+        console.log('Total sum across ALL demographic combinations:', totalSum);
+
+        // Check one specific ward in detail
+        const wardDetails = await prisma.childAnalyticsFact.findMany({
+            where: {
+                day: new Date(),
+                vaccineTypeId: 0,
+                doseNumber: 0,
+                ward: 1
+            },
+            select: {
+                ward: true,
+                gender: true,
+                ageGroup: true,
+                casteCode: true,
+                totalRegisteredChildren: true,
+                vaccinatedChildren: true
+            },
+            orderBy: [{ gender: 'asc' }, { ageGroup: 'asc' }, { casteCode: 'asc' }]
+        });
+
+        console.log('Ward 1 detailed breakdown:', wardDetails);
+
+        res.json({
+            success: true,
+            data: {
+                aggregateRows,
+                totalSum,
+                wardDetails
+            }
+        });
+
+    } catch (err) {
+        console.error('Debug error:', err);
+        res.status(500).json({ success: false, message: 'Debug failed', error: err.message });
     }
 };
 

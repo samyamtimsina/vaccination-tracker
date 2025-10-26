@@ -87,17 +87,16 @@ model Child {
   NotificationLog           NotificationLog[]
   isFromOtherMunicipality   Boolean             @default(false)
   weightRecords             WeightRecord[]
+  updatedAt DateTime @updatedAt
 
-  // --- Optimized Indexes (NEW) ---
-  // Composite: For filtering children by Ward and registration date (Analytics Trends)
   @@index([wardNumber, createdAt]) 
-  // Existing indexes:
   @@index([wardNumber])
   @@index([phoneNumber])
   @@index([fullName])        
   @@index([parentName])      
   @@index([birthDate])       
   @@index([createdAt])       
+  @@index([updatedAt])
 }
 
 model Mother {
@@ -118,17 +117,16 @@ model Mother {
   isFromOtherMunicipality   Boolean   @default(false)
   NotificationLog           NotificationLog[]
   tdDoses                   TDDose[]
+  updatedAt DateTime @updatedAt
 
-  // --- Optimized Indexes (NEW) ---
-  // Composite: For filtering mother registrations by Ward and Time (Analytics)
   @@index([wardNumber, createdAt]) 
-  // Existing indexes:
   @@index([sewaDartaNumber])
   @@index([name])
   @@index([wardNumber])
   @@index([phoneNumber])
   @@index([createdById])
   @@index([createdAt])
+  @@index([updatedAt])
 }
 
 model TDDose {
@@ -143,6 +141,9 @@ model TDDose {
   createdBy                 User      @relation(fields: [createdById], references: [id])
   administeredById          Int
   administeredBy            User      @relation("AdministeredByTDDose", fields: [administeredById], references: [id])
+  updatedAt DateTime @updatedAt
+  @@index([updatedAt])
+
 }
 
 model VaccinationRecord {
@@ -166,18 +167,17 @@ model VaccinationRecord {
   externalAdministeredBy   String?
   createdAt         DateTime    @default(now())
   wardOfVaccination Int
+  updatedAt DateTime @updatedAt
 
-  // --- Optimized Composite Indexes (NEW) ---
-  // PRIMARY ANALYTIC INDEX: Filters by ward AND date (Critical for seasonal/ward-based analytics)
+
   @@index([wardOfVaccination, dateGiven]) 
-  // Composite: For querying all records of a specific vaccine type over time
   @@index([vaccineTypeId, dateGiven])
-  // Existing indexes:
   @@index([dateGiven])
   @@index([vaccineTypeId])
   @@index([citizenId, dateGiven])
   @@index([wardOfVaccination])
   @@index([administeredById])
+  @@index([updatedAt])
 }
 
 model VaccineType {
@@ -246,10 +246,7 @@ model ChildDueVaccine {
   catchUpLocked    Boolean     @default(false)
   isCatchUp        Boolean     @default(false)
 
-  // --- Optimized Composite Indexes ---
-  // Composite: Crucial for fast due date checks and transactional updates
   @@index([childId, dueDate]) 
-  // Existing indexes (kept):
   @@index([dueDate, isCompleted, notificationSent])
   @@index([childId, isCompleted])
   @@index([childId, vaccineTypeId, doseNumber])
@@ -314,9 +311,8 @@ model WeightRecord {
 
   @@index([childId, date])
   @@index([wardOfVaccination])
+  @@index([updatedAt])
 }
-// Confirmed Fix for Schema: Ensure this exact block in schema.prisma (Prisma 5+ supports @db.Date).
-// If validation fails, check Prisma version (npx prisma --version >=5.0), or use String for day ('YYYY-MM-DD').
 
 model AnalyticsMeta {
   id                    Int      @id @default(autoincrement())

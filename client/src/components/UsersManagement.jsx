@@ -4,6 +4,7 @@ import {
     FiUsers,
     FiUserCheck,
     FiClock,
+    FiInfo,
     FiShield,
     FiSearch,
     FiMoreVertical,
@@ -149,11 +150,12 @@ const UserDetailsModal = ({ user, isOpen, onClose, onEdit }) => {
         });
     };
 
-    const childrenCount = user.Child?.length || 0;
-    const vaccinationsCreated = user.createdVaccinationRecords?.length || 0;
-    const vaccinationsAdministered = user.administeredVaccinations?.length || 0;
-    const weightRecordsCreated = user.createdWeightRecords?.length || 0;
-    const weightRecordsAdministered = user.administeredWeightRecords?.length || 0;
+    // UPDATED: Use _count data instead of full arrays
+    const childrenCount = user._count?.Child || user.Child?.length || 0;
+    const vaccinationsCreated = user._count?.createdVaccinationRecords || user.createdVaccinationRecords?.length || 0;
+    const vaccinationsAdministered = user._count?.administeredVaccinations || user.administeredVaccinations?.length || 0;
+    const weightRecordsCreated = user._count?.createdWeightRecords || user.createdWeightRecords?.length || 0;
+    const weightRecordsAdministered = user._count?.administeredWeightRecords || user.administeredWeightRecords?.length || 0;
 
     return (
         <div className="modal modal-open">
@@ -256,138 +258,9 @@ const UserDetailsModal = ({ user, isOpen, onClose, onEdit }) => {
                     </div>
                 </div>
 
-                {/* Detailed Activities */}
+                {/* Detailed Activities - TEMPORARILY COMMENTED OUT */}
                 <div className="space-y-6">
-                    {/* Children Section */}
-                    {childrenCount > 0 && (
-                        <div className="card bg-base-200 border border-base-300">
-                            <div className="card-body p-4">
-                                <h4 className="font-semibold text-base-content mb-3 flex items-center">
-                                    <FiUsers className="w-5 h-5 mr-2 text-primary" />
-                                    Registered Children ({childrenCount})
-                                </h4>
-                                <div className="overflow-x-auto">
-                                    <table className="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>Name</th>
-                                                <th>Ward</th>
-                                                <th>Parent</th>
-                                                <th>Birth Date</th>
-                                                <th>Gender</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {/* Corrected: Apply .slice(0, 5) to limit the displayed records */}
-                                            {user.Child.slice(0, 5).map((child) => (
-                                                <tr key={child.id}>
-                                                    <td className="font-medium capitalize">{child.fullName}</td>
-                                                    <td>Ward {child.wardNumber}</td>
-                                                    <td className="capitalize">{child.parentName}</td>
-                                                    <td>{formatDate(child.birthDate)}</td>
-                                                    <td>
-                                                        <span className={`badge badge-sm ${child.gender === 'MALE' ? 'badge-info' : 'badge-secondary'}`}>
-                                                            {child.gender}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                    {/* Corrected: Show a message if there are more records than displayed */}
-                                    {childrenCount > 5 && (
-                                        <div className="text-center text-sm text-base-content/70 mt-2">
-                                            And {childrenCount - 5} more records...
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Vaccination Records */}
-                    {vaccinationsCreated > 0 && (
-                        <div className="card bg-base-200 border border-base-300">
-                            <div className="card-body p-4">
-                                <h4 className="font-semibold text-base-content mb-3 flex items-center">
-                                    <FiShield className="w-5 h-5 mr-2 text-secondary" />
-                                    Vaccination Records Created ({vaccinationsCreated})
-                                </h4>
-                                <div className="overflow-x-auto">
-                                    <table className="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>Vaccine</th>
-                                                <th>Dose</th>
-                                                <th>Date Given</th>
-                                                <th>Ward</th>
-                                                <th>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {user.createdVaccinationRecords.slice(0, 5).map((record) => (
-                                                <tr key={record.id}>
-                                                    <td className="font-medium">{record.vaccineType}</td>
-                                                    <td>Dose {record.doseNumber}</td>
-                                                    <td>{formatDate(record.dateGiven)}</td>
-                                                    <td>Ward {record.wardOfVaccination}</td>
-                                                    <td>
-                                                        <span className={`badge badge-sm ${record.isComplete ? 'badge-success' : 'badge-warning'}`}>
-                                                            {record.isComplete ? 'Complete' : 'Pending'}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                    {vaccinationsCreated > 5 && (
-                                        <div className="text-center text-sm text-base-content/70 mt-2">
-                                            And {vaccinationsCreated - 5} more records...
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Weight Records */}
-                    {weightRecordsCreated > 0 && (
-                        <div className="card bg-base-200 border border-base-300">
-                            <div className="card-body p-4">
-                                <h4 className="font-semibold text-base-content mb-3 flex items-center">
-                                    <FiActivity className="w-5 h-5 mr-2 text-accent" />
-                                    Weight Records Created ({weightRecordsCreated})
-                                </h4>
-                                <div className="overflow-x-auto">
-                                    <table className="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Weight</th>
-                                                <th>Ward</th>
-                                                <th>Created</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {user.createdWeightRecords.slice(0, 5).map((record) => (
-                                                <tr key={record.id}>
-                                                    <td>{formatDate(record.date)}</td>
-                                                    <td className="font-medium">{record.weight} kg</td>
-                                                    <td>Ward {record.wardOfVaccination}</td>
-                                                    <td>{formatDate(record.createdAt)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                    {weightRecordsCreated > 5 && (
-                                        <div className="text-center text-sm text-base-content/70 mt-2">
-                                            And {weightRecordsCreated - 5} more records...
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    {/* Activity counts are still visible, but detailed tables are hidden for now */}
 
                     {/* No Activity State */}
                     {childrenCount === 0 && vaccinationsCreated === 0 && weightRecordsCreated === 0 && (
@@ -397,6 +270,20 @@ const UserDetailsModal = ({ user, isOpen, onClose, onEdit }) => {
                                 <h4 className="text-lg font-semibold text-base-content mb-2">No Activity Yet</h4>
                                 <p className="text-base-content/70">
                                     This user hasn't created any records or registered any children yet.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Information message about detailed data */}
+                    {(childrenCount > 0 || vaccinationsCreated > 0 || weightRecordsCreated > 0) && (
+                        <div className="card bg-info/10 border border-info/20">
+                            <div className="card-body p-6 text-center">
+                                <FiInfo className="w-8 h-8 text-info mx-auto mb-2" />
+                                <h4 className="text-lg font-semibold text-info mb-2">Detailed Data Available</h4>
+                                <p className="text-info/70">
+                                    User has {childrenCount} children, {vaccinationsCreated} vaccination records, and {weightRecordsCreated} weight records.
+                                    Detailed views will be available in a future update.
                                 </p>
                             </div>
                         </div>

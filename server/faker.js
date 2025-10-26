@@ -134,7 +134,7 @@ const generateData = async (totalChildren, batchSize = 1000) => {
 };
 
 // --- Run generator ---
-generateData(1000000, 1000);
+generateData(1, 1000);
 
 // // File: prisma/seed_debug_schedule.js
 // // import { prisma } from "../utils/prisma.js";
