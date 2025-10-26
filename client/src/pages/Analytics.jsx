@@ -13,7 +13,14 @@ const ageGroups = ['ALL', '0-1y', '1-5y', '5y+'];
 const casteCodes = Array.from({ length: 10 }, (_, i) => i + 1);
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#E74C3C'];
 
-const safeFixed = (v, n = 2) => (typeof v === 'number' && isFinite(v) ? v.toFixed(n) : (v || 0));
+const safeFixed = (v, decimals = 4) => {
+    if (typeof v !== 'number' || !isFinite(v)) return v || 0;
+    // Use more precision for near-100% to avoid clipping
+    const effectiveDecimals = (v >= 99) ? 4 : 2;
+    const fixed = v.toFixed(effectiveDecimals);
+    // Trim trailing zeros/decimals for clean display (e.g., 100.0000 → 100)
+    return fixed.replace(/\.?0+$/, '');
+};
 
 const AnalyticsDashboard = () => {
     const [activeTab, setActiveTab] = useState('overview');
