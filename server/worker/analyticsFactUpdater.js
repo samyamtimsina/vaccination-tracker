@@ -205,32 +205,57 @@ async function updateChildFactsForWards(wardList) {
     GROUP BY cs.ward, cs.gender, cs.ageGroup, cs.casteCode;
   `);
 
-  // per-vaccine rows scoped to wards
+  // per-vaccine rows scoped to wards (CORRECTED: Full cohort via CROSS JOIN + EXISTS)
   await prisma.$executeRawUnsafe(`
-    INSERT INTO "ChildAnalyticsFact" (
-      "day","ward","vaccineTypeId","doseNumber","gender","ageGroup","casteCode",
-      "totalRegisteredChildren","vaccinatedChildren","zeroDoseChildren",
-      "dueToday","overdue","onTime","late","dropoutRate","createdAt","updatedAt"
-    )
-    SELECT
-      CURRENT_DATE,
-      COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1)) AS ward,
-      vr."vaccineTypeId",
-      0 AS "doseNumber",
-      'ALL' AS gender,
-      'ALL' AS ageGroup,
-      0 AS casteCode,
-      COUNT(DISTINCT c.id) AS totalRegisteredChildren,
-      COUNT(DISTINCT CASE WHEN vr."isComplete" THEN c.id END) AS vaccinatedChildren,
-      COUNT(DISTINCT CASE WHEN NOT vr."isComplete" THEN c.id END) AS zeroDoseChildren,
-      0, 0, 0, 0, 0,
-      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+  WITH active_vaccine_types AS (
+    SELECT DISTINCT vr."vaccineTypeId"
     FROM "VaccinationRecord" vr
     JOIN "Child" c ON c.id = vr."citizenId"
-    WHERE vr."vaccineTypeId" IS NOT NULL
-      AND COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1)) IN ${wardSql}
-    GROUP BY COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1)), vr."vaccineTypeId";
-  `);
+    WHERE COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1)) IN ${wardSql}
+      AND vr."vaccineTypeId" IS NOT NULL
+  ),
+  all_children AS (
+    SELECT 
+      c.id,
+      COALESCE(c."wardNumber", 1) AS ward
+    FROM "Child" c
+    WHERE COALESCE(c."wardNumber", 1) IN ${wardSql}
+  )
+  INSERT INTO "ChildAnalyticsFact" (
+    "day","ward","vaccineTypeId","doseNumber","gender","ageGroup","casteCode",
+    "totalRegisteredChildren","vaccinatedChildren","zeroDoseChildren",
+    "dueToday","overdue","onTime","late","dropoutRate","createdAt","updatedAt"
+  )
+  SELECT
+    CURRENT_DATE,
+    ac.ward,
+    avt."vaccineTypeId",
+    0 AS "doseNumber",
+    'ALL' AS gender,
+    'ALL' AS ageGroup,
+    0 AS casteCode,
+    COUNT(DISTINCT ac.id) AS totalRegisteredChildren,  -- Full ward cohort
+    COUNT(DISTINCT CASE 
+      WHEN EXISTS (
+        SELECT 1 FROM "VaccinationRecord" vr 
+        WHERE vr."citizenId" = ac.id 
+          AND vr."vaccineTypeId" = avt."vaccineTypeId" 
+          AND vr."isComplete" = true
+      ) THEN ac.id 
+    END) AS vaccinatedChildren,  -- Any complete dose for this type
+    COUNT(DISTINCT CASE 
+      WHEN NOT EXISTS (
+        SELECT 1 FROM "VaccinationRecord" vr 
+        WHERE vr."citizenId" = ac.id 
+          AND vr."vaccineTypeId" = avt."vaccineTypeId"
+      ) THEN ac.id 
+    END) AS zeroDoseChildren,  -- No records at all for this type
+    0, 0, 0, 0, 0,
+    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+  FROM all_children ac
+  CROSS JOIN active_vaccine_types avt
+  GROUP BY ac.ward, avt."vaccineTypeId";
+`);
 
   // dropout per vaccine (multi-primary vaccines) scoped to wards
   await prisma.$executeRawUnsafe(`
