@@ -33,8 +33,11 @@ export const getChangedVaccineTypes = async (oldVersionId, newVersionId) => {
     const changedTypes = new Set();
 
     newDoses.forEach(newDose => {
-        const oldDose = oldDoses.find(d => d.vaccineTypeId === newDose.vaccineTypeId && d.doseNumber === newDose.doseNumber);
-        if (!oldDose ||
+        const oldDose = oldDoses.find(d =>
+            d.vaccineTypeId === newDose.vaccineTypeId && d.doseNumber === newDose.doseNumber
+        );
+        if (
+            !oldDose ||
             oldDose.recommendedAtDays !== newDose.recommendedAtDays ||
             oldDose.recommendedAtWeeks !== newDose.recommendedAtWeeks ||
             oldDose.recommendedAtMonths !== newDose.recommendedAtMonths ||
@@ -45,7 +48,9 @@ export const getChangedVaccineTypes = async (oldVersionId, newVersionId) => {
             oldDose.maxAgeWeeks !== newDose.maxAgeWeeks ||
             oldDose.maxAgeMonths !== newDose.maxAgeMonths ||
             oldDose.maxAgeYears !== newDose.maxAgeYears
-        ) changedTypes.add(newDose.vaccineTypeId);
+        ) {
+            changedTypes.add(newDose.vaccineTypeId);
+        }
     });
 
     oldDoses.forEach(oldDose => {
@@ -57,7 +62,7 @@ export const getChangedVaccineTypes = async (oldVersionId, newVersionId) => {
     return Array.from(changedTypes);
 };
 
-// Main recalculation function with console.log progress
+// 🧩 Main recalculation function (fixed version)
 export const recalculateChildVaccines = async (newScheduleVersionId, oldScheduleVersionId) => {
     log(`--- Recalculation started for schedule version ${newScheduleVersionId} ---`);
 
@@ -91,7 +96,14 @@ export const recalculateChildVaccines = async (newScheduleVersionId, oldSchedule
 
         for (const child of children) {
             const birthDate = child.birthDate;
+
+            //  Optional if you use it elsewhere
             const missedPrimaryVaccineTypeIds = await getMissedPrimaryVaccineTypes(child.id);
+
+            // ️ Pre-index given vaccines to prevent re-creating deleted ones
+            const givenDoses = new Set(
+                child.vaccinations.map(v => `${v.vaccineTypeId}-${v.doseNumber}`)
+            );
 
             for (const vaccineTypeId of changedVaccineTypeIds) {
                 const dosesMap = scheduleDosesMap.get(vaccineTypeId);
@@ -106,7 +118,10 @@ export const recalculateChildVaccines = async (newScheduleVersionId, oldSchedule
                     const oldDueDate = existingDue ? new Date(existingDue.dueDate) : null;
                     const isPrimary = dose.isPrimary;
 
-                    if (!existingDue) {
+                    const alreadyGiven = givenDoses.has(`${dose.vaccineTypeId}-${dose.doseNumber}`);
+
+                    //  Only create new due if not already given AND no existing due
+                    if (!existingDue && !alreadyGiven) {
                         newDueVaccines.push({
                             childId: child.id,
                             vaccineTypeId: dose.vaccineTypeId,
@@ -120,10 +135,14 @@ export const recalculateChildVaccines = async (newScheduleVersionId, oldSchedule
                             isCatchUp: false,
                         });
                         totalChanges++;
-                    } else if (!existingDue.isCompleted &&
+                    }
+                    //  Only update existing if not completed and due date changed
+                    else if (
+                        existingDue &&
+                        !existingDue.isCompleted &&
                         (isPrimary || !existingDue.catchUpLocked) &&
-                        oldDueDate.getTime() !== newDueDate.getTime()) {
-
+                        oldDueDate.getTime() !== newDueDate.getTime()
+                    ) {
                         updateDueVaccines.push({
                             id: existingDue.id,
                             previousDueDate: existingDue.dueDate,
@@ -136,7 +155,9 @@ export const recalculateChildVaccines = async (newScheduleVersionId, oldSchedule
                             correctionSMSQueue.push({ child, dose, newDueDate });
                         }
                         totalChanges++;
-                        console.log(`Updated dueDate for child ${child.id}, vaccineType ${dose.vaccineTypeId}, dose ${doseNumber}`);
+                        console.log(
+                            `Updated dueDate for child ${child.id}, vaccineType ${dose.vaccineTypeId}, dose ${doseNumber}`
+                        );
                     }
                 }
             }
@@ -144,10 +165,13 @@ export const recalculateChildVaccines = async (newScheduleVersionId, oldSchedule
 
         // Bulk insert new due vaccines
         if (newDueVaccines.length > 0) {
-            await prisma.childDueVaccine.createMany({ data: newDueVaccines, skipDuplicates: true });
+            await prisma.childDueVaccine.createMany({
+                data: newDueVaccines,
+                skipDuplicates: true,
+            });
         }
 
-        // Sequential update
+        // Sequential update (small batches for safety)
         for (const upd of updateDueVaccines) {
             await prisma.childDueVaccine.update({
                 where: { id: upd.id },

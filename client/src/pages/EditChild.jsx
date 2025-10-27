@@ -864,31 +864,42 @@ export default function EditChild() {
       });
 
       const filteredVaccinations = Object.entries(data.vaccines)
-        .flatMap(([vaccineName, doses]) =>
-          doses
-            .filter((dose) => dose.date)
-            .map((dose, index) => {
-              const scheduleDose = vaccineSchedule.doses[vaccineName][index];
+        .flatMap(([vaccineName, doses]) => {
+          const administeredDoses = [];
+
+          doses.forEach((dose, index) => {
+            if (dose.date) {
+              const scheduleVaccine = vaccineSchedule.doses[vaccineName];
+              if (!scheduleVaccine || !scheduleVaccine[index]) {
+                console.error(`Schedule data missing for ${vaccineName} dose ${index}`);
+                return; // Skip this dose but continue processing
+              }
+
+              const scheduleDose = scheduleVaccine[index];
               const vaccineTypeId = vaccineTypeIdToName[vaccineName];
+
               if (!vaccineTypeId) {
                 console.error(`Vaccine type ID not found for ${vaccineName}`);
-                return null;
+                return;
               }
 
               const isExternal = !!dose.isExternallyAdministered;
               const externalBy = dose.externalAdministeredBy?.trim() || null;
 
-              return {
+              administeredDoses.push({
                 vaccineTypeId,
-                doseNumber: scheduleDose.doseNumber,
+                doseNumber: scheduleDose.doseNumber, // ✅ Now correctly uses the dose number from schedule
                 dateGiven: dose.date,
                 remarks: dose.remarks || null,
                 type: scheduleDose.isBooster ? 'booster' : 'current',
                 isExternallyAdministered: isExternal,
                 externalAdministeredBy: externalBy,
-              };
-            })
-        )
+              });
+            }
+          });
+
+          return administeredDoses;
+        })
         .filter(Boolean);
 
       const administeredById = data.administeredById;
@@ -937,19 +948,24 @@ export default function EditChild() {
       }));
 
       // Build a set of all vaccinations being submitted (with a date)
+      // Update the removedVaccinations section in EditChild.jsx:
       const submittedVaccinations = Object.entries(data.vaccines)
-        .flatMap(([vaccineName, doses]) =>
-          doses
-            .filter((dose) => dose.date)
-            .map((dose, index) => {
+        .flatMap(([vaccineName, doses]) => {
+          const submitted = [];
+          doses.forEach((dose, index) => {
+            if (dose.date) {
               const scheduleDose = vaccineSchedule.doses[vaccineName][index];
               const vaccineTypeId = vaccineTypeIdToName[vaccineName];
-              return {
-                vaccineTypeId,
-                doseNumber: scheduleDose.doseNumber,
-              };
-            })
-        );
+              if (scheduleDose && vaccineTypeId) {
+                submitted.push({
+                  vaccineTypeId,
+                  doseNumber: scheduleDose.doseNumber,
+                });
+              }
+            }
+          });
+          return submitted;
+        });
 
       // Find vaccinations that exist in DB but are now cleared (no date in form)
       const removedVaccinations = existingVaccinations.filter(ev =>
