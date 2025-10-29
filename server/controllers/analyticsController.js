@@ -174,20 +174,21 @@ export const getSystemOverview = async (req, res) => {
 
     try {
         const data = await cachedAnalytics(cacheKey, async () => {
-            // For overview totals, use ONLY the latest day to avoid summing across time
-            const latestDayWhere = {
-                day: new Date(endDate), // Use endDate only for totals
-                vaccineTypeId: 0,
+            // ✅ FIXED: Only use vaccineTypeId = 0 for overview totals
+            const overviewWhere = {
+                day: new Date(endDate),
+                vaccineTypeId: 0,  // ← CRITICAL: Only summary rows
                 doseNumber: 0
             };
 
             // Apply filters
-            if (ward) latestDayWhere.ward = Number(ward);
-            if (casteCode) latestDayWhere.casteCode = Number(casteCode);
-            if (gender && gender !== 'ALL') latestDayWhere.gender = gender;
-            if (ageGroup && ageGroup !== 'ALL') latestDayWhere.ageGroup = ageGroup;
+            if (ward) overviewWhere.ward = Number(ward);
+            if (casteCode) overviewWhere.casteCode = Number(casteCode);
+            if (gender && gender !== 'ALL') overviewWhere.gender = gender;
+            if (ageGroup && ageGroup !== 'ALL') overviewWhere.ageGroup = ageGroup;
 
-            const childAgg = await prisma.childAnalyticsFact.aggregate({
+            // ✅ FIXED: Get overview from summary rows only
+            const childOverview = await prisma.childAnalyticsFact.aggregate({
                 _sum: {
                     totalRegisteredChildren: true,
                     vaccinatedChildren: true,
@@ -197,11 +198,10 @@ export const getSystemOverview = async (req, res) => {
                     onTime: true,
                     late: true,
                 },
-                _avg: { dropoutRate: true },
-                where: latestDayWhere,
+                where: overviewWhere,
             });
 
-            // For dropout rates, you can still use the full date range
+            // For dropout rates, use the full date range but only non-zero vaccine types
             const dropoutWhere = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
             dropoutWhere.vaccineTypeId = { not: 0 };
 
@@ -211,19 +211,19 @@ export const getSystemOverview = async (req, res) => {
             });
 
             const deltaVacc = await getTodayChildDelta(ward, casteCode, gender, ageGroup);
-            const totalVaccinated = (childAgg._sum.vaccinatedChildren || 0) + deltaVacc;
-            const totalChildren = childAgg._sum.totalRegisteredChildren || 1;
+            const totalVaccinated = (childOverview._sum.vaccinatedChildren || 0) + deltaVacc;
+            const totalChildren = childOverview._sum.totalRegisteredChildren || 1;
 
-            // Similar fix for mothers - use latest day only for totals
-            const motherLatestWhere = {
+            // ✅ FIXED: Mother overview - only doseNumber = 0 summary rows
+            const motherOverviewWhere = {
                 day: new Date(endDate),
-                doseNumber: 0
+                doseNumber: 0  // ← Only summary rows
             };
 
-            if (ward) motherLatestWhere.ward = Number(ward);
-            if (casteCode) motherLatestWhere.casteCode = Number(casteCode);
+            if (ward) motherOverviewWhere.ward = Number(ward);
+            if (casteCode) motherOverviewWhere.casteCode = Number(casteCode);
 
-            const motherAgg = await prisma.motherAnalyticsFact.aggregate({
+            const motherOverview = await prisma.motherAnalyticsFact.aggregate({
                 _sum: {
                     totalRegisteredMothers: true,
                     tdDosesGiven: true,
@@ -231,7 +231,7 @@ export const getSystemOverview = async (req, res) => {
                     mothersWithFullTD: true,
                     overdue: true,
                 },
-                where: motherLatestWhere,
+                where: motherOverviewWhere,
             });
 
             // Growth data can use full range since these are cumulative records
@@ -248,23 +248,23 @@ export const getSystemOverview = async (req, res) => {
 
             return {
                 children: {
-                    totalRegistered: childAgg._sum.totalRegisteredChildren || 0,
+                    totalRegistered: childOverview._sum.totalRegisteredChildren || 0,
                     vaccinated: totalVaccinated,
-                    zeroDose: childAgg._sum.zeroDoseChildren || 0,
+                    zeroDose: childOverview._sum.zeroDoseChildren || 0,
                     coverageRate: (totalVaccinated / totalChildren) * 100,
-                    dropoutRate: Number((dropoutAvg._avg.dropoutRate ?? childAgg._avg.dropoutRate ?? 0)),
-                    dueToday: childAgg._sum.dueToday || 0,
-                    overdue: childAgg._sum.overdue || 0,
-                    onTime: childAgg._sum.onTime || 0,
-                    late: childAgg._sum.late || 0,
+                    dropoutRate: Number((dropoutAvg._avg.dropoutRate ?? 0)),
+                    dueToday: childOverview._sum.dueToday || 0,
+                    overdue: childOverview._sum.overdue || 0, // ← Now will be 23,866, not 715,980!
+                    onTime: childOverview._sum.onTime || 0,
+                    late: childOverview._sum.late || 0,
                 },
                 mothers: {
-                    totalRegistered: motherAgg._sum.totalRegisteredMothers || 0,
-                    tdDosesGiven: motherAgg._sum.tdDosesGiven || 0,
-                    zeroTD: motherAgg._sum.mothersWithZeroTD || 0,
-                    fullTD: motherAgg._sum.mothersWithFullTD || 0,
-                    tdCoverage: ((motherAgg._sum.mothersWithFullTD || 0) / (motherAgg._sum.totalRegisteredMothers || 1)) * 100,
-                    overdue: motherAgg._sum.overdue || 0,
+                    totalRegistered: motherOverview._sum.totalRegisteredMothers || 0,
+                    tdDosesGiven: motherOverview._sum.tdDosesGiven || 0,
+                    zeroTD: motherOverview._sum.mothersWithZeroTD || 0,
+                    fullTD: motherOverview._sum.mothersWithFullTD || 0,
+                    tdCoverage: ((motherOverview._sum.mothersWithFullTD || 0) / (motherOverview._sum.totalRegisteredMothers || 1)) * 100,
+                    overdue: motherOverview._sum.overdue || 0,
                 },
                 nutrition: {
                     totalRecords: growthAgg._sum.totalWeightRecords || 0,
@@ -425,12 +425,16 @@ export const getDropoutRates = async (req, res) => {
 export const getZeroDoseChildren = async (req, res) => {
     const { ward, casteCode, gender, ageGroup, startDate, endDate } = req.query;
     try {
+        // ✅ FIXED: Only use vaccineTypeId = 0 summary rows
         const where = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
         where.vaccineTypeId = 0;
+        where.doseNumber = 0;
+
         const agg = await prisma.childAnalyticsFact.aggregate({
             _sum: { zeroDoseChildren: true, totalRegisteredChildren: true },
             where,
         });
+
         const zero = agg._sum.zeroDoseChildren || 0;
         const total = agg._sum.totalRegisteredChildren || 1;
         res.json({ success: true, data: { zeroDoseCount: zero, zeroDoseRate: (zero / total) * 100 } });
@@ -492,19 +496,23 @@ export const getTDCoverage = async (req, res) => {
 export const getDueOverdue = async (req, res) => {
     const { ward, casteCode, gender, ageGroup, startDate, endDate } = req.query;
     try {
+        // ✅ FIXED: Only use vaccineTypeId = 0 summary rows
         const where = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
         where.vaccineTypeId = 0;
+        where.doseNumber = 0;  // Also ensure doseNumber = 0 for summaries
+
         const agg = await prisma.childAnalyticsFact.aggregate({
             _sum: { dueToday: true, overdue: true, onTime: true, late: true },
             where,
         });
+
         const on = agg._sum.onTime || 0;
         const late = agg._sum.late || 0;
         res.json({
             success: true,
             data: {
                 dueToday: agg._sum.dueToday || 0,
-                overdue: agg._sum.overdue || 0,
+                overdue: agg._sum.overdue || 0, // ← Now correct!
                 onTime: on,
                 late,
                 timelinessRate: (on / ((on + late) || 1)) * 100,

@@ -117,7 +117,7 @@ function toSqlWardList(wards) {
 }
 
 /* =================================================
-   CHILD - per-ward incremental insert (WITH ELIGIBILITY FIXES)
+   CHILD - per-ward incremental insert (WITH FIXED DEMOGRAPHIC OVERDUE)
    ================================================= */
 async function updateChildFactsForWards(wardList) {
   if (!wardList || wardList.length === 0) {
@@ -183,9 +183,13 @@ async function updateChildFactsForWards(wardList) {
         (SELECT COUNT(*) FROM "ChildDueVaccine" cdv
           WHERE cdv."childId" = c.id AND cdv."dueDate" = CURRENT_DATE AND cdv."isCompleted" = false
         ) AS due_today,
-        (SELECT COUNT(*) FROM "ChildDueVaccine" cdv
-          WHERE cdv."childId" = c.id AND cdv."dueDate" < CURRENT_DATE AND cdv."isCompleted" = false
-        ) AS overdue_count
+        -- FIXED: Count actual overdue children (not doses) per demographic group
+        CASE WHEN EXISTS (
+          SELECT 1 FROM "ChildDueVaccine" cdv
+          WHERE cdv."childId" = c.id
+            AND cdv."dueDate" < CURRENT_DATE
+            AND cdv."isCompleted" = false
+        ) THEN 1 ELSE 0 END AS overdue_count
       FROM "Child" c
       WHERE COALESCE(c."wardNumber", 1) IN ${wardSql}
     )
@@ -209,7 +213,7 @@ async function updateChildFactsForWards(wardList) {
   `);
   log('✅ Overall child facts inserted.');
 
-  // per-vaccine rows scoped to wards WITH CORRECT ELIGIBILITY LOGIC
+  // FIXED: per-vaccine rows with PROPER per-child-per-vaccine logic
   await prisma.$executeRawUnsafe(`
     WITH active_vaccine_types AS (
       SELECT DISTINCT vr."vaccineTypeId"
@@ -230,7 +234,7 @@ async function updateChildFactsForWards(wardList) {
         ac.id AS child_id,
         ac.ward,
         avt."vaccineTypeId",
-        -- Vaccinated if eligible and completed
+        -- FIX: Vaccinated if AT LEAST ONE eligible dose is completed
         EXISTS(
           SELECT 1 FROM "ChildDueVaccine" cdv
           WHERE cdv."childId" = ac.id 
@@ -238,14 +242,26 @@ async function updateChildFactsForWards(wardList) {
             AND cdv."dueDate" <= CURRENT_DATE
             AND cdv."isCompleted" = true
         ) AS is_vaccinated,
-        -- Zero-dose if eligible but not completed
+        -- FIX: Zero-dose if eligible but NO doses completed
         EXISTS(
           SELECT 1 FROM "ChildDueVaccine" cdv
           WHERE cdv."childId" = ac.id 
             AND cdv."vaccineTypeId" = avt."vaccineTypeId"
             AND cdv."dueDate" <= CURRENT_DATE
-            AND cdv."isCompleted" = false
-        ) AS is_zero_dose
+        ) AND NOT EXISTS(
+          SELECT 1 FROM "ChildDueVaccine" cdv
+          WHERE cdv."childId" = ac.id 
+            AND cdv."vaccineTypeId" = avt."vaccineTypeId"
+            AND cdv."dueDate" <= CURRENT_DATE
+            AND cdv."isCompleted" = true
+        ) AS is_zero_dose,
+        -- Eligible if any due vaccine exists
+        EXISTS(
+          SELECT 1 FROM "ChildDueVaccine" cdv
+          WHERE cdv."childId" = ac.id 
+            AND cdv."vaccineTypeId" = avt."vaccineTypeId"
+            AND cdv."dueDate" <= CURRENT_DATE
+        ) AS is_eligible
       FROM all_children ac
       CROSS JOIN active_vaccine_types avt
     )
@@ -262,7 +278,8 @@ async function updateChildFactsForWards(wardList) {
       'ALL' AS gender,
       'ALL' AS ageGroup,
       0 AS casteCode,
-      COUNT(DISTINCT ev.child_id) AS totalRegisteredChildren,
+      -- Count only ELIGIBLE children as denominator
+      COUNT(DISTINCT CASE WHEN ev.is_eligible THEN ev.child_id END) AS totalRegisteredChildren,
       COUNT(DISTINCT CASE WHEN ev.is_vaccinated THEN ev.child_id END) AS vaccinatedChildren,
       COUNT(DISTINCT CASE WHEN ev.is_zero_dose THEN ev.child_id END) AS zeroDoseChildren,
       0, 0, 0, 0, 0,
@@ -271,6 +288,51 @@ async function updateChildFactsForWards(wardList) {
     GROUP BY ev.ward, ev."vaccineTypeId";
   `);
   log('✅ Per-vaccine eligible child facts inserted.');
+
+  // FIXED: Calculate ACTUAL overdue children per demographic group
+  await prisma.$executeRawUnsafe(`
+    -- Calculate ACTUAL overdue children per demographic group
+    UPDATE "ChildAnalyticsFact" caf
+    SET "overdue" = sub.demographic_overdue
+    FROM (
+      SELECT
+        COALESCE(c."wardNumber", 1) AS ward,
+        COALESCE(NULLIF(c."gender", ''), 'ALL') AS gender,
+        CASE
+          WHEN c."birthDate" IS NULL THEN 'ALL'
+          WHEN EXTRACT(YEAR FROM AGE(c."birthDate")) < 1 THEN '0-1y'
+          WHEN EXTRACT(YEAR FROM AGE(c."birthDate")) < 5 THEN '1-5y'
+          ELSE '5y+'
+        END AS ageGroup,
+        COALESCE(c."casteCode", 0) AS casteCode,
+        COUNT(DISTINCT c.id) AS demographic_overdue
+      FROM "Child" c
+      WHERE EXISTS (
+        SELECT 1 FROM "ChildDueVaccine" cdv
+        WHERE cdv."childId" = c.id
+          AND cdv."dueDate" < CURRENT_DATE
+          AND cdv."isCompleted" = false
+      )
+      AND COALESCE(c."wardNumber", 1) IN ${wardSql}
+      GROUP BY 
+        COALESCE(c."wardNumber", 1),
+        COALESCE(NULLIF(c."gender", ''), 'ALL'),
+        CASE
+          WHEN c."birthDate" IS NULL THEN 'ALL'
+          WHEN EXTRACT(YEAR FROM AGE(c."birthDate")) < 1 THEN '0-1y'
+          WHEN EXTRACT(YEAR FROM AGE(c."birthDate")) < 5 THEN '1-5y'
+          ELSE '5y+'
+        END,
+        COALESCE(c."casteCode", 0)
+    ) sub
+    WHERE caf."ward" = sub.ward
+      AND caf."gender" = sub.gender
+      AND caf."ageGroup" = sub.ageGroup
+      AND caf."casteCode" = sub.casteCode
+      AND caf."vaccineTypeId" = 0 
+      AND caf."day" = CURRENT_DATE;
+  `);
+  log('✅ Overdue counts fixed to maintain demographic breakdown.');
 
   // dropout per vaccine (multi-primary vaccines) scoped to wards WITH ELIGIBILITY
   await prisma.$executeRawUnsafe(`
@@ -637,6 +699,40 @@ async function validateDataQuality() {
       });
     }
 
+    // NEW: Overdue validation to ensure demographic breakdown is correct
+    const overdueValidation = await prisma.$queryRaw`
+      SELECT 
+        SUM("totalRegisteredChildren") AS total_children,
+        SUM("overdue") AS overdue_children,
+        ROUND((SUM("overdue")::decimal / NULLIF(SUM("totalRegisteredChildren"), 0) * 100), 2) AS overdue_pct
+      FROM "ChildAnalyticsFact" 
+      WHERE "vaccineTypeId" = 0 AND "day" = CURRENT_DATE;
+    `;
+
+    if (overdueValidation && overdueValidation.length > 0) {
+      const val = overdueValidation[0];
+      log(`📊 Overdue validation - Total: ${val.total_children}, Overdue: ${val.overdue_children} (${val.overdue_pct}%)`);
+
+      // Check demographic distribution
+      const demographicOverdue = await prisma.$queryRaw`
+        SELECT 
+          "gender", 
+          "ageGroup",
+          SUM("totalRegisteredChildren") AS total,
+          SUM("overdue") AS overdue,
+          ROUND((SUM("overdue")::decimal / NULLIF(SUM("totalRegisteredChildren"), 0) * 100), 2) AS overdue_pct
+        FROM "ChildAnalyticsFact"
+        WHERE "vaccineTypeId" = 0 AND "day" = CURRENT_DATE
+        GROUP BY "gender", "ageGroup"
+        ORDER BY "gender", "ageGroup";
+      `;
+
+      log('📈 Demographic overdue distribution:');
+      demographicOverdue.forEach(row => {
+        log(`- ${row.gender}/${row.ageGroup}: ${row.overdue}/${row.total} (${row.overdue_pct}%)`);
+      });
+    }
+
   } catch (err) {
     log(`❌ Validation query failed: ${err.message}`, '❌');
     console.error(err);
@@ -680,50 +776,36 @@ async function main() {
 
     // first-run fallback: if no changed wards detected but it's first run, rebuild all wards
     if (isFirstRun && (!changedWards || changedWards.length === 0)) {
-      log('📊 No changed wards detected but this is first run — fetching all wards to rebuild.');
-      const rows = await prisma.$queryRaw`SELECT DISTINCT COALESCE("wardNumber", 1)::int AS ward FROM "Child"`;
-      const all = (rows || []).map(r => Number(r.ward)).filter(n => Number.isFinite(n));
-      if (all.length === 0) {
-        log('⚠️ DB has no child wards. Nothing to process. Exiting.');
-        console.timeEnd('TotalWorkerDuration');
-        return;
-      }
-      changedWards = all;
-      log(`📈 Rebuilding all wards: ${all.join(', ')}`);
+      log('🔄 First run fallback: rebuilding all wards...');
+      // get all wards from Child table
+      const allWards = await prisma.$queryRaw`SELECT DISTINCT COALESCE("wardNumber", 1)::int AS ward FROM "Child" ORDER BY 1`;
+      changedWards = allWards.map(r => Number(r.ward));
     }
 
-    if (!changedWards || changedWards.length === 0) {
-      log('✅ No changes since last run — skipping rebuild.');
-      console.timeEnd('TotalWorkerDuration');
-      return;
-    }
-
-    // perform per-ward updates (child, mother, growth)
+    // run incremental updates for changed wards
     await updateChildFactsForWards(changedWards);
     await updateMotherFactsForWards(changedWards);
     await updateGrowthFactsForWards(changedWards);
 
-    // update meta timestamps AFTER successful updates
-    await prisma.analyticsMeta.update({
-      where: { id: meta.id },
+    // update last processed timestamps
+    const now = new Date();
+    await prisma.analyticsMeta.updateMany({
       data: {
-        lastProcessedChild: new Date(),
-        lastProcessedMother: new Date(),
-        lastProcessedGrowth: new Date(),
+        lastProcessedChild: now,
+        lastProcessedMother: now,
+        lastProcessedGrowth: now,
       },
     });
+    log('✅ Updated AnalyticsMeta timestamps.');
 
-    // run validation & full data quality report (always print)
+    // always run validation
     await validateDataQuality();
 
-    log('✅ Incremental analytics update completed successfully!');
-  } catch (err) {
-    log(`❌ Error in incremental analytics update: ${err.message}`, '❌');
-    console.error(err);
-  } finally {
     console.timeEnd('TotalWorkerDuration');
-    try { await prisma.$disconnect(); } catch { }
-    log('Disconnected Prisma client. Worker exiting.');
+    log('✅ Incremental analytics update completed successfully!');
+  } catch (error) {
+    console.error('❌ Analytics update failed:', error);
+    throw error;
   }
 }
 
