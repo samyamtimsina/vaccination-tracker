@@ -18,7 +18,7 @@ const prepareChildDueVaccines = (birthDate, doses, scheduleVersionId) => {
             vaccineTypeId: dose.vaccineTypeId,
             doseNumber: dose.doseNumber,
             dueDate,
-            isCompleted: false,
+            isCompleted: false, // Default to false, will update based on vaccinations
             scheduleVersion: scheduleVersionId,
         };
     });
@@ -78,41 +78,61 @@ const generateData = async (totalChildren, batchSize = 1000) => {
         const dueVaccinesRecords = [];
         const weightRecords = [];
 
-        // --- Generate dense vaccination records ---
+        // --- Generate vaccination records and sync with due vaccines ---
         for (const child of children) {
             const creatorUser = faker.helpers.arrayElement(users);
 
+            // First create due vaccines for this child
+            const dueVaccines = prepareChildDueVaccines(child.birthDate, scheduleVersion.doses, scheduleVersion.id);
+
+            // Track which doses will be completed
+            const completedDoses = new Set();
+
+            // Generate vaccination records
             for (const vaccine of vaccineTypes) {
                 const dosesForVaccine = scheduleVersion.doses.filter(d => d.vaccineTypeId === vaccine.id);
                 for (const dose of dosesForVaccine) {
-                    // Randomly decide if the dose was already given (dense but not always 100%)
+                    // Randomly decide if the dose was already given (80% chance)
                     if (Math.random() < 0.8) {
+                        const dateGiven = getRandomDate(child.birthDate, new Date());
+
                         vaccinationRecords.push({
                             citizenId: child.id,
                             vaccineTypeId: vaccine.id,
                             doseNumber: dose.doseNumber,
-                            dateGiven: getRandomDate(child.birthDate, new Date()),
+                            dateGiven: dateGiven,
                             isComplete: true,
-                            type: faker.helpers.arrayElement(['current', 'booster']),
+                            type: faker.helpers.arrayElement(['routine', 'booster']),
                             createdById: creatorUser.id,
                             administeredById: creatorUser.id,
                             wardOfVaccination: child.wardNumber,
                             remarks: faker.lorem.sentence(),
                         });
+
+                        // Mark this dose as completed for due vaccines
+                        completedDoses.add(`${vaccine.id}-${dose.doseNumber}`);
                     }
                 }
             }
 
-            // ChildDueVaccine
-            const dueVaccines = prepareChildDueVaccines(child.birthDate, scheduleVersion.doses, scheduleVersion.id);
-            dueVaccines.forEach(v => dueVaccinesRecords.push({ ...v, childId: child.id }));
+            // Create due vaccines - mark as completed if vaccination exists
+            dueVaccines.forEach(v => {
+                const doseKey = `${v.vaccineTypeId}-${v.doseNumber}`;
+                const isCompleted = completedDoses.has(doseKey);
+
+                dueVaccinesRecords.push({
+                    ...v,
+                    childId: child.id,
+                    isCompleted: isCompleted
+                });
+            });
 
             // Weight records
             const numWeights = faker.number.int({ min: 0, max: 3 });
             for (let k = 0; k < numWeights; k++) {
                 weightRecords.push({
                     childId: child.id,
-                    weight: faker.number.float({ min: 2.5, max: 15, precision: 0.01, fixed: 2 }),
+                    weight: faker.number.float({ min: 2.5, max: 15, precision: 0.01, fractionDigits: 2 }),
                     date: getRandomDate(child.birthDate, new Date()),
                     createdById: creatorUser.id,
                     administeredById: creatorUser.id,
@@ -121,20 +141,27 @@ const generateData = async (totalChildren, batchSize = 1000) => {
             }
         }
 
+        // Insert all records
         if (vaccinationRecords.length) await prisma.vaccinationRecord.createMany({ data: vaccinationRecords });
         if (dueVaccinesRecords.length) await prisma.childDueVaccine.createMany({ data: dueVaccinesRecords });
         if (weightRecords.length) await prisma.weightRecord.createMany({ data: weightRecords });
+
+        // Log completion stats for this batch
+        const completedCount = dueVaccinesRecords.filter(d => d.isCompleted).length;
+        const totalDueVaccines = dueVaccinesRecords.length;
+        console.log(`Batch ${createdCount + batch.length}: ${completedCount}/${totalDueVaccines} due vaccines marked completed (${Math.round((completedCount / totalDueVaccines) * 100)}%)`);
 
         createdCount += batch.length;
         console.log(`Generated ${createdCount}/${totalChildren} children...`);
     }
 
-    console.log('Data generation complete!');
+    console.log('✅ Data generation complete!');
+    console.log('📊 Now run your analytics worker to see correct vaccinated counts!');
     await prisma.$disconnect();
 };
 
 // --- Run generator ---
-generateData(100000, 1000);
+generateData(100000, 1000).catch(console.error);
 
 // // File: prisma/seed_debug_schedule.js
 // // import { prisma } from "../utils/prisma.js";

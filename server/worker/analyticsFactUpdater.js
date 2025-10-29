@@ -110,14 +110,14 @@ async function getChangedWards(lastProcessedChild, lastProcessedMother, lastProc
 --------------------------- */
 function toSqlWardList(wards) {
   if (!wards || wards.length === 0) return null;
-  // Ensure integerse
+  // Ensure integers
   const nums = Array.from(new Set(wards.map(w => Number(w)).filter(n => Number.isFinite(n))));
   if (nums.length === 0) return null;
   return `(${nums.join(',')})`;
 }
 
 /* =================================================
-   CHILD - per-ward incremental insert (full logic)
+   CHILD - per-ward incremental insert (WITH ELIGIBILITY FIXES)
    ================================================= */
 async function updateChildFactsForWards(wardList) {
   if (!wardList || wardList.length === 0) {
@@ -129,18 +129,18 @@ async function updateChildFactsForWards(wardList) {
 
   log(`🧒 Updating ChildAnalyticsFact for wards ${wardSql} ...`);
 
-  // detect backdated vaccination edits in those wards (use the single AnalyticsMeta row via LIMIT 1)
+  // detect backdated vaccination edits in those wards
   const backdatedRows = await prisma.$queryRawUnsafe(`
-  SELECT 1 FROM "VaccinationRecord" vr
-  LEFT JOIN "Child" c ON c.id = vr."citizenId"
-  WHERE vr."updatedAt" > (SELECT LEAST(
-        COALESCE((SELECT "lastProcessedChild" FROM "AnalyticsMeta" LIMIT 1), '1970-01-01'::timestamp),
-        COALESCE((SELECT "lastProcessedMother" FROM "AnalyticsMeta" LIMIT 1), '1970-01-01'::timestamp)
-      ))
-    AND DATE(vr."dateGiven") < CURRENT_DATE
-    AND COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1)) IN ${wardSql}
-  LIMIT 1;
-`);
+    SELECT 1 FROM "VaccinationRecord" vr
+    LEFT JOIN "Child" c ON c.id = vr."citizenId"
+    WHERE vr."updatedAt" > (SELECT LEAST(
+          COALESCE((SELECT "lastProcessedChild" FROM "AnalyticsMeta" LIMIT 1), '1970-01-01'::timestamp),
+          COALESCE((SELECT "lastProcessedMother" FROM "AnalyticsMeta" LIMIT 1), '1970-01-01'::timestamp)
+        ))
+      AND DATE(vr."dateGiven") < CURRENT_DATE
+      AND COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1)) IN ${wardSql}
+    LIMIT 1;
+  `);
 
   if (backdatedRows && backdatedRows.length) {
     log('⚠️ Backdated vaccination edits detected in affected wards (dateGiven < today).', '⚠️');
@@ -154,7 +154,7 @@ async function updateChildFactsForWards(wardList) {
   `);
   log('Deleted existing ChildAnalyticsFact rows for affected wards (today).');
 
-  // overall per-ward child summary scoped to wards
+  // overall per-ward child summary scoped to wards WITH ELIGIBILITY
   await prisma.$executeRawUnsafe(`
     INSERT INTO "ChildAnalyticsFact" (
       "day","ward","vaccineTypeId","doseNumber","gender","ageGroup","casteCode",
@@ -173,9 +173,12 @@ async function updateChildFactsForWards(wardList) {
           WHEN EXTRACT(YEAR FROM AGE(c."birthDate")) < 5 THEN '1-5y'
           ELSE '5y+'
         END AS ageGroup,
+        -- Count only eligible vaccinations (due vaccines that are past due date)
         EXISTS (
-          SELECT 1 FROM "VaccinationRecord" vr
-          WHERE vr."citizenId" = c.id AND vr."isComplete" = true
+          SELECT 1 FROM "ChildDueVaccine" cdv
+          WHERE cdv."childId" = c.id 
+            AND cdv."dueDate" <= CURRENT_DATE 
+            AND cdv."isCompleted" = true
         ) AS is_vaccinated,
         (SELECT COUNT(*) FROM "ChildDueVaccine" cdv
           WHERE cdv."childId" = c.id AND cdv."dueDate" = CURRENT_DATE AND cdv."isCompleted" = false
@@ -204,60 +207,72 @@ async function updateChildFactsForWards(wardList) {
     FROM child_stats cs
     GROUP BY cs.ward, cs.gender, cs.ageGroup, cs.casteCode;
   `);
+  log('✅ Overall child facts inserted.');
 
-  // per-vaccine rows scoped to wards (CORRECTED: Full cohort via CROSS JOIN + EXISTS)
+  // per-vaccine rows scoped to wards WITH CORRECT ELIGIBILITY LOGIC
   await prisma.$executeRawUnsafe(`
-  WITH active_vaccine_types AS (
-    SELECT DISTINCT vr."vaccineTypeId"
-    FROM "VaccinationRecord" vr
-    JOIN "Child" c ON c.id = vr."citizenId"
-    WHERE COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1)) IN ${wardSql}
-      AND vr."vaccineTypeId" IS NOT NULL
-  ),
-  all_children AS (
-    SELECT 
-      c.id,
-      COALESCE(c."wardNumber", 1) AS ward
-    FROM "Child" c
-    WHERE COALESCE(c."wardNumber", 1) IN ${wardSql}
-  )
-  INSERT INTO "ChildAnalyticsFact" (
-    "day","ward","vaccineTypeId","doseNumber","gender","ageGroup","casteCode",
-    "totalRegisteredChildren","vaccinatedChildren","zeroDoseChildren",
-    "dueToday","overdue","onTime","late","dropoutRate","createdAt","updatedAt"
-  )
-  SELECT
-    CURRENT_DATE,
-    ac.ward,
-    avt."vaccineTypeId",
-    0 AS "doseNumber",
-    'ALL' AS gender,
-    'ALL' AS ageGroup,
-    0 AS casteCode,
-    COUNT(DISTINCT ac.id) AS totalRegisteredChildren,  -- Full ward cohort
-    COUNT(DISTINCT CASE 
-      WHEN EXISTS (
-        SELECT 1 FROM "VaccinationRecord" vr 
-        WHERE vr."citizenId" = ac.id 
-          AND vr."vaccineTypeId" = avt."vaccineTypeId" 
-          AND vr."isComplete" = true
-      ) THEN ac.id 
-    END) AS vaccinatedChildren,  -- Any complete dose for this type
-    COUNT(DISTINCT CASE 
-      WHEN NOT EXISTS (
-        SELECT 1 FROM "VaccinationRecord" vr 
-        WHERE vr."citizenId" = ac.id 
-          AND vr."vaccineTypeId" = avt."vaccineTypeId"
-      ) THEN ac.id 
-    END) AS zeroDoseChildren,  -- No records at all for this type
-    0, 0, 0, 0, 0,
-    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-  FROM all_children ac
-  CROSS JOIN active_vaccine_types avt
-  GROUP BY ac.ward, avt."vaccineTypeId";
-`);
+    WITH active_vaccine_types AS (
+      SELECT DISTINCT vr."vaccineTypeId"
+      FROM "VaccinationRecord" vr
+      JOIN "Child" c ON c.id = vr."citizenId"
+      WHERE COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1)) IN ${wardSql}
+        AND vr."vaccineTypeId" IS NOT NULL
+    ),
+    all_children AS (
+      SELECT 
+        c.id,
+        COALESCE(c."wardNumber", 1) AS ward
+      FROM "Child" c
+      WHERE COALESCE(c."wardNumber", 1) IN ${wardSql}
+    ),
+    eligible_vaccinations AS (
+      SELECT 
+        ac.id AS child_id,
+        ac.ward,
+        avt."vaccineTypeId",
+        -- Vaccinated if eligible and completed
+        EXISTS(
+          SELECT 1 FROM "ChildDueVaccine" cdv
+          WHERE cdv."childId" = ac.id 
+            AND cdv."vaccineTypeId" = avt."vaccineTypeId"
+            AND cdv."dueDate" <= CURRENT_DATE
+            AND cdv."isCompleted" = true
+        ) AS is_vaccinated,
+        -- Zero-dose if eligible but not completed
+        EXISTS(
+          SELECT 1 FROM "ChildDueVaccine" cdv
+          WHERE cdv."childId" = ac.id 
+            AND cdv."vaccineTypeId" = avt."vaccineTypeId"
+            AND cdv."dueDate" <= CURRENT_DATE
+            AND cdv."isCompleted" = false
+        ) AS is_zero_dose
+      FROM all_children ac
+      CROSS JOIN active_vaccine_types avt
+    )
+    INSERT INTO "ChildAnalyticsFact" (
+      "day","ward","vaccineTypeId","doseNumber","gender","ageGroup","casteCode",
+      "totalRegisteredChildren","vaccinatedChildren","zeroDoseChildren",
+      "dueToday","overdue","onTime","late","dropoutRate","createdAt","updatedAt"
+    )
+    SELECT
+      CURRENT_DATE,
+      ev.ward,
+      ev."vaccineTypeId",
+      0 AS "doseNumber",
+      'ALL' AS gender,
+      'ALL' AS ageGroup,
+      0 AS casteCode,
+      COUNT(DISTINCT ev.child_id) AS totalRegisteredChildren,
+      COUNT(DISTINCT CASE WHEN ev.is_vaccinated THEN ev.child_id END) AS vaccinatedChildren,
+      COUNT(DISTINCT CASE WHEN ev.is_zero_dose THEN ev.child_id END) AS zeroDoseChildren,
+      0, 0, 0, 0, 0,
+      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    FROM eligible_vaccinations ev
+    GROUP BY ev.ward, ev."vaccineTypeId";
+  `);
+  log('✅ Per-vaccine eligible child facts inserted.');
 
-  // dropout per vaccine (multi-primary vaccines) scoped to wards
+  // dropout per vaccine (multi-primary vaccines) scoped to wards WITH ELIGIBILITY
   await prisma.$executeRawUnsafe(`
     WITH eligible_vaccines AS (
       SELECT "vaccineTypeId"
@@ -273,12 +288,33 @@ async function updateChildFactsForWards(wardList) {
       WHERE d."isPrimary" = true
       GROUP BY d."vaccineTypeId"
     ),
-    dose_counts AS (
+    eligible_dose_counts AS (
       SELECT
         vr."vaccineTypeId",
         COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1)) AS ward,
-        COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.first_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS first_dose,
-        COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.last_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS last_dose
+        -- Only count doses where child was eligible (due date has passed)
+        COUNT(DISTINCT CASE 
+          WHEN vr."doseNumber" = db.first_dose_no AND vr."isComplete" = true
+          AND EXISTS (
+            SELECT 1 FROM "ChildDueVaccine" cdv 
+            WHERE cdv."childId" = vr."citizenId" 
+              AND cdv."vaccineTypeId" = vr."vaccineTypeId" 
+              AND cdv."doseNumber" = db.first_dose_no
+              AND cdv."dueDate" <= CURRENT_DATE
+          )
+          THEN vr."citizenId" 
+        END) AS first_dose,
+        COUNT(DISTINCT CASE 
+          WHEN vr."doseNumber" = db.last_dose_no AND vr."isComplete" = true
+          AND EXISTS (
+            SELECT 1 FROM "ChildDueVaccine" cdv 
+            WHERE cdv."childId" = vr."citizenId" 
+              AND cdv."vaccineTypeId" = vr."vaccineTypeId" 
+              AND cdv."doseNumber" = db.last_dose_no
+              AND cdv."dueDate" <= CURRENT_DATE
+          )
+          THEN vr."citizenId" 
+        END) AS last_dose
       FROM "VaccinationRecord" vr
       JOIN "Child" c ON c.id = vr."citizenId"
       JOIN dose_bounds db ON db."vaccineTypeId" = vr."vaccineTypeId"
@@ -296,7 +332,7 @@ async function updateChildFactsForWards(wardList) {
           WHEN last_dose > first_dose THEN 0
           ELSE ROUND((1.0 - (last_dose::numeric / NULLIF(first_dose, 0))) * 100, 2)
         END AS dropout_rate
-      FROM dose_counts
+      FROM eligible_dose_counts
     )
     UPDATE "ChildAnalyticsFact" caf
     SET "dropoutRate" = dc.dropout_rate
@@ -306,48 +342,9 @@ async function updateChildFactsForWards(wardList) {
       AND caf."doseNumber" = 0
       AND caf."day" = CURRENT_DATE;
   `);
+  log('✅ Dropout rates updated for multi-dose vaccines.');
 
-  // weighted ward-level dropout (vaccineTypeId = 0 row)
-  await prisma.$executeRawUnsafe(`
-    WITH dose_bounds AS (
-      SELECT "vaccineTypeId", MIN("doseNumber") AS first_dose_no, MAX("doseNumber") AS last_dose_no
-      FROM "Dose"
-      GROUP BY "vaccineTypeId"
-    ),
-    dose_counts AS (
-      SELECT
-        vr."vaccineTypeId",
-        COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1)) AS ward,
-        COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.first_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS first_dose,
-        COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.last_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS last_dose
-      FROM "VaccinationRecord" vr
-      JOIN "Child" c ON c.id = vr."citizenId"
-      JOIN dose_bounds db ON db."vaccineTypeId" = vr."vaccineTypeId"
-      WHERE COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1)) IN ${wardSql}
-      GROUP BY vr."vaccineTypeId", COALESCE(vr."wardOfVaccination", COALESCE(c."wardNumber", 1))
-    ),
-    ward_dropout AS (
-      SELECT
-        ward,
-        SUM(first_dose) AS total_first,
-        SUM(last_dose) AS total_last,
-        CASE
-          WHEN SUM(first_dose) = 0 THEN 0
-          ELSE ROUND((1.0 - (SUM(last_dose)::numeric / NULLIF(SUM(first_dose), 0))) * 100, 2)
-        END AS weighted_dropout_rate
-      FROM dose_counts
-      GROUP BY ward
-    )
-    UPDATE "ChildAnalyticsFact" caf
-    SET "dropoutRate" = wd.weighted_dropout_rate
-    FROM ward_dropout wd
-    WHERE caf."ward" = wd.ward
-      AND caf."vaccineTypeId" = 0
-      AND caf."doseNumber" = 0
-      AND caf."day" = CURRENT_DATE;
-  `);
-
-  log('ChildFacts reprocessed for affected wards.');
+  log('🟢 ChildFacts fully reprocessed for affected wards.');
 }
 
 /* =================================================
@@ -363,16 +360,15 @@ async function updateMotherFactsForWards(wardList) {
 
   log(`🤰 Updating MotherAnalyticsFact for wards ${wardSql} ...`);
 
-  // inside updateMotherFactsForWards()
+  // backdated detection
   const backdated = await prisma.$queryRawUnsafe(`
-  SELECT 1 FROM "TDDose" td
-  JOIN "Mother" m ON m.id = td."motherId"
-  WHERE td."updatedAt" > (SELECT COALESCE("lastProcessedMother", '1970-01-01'::timestamp) FROM "AnalyticsMeta" LIMIT 1)
-    AND DATE(td."dateGiven") < CURRENT_DATE
-    AND COALESCE(m."wardNumber", 1) IN ${wardSql}
-  LIMIT 1;
-`);
-
+    SELECT 1 FROM "TDDose" td
+    JOIN "Mother" m ON m.id = td."motherId"
+    WHERE td."updatedAt" > (SELECT COALESCE("lastProcessedMother", '1970-01-01'::timestamp) FROM "AnalyticsMeta" LIMIT 1)
+      AND DATE(td."dateGiven") < CURRENT_DATE
+      AND COALESCE(m."wardNumber", 1) IN ${wardSql}
+    LIMIT 1;
+  `);
 
   if (backdated && backdated.length) {
     log('⚠️ Backdated TD edits detected in affected wards (dateGiven < today).', '⚠️');
@@ -445,7 +441,7 @@ async function updateMotherFactsForWards(wardList) {
     GROUP BY COALESCE(m."wardNumber", 1), td."doseNumber", m."casteCode";
   `);
 
-  log('MotherFacts reprocessed for affected wards.');
+  log('✅ MotherFacts reprocessed for affected wards.');
 }
 
 /* =================================================
@@ -461,16 +457,15 @@ async function updateGrowthFactsForWards(wardList) {
 
   log(`📈 Updating GrowthAnalyticsFact for wards ${wardSql} ...`);
 
-  // inside updateGrowthFactsForWards()
+  // backdated detection
   const backdated = await prisma.$queryRawUnsafe(`
-  SELECT 1 FROM "WeightRecord" wr
-  LEFT JOIN "Child" c ON c.id = wr."childId"
-  WHERE wr."updatedAt" > (SELECT COALESCE("lastProcessedGrowth", '1970-01-01'::timestamp) FROM "AnalyticsMeta" LIMIT 1)
-    AND DATE(wr."date") < CURRENT_DATE
-    AND COALESCE(NULLIF(wr."wardOfVaccination", 0), COALESCE(c."wardNumber", 1)) IN ${wardSql}
-  LIMIT 1;
-`);
-
+    SELECT 1 FROM "WeightRecord" wr
+    LEFT JOIN "Child" c ON c.id = wr."childId"
+    WHERE wr."updatedAt" > (SELECT COALESCE("lastProcessedGrowth", '1970-01-01'::timestamp) FROM "AnalyticsMeta" LIMIT 1)
+      AND DATE(wr."date") < CURRENT_DATE
+      AND COALESCE(NULLIF(wr."wardOfVaccination", 0), COALESCE(c."wardNumber", 1)) IN ${wardSql}
+    LIMIT 1;
+  `);
 
   if (backdated && backdated.length) {
     log('⚠️ Backdated weight edits detected in affected wards (date < today).', '⚠️');
@@ -525,7 +520,7 @@ async function updateGrowthFactsForWards(wardList) {
     FROM aggregated;
   `);
 
-  log('GrowthFacts reprocessed for affected wards.');
+  log('✅ GrowthFacts reprocessed for affected wards.');
 }
 
 /* =================================================
@@ -578,7 +573,7 @@ async function validateDataQuality() {
       log('✅ Growth records match perfectly (sum of daily totals).');
     }
 
-    // Vaccine per-dose consistency check (detailed, always printed)
+    // Vaccine per-dose consistency check WITH ELIGIBILITY FILTERING
     const dataQualityCheck = await prisma.$queryRaw`
       WITH eligible_vaccines AS (
         SELECT "vaccineTypeId"
@@ -597,12 +592,32 @@ async function validateDataQuality() {
         WHERE d."isPrimary" = true
         GROUP BY d."vaccineTypeId"
       ),
-      dose_counts AS (
+      eligible_dose_counts AS (
         SELECT 
           vr."vaccineTypeId",
           vt.name AS vaccine_name,
-          COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.first_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS first_dose,
-          COUNT(DISTINCT CASE WHEN vr."doseNumber" = db.last_dose_no AND vr."isComplete" = true THEN vr."citizenId" END) AS last_dose
+          COUNT(DISTINCT CASE 
+            WHEN vr."doseNumber" = db.first_dose_no AND vr."isComplete" = true
+            AND EXISTS (
+              SELECT 1 FROM "ChildDueVaccine" cdv 
+              WHERE cdv."childId" = vr."citizenId" 
+                AND cdv."vaccineTypeId" = vr."vaccineTypeId" 
+                AND cdv."doseNumber" = db.first_dose_no
+                AND cdv."dueDate" <= CURRENT_DATE
+            )
+            THEN vr."citizenId" 
+          END) AS first_dose,
+          COUNT(DISTINCT CASE 
+            WHEN vr."doseNumber" = db.last_dose_no AND vr."isComplete" = true
+            AND EXISTS (
+              SELECT 1 FROM "ChildDueVaccine" cdv 
+              WHERE cdv."childId" = vr."citizenId" 
+                AND cdv."vaccineTypeId" = vr."vaccineTypeId" 
+                AND cdv."doseNumber" = db.last_dose_no
+                AND cdv."dueDate" <= CURRENT_DATE
+            )
+            THEN vr."citizenId" 
+          END) AS last_dose
         FROM "VaccinationRecord" vr
         JOIN dose_bounds db ON db."vaccineTypeId" = vr."vaccineTypeId"
         JOIN "VaccineType" vt ON vt.id = vr."vaccineTypeId"
@@ -610,7 +625,7 @@ async function validateDataQuality() {
       )
       SELECT vaccine_name, first_dose, last_dose,
         CASE WHEN last_dose > first_dose THEN 'DATA_ISSUE' ELSE 'OK' END AS status
-      FROM dose_counts;
+      FROM eligible_dose_counts;
     `;
 
     if (!dataQualityCheck || dataQualityCheck.length === 0) {
@@ -635,16 +650,13 @@ async function main() {
   log('🚀 Starting incremental analytics update...');
   console.time('TotalWorkerDuration');
 
-
   try {
     // ensure AnalyticsMeta row exists
-    // Use findFirst() and create without manually setting autoincrement id
     let meta = await prisma.analyticsMeta.findFirst();
     if (!meta) {
       log('🆕 AnalyticsMeta missing — creating default entry...');
       meta = await prisma.analyticsMeta.create({
         data: {
-          // use epoch-zero fallback to indicate "not processed"
           lastProcessedChild: new Date(0),
           lastProcessedMother: new Date(0),
           lastProcessedGrowth: new Date(0),
@@ -674,7 +686,6 @@ async function main() {
       if (all.length === 0) {
         log('⚠️ DB has no child wards. Nothing to process. Exiting.');
         console.timeEnd('TotalWorkerDuration');
-
         return;
       }
       changedWards = all;
@@ -683,7 +694,7 @@ async function main() {
 
     if (!changedWards || changedWards.length === 0) {
       log('✅ No changes since last run — skipping rebuild.');
-      console.timeEnd('⏱️ Total Worker Duration');
+      console.timeEnd('TotalWorkerDuration');
       return;
     }
 
@@ -710,7 +721,7 @@ async function main() {
     log(`❌ Error in incremental analytics update: ${err.message}`, '❌');
     console.error(err);
   } finally {
-    console.timeEnd('⏱️ Total Worker Duration');
+    console.timeEnd('TotalWorkerDuration');
     try { await prisma.$disconnect(); } catch { }
     log('Disconnected Prisma client. Worker exiting.');
   }

@@ -124,23 +124,24 @@ export const createChild = async (req, res) => {
         validatedData.administeredById
       );
 
-      if (vaccinationCreateData.length) {
-        const vaccinationsWithChildId = vaccinationCreateData.map(v => ({
-          ...v,
-          citizenId: child.id,
-          wardOfVaccination: req.user.wardId,
-        }));
+      const vaccinationsWithChildId = vaccinationCreateData.map(v => ({
+        ...v,
+        citizenId: child.id,
+        wardOfVaccination: req.user.wardId,
+      }));
 
+      if (vaccinationsWithChildId.length) {
         await tx.vaccinationRecord.createMany({ data: vaccinationsWithChildId });
 
-        // 🧠 DELETE CORRESPONDING DUE VACCINES WHEN VACCINATION IS GIVEN
+        // 🧠 Instead of deleting, mark corresponding due vaccines as completed
         for (const v of vaccinationsWithChildId) {
-          await tx.childDueVaccine.deleteMany({
+          await tx.childDueVaccine.updateMany({
             where: {
               childId: child.id,
               vaccineTypeId: v.vaccineTypeId,
               doseNumber: v.doseNumber,
             },
+            data: { isCompleted: true },
           });
         }
       }
@@ -161,18 +162,26 @@ export const createChild = async (req, res) => {
       // --- ChildDueVaccine entries (filter out already given vaccines) ---
       const dueVaccines = await prepareChildDueVaccines(validatedData.birthDate);
 
-      // Filter out vaccines that were already given
       const givenVaccineSet = new Set(
         vaccinationCreateData.map(v => `${v.vaccineTypeId}-${v.doseNumber}`)
       );
+
       const filteredDueVaccines = dueVaccines.filter(
         dv => !givenVaccineSet.has(`${dv.vaccineTypeId}-${dv.doseNumber}`)
       );
 
-      if (filteredDueVaccines.length) {
-        const dueWithChildId = filteredDueVaccines.map((v) => ({ ...v, childId: child.id }));
-        await tx.childDueVaccine.createMany({ data: dueWithChildId });
-        console.log(`Created ${dueWithChildId.length} due vaccines (filtered from ${dueVaccines.length} total)`);
+      const completedDueVaccines = dueVaccines
+        .filter(dv => givenVaccineSet.has(`${dv.vaccineTypeId}-${dv.doseNumber}`))
+        .map(dv => ({ ...dv, childId: child.id, isCompleted: true }));
+
+      const dueToInsert = [
+        ...filteredDueVaccines.map(v => ({ ...v, childId: child.id })),
+        ...completedDueVaccines,
+      ];
+
+      if (dueToInsert.length) {
+        await tx.childDueVaccine.createMany({ data: dueToInsert });
+        console.log(`Created ${dueToInsert.length} due vaccines (including completed ones).`);
       }
 
       // 🧩 CATCH-UP DELETION + LOCK LOGIC
@@ -211,6 +220,7 @@ export const createChild = async (req, res) => {
     res.status(500).json({ error: 'Child creation failed', details: error.message });
   }
 };
+
 
 export const updateChildPurnaKhop = async (req, res) => {
   try {
@@ -672,23 +682,25 @@ export const updateChild = async (req, res) => {
           console.log('Skipping: No dateGiven for new vaccination.');
         }
 
-        // 🧠 DELETE CORRESPONDING DUE ENTRY ONCE VACCINATED
-        console.log('Deleting corresponding childDueVaccine entries:', { childId: existingChild.id, vaccineTypeId: v.vaccineTypeId, doseNumber: v.doseNumber });
-        await tx.childDueVaccine.deleteMany({
+        // 🧠 Mark corresponding due vaccine as completed (instead of deleting)
+        await tx.childDueVaccine.updateMany({
           where: {
             childId: existingChild.id,
             vaccineTypeId: v.vaccineTypeId,
             doseNumber: v.doseNumber,
           },
+          data: { isCompleted: true },
         });
-        console.log('Due vaccine entries deleted.');
       }
 
-      // Remove vaccinations that were cleared in the UI
+      // --- Removed Vaccinations ---
       if (req.body.removedVaccinations && Array.isArray(req.body.removedVaccinations)) {
         console.log('Processing removed vaccinations:', req.body.removedVaccinations);
+
         for (const { vaccineTypeId, doseNumber } of req.body.removedVaccinations) {
           console.log('Deleting removed vaccination:', { vaccineTypeId, doseNumber });
+
+          // 1️⃣ Delete vaccination record
           await tx.vaccinationRecord.deleteMany({
             where: {
               citizenId: existingChild.id,
@@ -697,10 +709,22 @@ export const updateChild = async (req, res) => {
             },
           });
           console.log('Removed vaccination deleted.');
+
+          // 2️⃣ Reactivate the due vaccine (mark isCompleted back to false)
+          await tx.childDueVaccine.updateMany({
+            where: {
+              childId: existingChild.id,
+              vaccineTypeId,
+              doseNumber,
+            },
+            data: { isCompleted: false },
+          });
+          console.log(`Reactivated due vaccine: ${vaccineTypeId} - Dose ${doseNumber}`);
         }
       } else {
         console.log('No removed vaccinations provided.');
       }
+
 
       // --- Weight Records ---
       const incomingWeights = Array.isArray(weightRecords) ? weightRecords : [];
@@ -746,32 +770,30 @@ export const updateChild = async (req, res) => {
         }
       }
 
-      // --- ChildDueVaccines - ONLY regenerate if birthDate changed ---
       if (demographicData.birthDate && demographicData.birthDate !== existingChild.birthDate) {
         console.log('Birth date changed, recalculating due vaccines...');
-        const childDueVaccines = await prepareChildDueVaccines(demographicData.birthDate);
+        const newDueVaccines = await prepareChildDueVaccines(demographicData.birthDate);
 
-        // Get all current vaccinations to filter out already given ones
-        const currentVaccinations = await tx.vaccinationRecord.findMany({
-          where: { citizenId: existingChild.id },
-          select: { vaccineTypeId: true, doseNumber: true },
-        });
+        for (const due of newDueVaccines) {
+          const exists = await tx.childDueVaccine.findFirst({
+            where: {
+              childId: existingChild.id,
+              vaccineTypeId: due.vaccineTypeId,
+              doseNumber: due.doseNumber,
+            },
+          });
 
-        const givenSet = new Set(currentVaccinations.map(v => `${v.vaccineTypeId}-${v.doseNumber}`));
-        const filteredDueVaccines = childDueVaccines.filter(
-          dv => !givenSet.has(`${dv.vaccineTypeId}-${dv.doseNumber}`)
-        );
-
-        const dueWithChildId = filteredDueVaccines.map(v => ({ ...v, childId: existingChild.id }));
-
-        console.log(`Prepared ${childDueVaccines.length} due vaccines, filtered down to ${dueWithChildId.length} (removed already given)`);
-
-        await tx.childDueVaccine.deleteMany({ where: { childId: existingChild.id } });
-        await tx.childDueVaccine.createMany({ data: dueWithChildId });
-        console.log('Recreated due vaccines successfully.');
-      } else {
-        console.log('Birth date unchanged, skipping due vaccine recalculation.');
+          if (!exists) {
+            await tx.childDueVaccine.create({
+              data: { ...due, childId: existingChild.id },
+            });
+            console.log(`Created new due vaccine: ${due.vaccineTypeId} - dose ${due.doseNumber}`);
+          } else {
+            console.log(`Skipping existing due vaccine: ${due.vaccineTypeId} - dose ${due.doseNumber}`);
+          }
+        }
       }
+
 
       // 🧩 CATCH-UP DELETION + LOCK LOGIC
       console.log('Processing catch-up deletion and lock logic...');
