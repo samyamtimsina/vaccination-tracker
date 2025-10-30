@@ -10,97 +10,112 @@ function log(msg, symbol = 'ℹ️') {
 
 /* ---------------------------
    Helpers: changed wards detection
-   Uses updatedAt on relevant tables
+   Returns separate ward lists for each fact type
 --------------------------- */
 async function getChangedWards(lastProcessedChild, lastProcessedMother, lastProcessedGrowth) {
-  log('🔍 Checking for changed wards...');
+  log('🔍 Checking for changed wards by entity type...');
 
-  const meta = await prisma.analyticsMeta.findFirst();
-  if (!meta) {
-    log('No AnalyticsMeta found');
-    return [];
-  }
+  // If no timestamps provided (first run), use epoch
+  const childTime = lastProcessedChild || new Date(0);
+  const motherTime = lastProcessedMother || new Date(0);
+  const growthTime = lastProcessedGrowth || new Date(0);
 
-  console.log('=== DEBUG RAW SQL APPROACH ===');
-
-  // Format timestamp for direct SQL insertion (bypass Prisma parameter handling)
   const formatTimestampForSQL = (date) => {
     return date.toISOString().replace('T', ' ').replace('Z', '');
   };
 
-  const childTimeSQL = formatTimestampForSQL(meta.lastProcessedChild);
-  const motherTimeSQL = formatTimestampForSQL(meta.lastProcessedMother);
-  const growthTimeSQL = formatTimestampForSQL(meta.lastProcessedGrowth);
-
-  console.log('Child time for SQL:', childTimeSQL);
+  const childTimeSQL = formatTimestampForSQL(childTime);
+  const motherTimeSQL = formatTimestampForSQL(motherTime);
+  const growthTimeSQL = formatTimestampForSQL(growthTime);
 
   try {
-    // Use unsafe raw SQL with direct string interpolation
-    const updatedChildren = await prisma.$queryRawUnsafe(`
-      SELECT DISTINCT COALESCE("wardNumber", 1)::int AS ward
-      FROM "Child"
-      WHERE "updatedAt" > '${childTimeSQL}'
+    // Check for child-related changes (Child + VaccinationRecord)
+    const [updatedChildren, updatedVaccinations] = await Promise.all([
+      prisma.$queryRawUnsafe(`
+        SELECT DISTINCT COALESCE("wardNumber", 1)::int AS ward
+        FROM "Child"
+        WHERE "updatedAt" > '${childTimeSQL}'
+      `),
+      prisma.$queryRawUnsafe(`
+        SELECT DISTINCT COALESCE("wardOfVaccination", COALESCE(c."wardNumber", 1))::int AS ward
+        FROM "VaccinationRecord" vr
+        LEFT JOIN "Child" c ON c.id = vr."citizenId"
+        WHERE vr."updatedAt" > '${childTimeSQL}'
+      `)
+    ]);
+
+    // Check for mother-related changes (Mother + TDDose)
+    const [updatedMothers, updatedTDDoses] = await Promise.all([
+      prisma.$queryRawUnsafe(`
+        SELECT DISTINCT COALESCE("wardNumber", 1)::int AS ward
+        FROM "Mother"
+        WHERE "updatedAt" > '${motherTimeSQL}'
+      `),
+      prisma.$queryRawUnsafe(`
+        SELECT DISTINCT COALESCE(m."wardNumber", 1)::int AS ward
+        FROM "TDDose" td
+        JOIN "Mother" m ON m.id = td."motherId"
+        WHERE td."updatedAt" > '${motherTimeSQL}'
+      `)
+    ]);
+
+    // Check for growth-related changes (WeightRecord)
+    const updatedWeights = await prisma.$queryRawUnsafe(`
+      SELECT DISTINCT COALESCE(NULLIF(wr."wardOfVaccination", 0), COALESCE(c."wardNumber", 1))::int AS ward
+      FROM "WeightRecord" wr
+      LEFT JOIN "Child" c ON c.id = wr."childId"
+      WHERE wr."updatedAt" > '${growthTimeSQL}'
     `);
 
-    console.log('Children with updates (raw SQL):', updatedChildren);
+    // Create separate sets for each fact type
+    const childWardSet = new Set();
+    const motherWardSet = new Set();
+    const growthWardSet = new Set();
 
-    // If we get results, proceed with all tables using the same approach
-    if (updatedChildren.length > 0) {
-      const [
-        updatedVaccinations,
-        updatedMothers,
-        updatedTDDoses,
-        updatedWeights,
-      ] = await Promise.all([
-        prisma.$queryRawUnsafe(`
-          SELECT DISTINCT COALESCE("wardOfVaccination", COALESCE(c."wardNumber", 1))::int AS ward
-          FROM "VaccinationRecord" vr
-          LEFT JOIN "Child" c ON c.id = vr."citizenId"
-          WHERE vr."updatedAt" > '${childTimeSQL}'
-        `),
-
-        prisma.$queryRawUnsafe(`
-          SELECT DISTINCT COALESCE("wardNumber", 1)::int AS ward
-          FROM "Mother"
-          WHERE "updatedAt" > '${childTimeSQL}'
-        `),
-
-        prisma.$queryRawUnsafe(`
-          SELECT DISTINCT COALESCE(m."wardNumber", 1)::int AS ward
-          FROM "TDDose" td
-          JOIN "Mother" m ON m.id = td."motherId"
-          WHERE td."updatedAt" > '${childTimeSQL}'
-        `),
-
-        prisma.$queryRawUnsafe(`
-          SELECT DISTINCT COALESCE(NULLIF(wr."wardOfVaccination", 0), COALESCE(c."wardNumber", 1))::int AS ward
-          FROM "WeightRecord" wr
-          LEFT JOIN "Child" c ON c.id = wr."childId"
-          WHERE wr."updatedAt" > '${childTimeSQL}'
-        `)
-      ]);
-
-      // Merge results
-      const set = new Set();
-      [updatedChildren, updatedVaccinations, updatedMothers, updatedTDDoses, updatedWeights].forEach(arr => {
-        if (!arr) return;
-        arr.forEach(r => {
-          const w = r.ward;
-          if (w !== null && w !== undefined) set.add(Number(w));
-        });
+    // Populate child wards (Child + VaccinationRecord)
+    [updatedChildren, updatedVaccinations].forEach(arr => {
+      if (!arr) return;
+      arr.forEach(r => {
+        const w = r.ward;
+        if (w !== null && w !== undefined) childWardSet.add(Number(w));
       });
+    });
 
-      const list = Array.from(set).filter(w => Number.isFinite(w)).sort((a, b) => a - b);
-      log(`🧩 Changed wards since last run: ${list.length ? list.join(', ') : 'none'}`);
-      return list;
-    } else {
-      console.log('No changes detected with raw SQL approach either');
-      return [];
+    // Populate mother wards (Mother + TDDose)
+    [updatedMothers, updatedTDDoses].forEach(arr => {
+      if (!arr) return;
+      arr.forEach(r => {
+        const w = r.ward;
+        if (w !== null && w !== undefined) motherWardSet.add(Number(w));
+      });
+    });
+
+    // Populate growth wards (WeightRecord)
+    if (updatedWeights) {
+      updatedWeights.forEach(r => {
+        const w = r.ward;
+        if (w !== null && w !== undefined) growthWardSet.add(Number(w));
+      });
     }
 
+    // Convert to sorted arrays
+    const childWards = Array.from(childWardSet).filter(w => Number.isFinite(w)).sort((a, b) => a - b);
+    const motherWards = Array.from(motherWardSet).filter(w => Number.isFinite(w)).sort((a, b) => a - b);
+    const growthWards = Array.from(growthWardSet).filter(w => Number.isFinite(w)).sort((a, b) => a - b);
+
+    log(`🧒 Child-related wards: ${childWards.length ? childWards.join(', ') : 'none'}`);
+    log(`🤰 Mother-related wards: ${motherWards.length ? motherWards.join(', ') : 'none'}`);
+    log(`📈 Growth-related wards: ${growthWards.length ? growthWards.join(', ') : 'none'}`);
+
+    return {
+      childWards,
+      motherWards,
+      growthWards
+    };
+
   } catch (error) {
-    console.error('Error in raw SQL detection:', error);
-    return [];
+    console.error('Error in changed wards detection:', error);
+    return { childWards: [], motherWards: [], growthWards: [] };
   }
 }
 
@@ -771,21 +786,26 @@ async function main() {
       log('🆕 First-ever analytics run detected — will perform full rebuild (all wards).');
     }
 
-    // get changed wards
-    let changedWards = await getChangedWards(lastChild, lastMother, lastGrowth);
+    // get changed wards - NOW RETURNS SEPARATE LISTS FOR EACH FACT TYPE
+    const { childWards, motherWards, growthWards } = await getChangedWards(lastChild, lastMother, lastGrowth);
 
     // first-run fallback: if no changed wards detected but it's first run, rebuild all wards
-    if (isFirstRun && (!changedWards || changedWards.length === 0)) {
+    if (isFirstRun && (!childWards || childWards.length === 0) && (!motherWards || motherWards.length === 0) && (!growthWards || growthWards.length === 0)) {
       log('🔄 First run fallback: rebuilding all wards...');
       // get all wards from Child table
       const allWards = await prisma.$queryRaw`SELECT DISTINCT COALESCE("wardNumber", 1)::int AS ward FROM "Child" ORDER BY 1`;
-      changedWards = allWards.map(r => Number(r.ward));
-    }
+      const allWardList = allWards.map(r => Number(r.ward));
 
-    // run incremental updates for changed wards
-    await updateChildFactsForWards(changedWards);
-    await updateMotherFactsForWards(changedWards);
-    await updateGrowthFactsForWards(changedWards);
+      // Use all wards for all fact types on first run
+      await updateChildFactsForWards(allWardList);
+      await updateMotherFactsForWards(allWardList);
+      await updateGrowthFactsForWards(allWardList);
+    } else {
+      // Incremental update - only update fact types that actually changed
+      await updateChildFactsForWards(childWards);
+      await updateMotherFactsForWards(motherWards);
+      await updateGrowthFactsForWards(growthWards);
+    }
 
     // update last processed timestamps
     const now = new Date();
