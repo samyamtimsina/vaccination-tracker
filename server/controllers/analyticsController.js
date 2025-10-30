@@ -234,6 +234,35 @@ export const getSystemOverview = async (req, res) => {
                 where: motherOverviewWhere,
             });
 
+            // ✅ FIXED: Calculate weighted average for mother dropout rate
+            const motherDropoutWhere = buildWhereFilters({ ward, casteCode, startDate, endDate });
+            motherDropoutWhere.doseNumber = 0;
+            motherDropoutWhere.dropoutRate = { not: null }; // Exclude null values
+
+            // Get all mother facts to calculate weighted average
+            const motherDropoutData = await prisma.motherAnalyticsFact.findMany({
+                where: motherDropoutWhere,
+                select: {
+                    dropoutRate: true,
+                    totalRegisteredMothers: true
+                }
+            });
+
+            // Calculate weighted average dropout rate
+            let totalWeightedDropout = 0;
+            let totalMothersForDropout = 0;
+
+            motherDropoutData.forEach(row => {
+                if (row.dropoutRate !== null && row.totalRegisteredMothers > 0) {
+                    totalWeightedDropout += row.dropoutRate * row.totalRegisteredMothers;
+                    totalMothersForDropout += row.totalRegisteredMothers;
+                }
+            });
+
+            const weightedMotherDropoutRate = totalMothersForDropout > 0
+                ? totalWeightedDropout / totalMothersForDropout
+                : 0;
+
             // Growth data can use full range since these are cumulative records
             const growthAgg = await prisma.growthAnalyticsFact.aggregate({
                 _sum: {
@@ -254,7 +283,7 @@ export const getSystemOverview = async (req, res) => {
                     coverageRate: (totalVaccinated / totalChildren) * 100,
                     dropoutRate: Number((dropoutAvg._avg.dropoutRate ?? 0)),
                     dueToday: childOverview._sum.dueToday || 0,
-                    overdue: childOverview._sum.overdue || 0, // ← Now will be 23,866, not 715,980!
+                    overdue: childOverview._sum.overdue || 0,
                     onTime: childOverview._sum.onTime || 0,
                     late: childOverview._sum.late || 0,
                 },
@@ -265,6 +294,7 @@ export const getSystemOverview = async (req, res) => {
                     fullTD: motherOverview._sum.mothersWithFullTD || 0,
                     tdCoverage: ((motherOverview._sum.mothersWithFullTD || 0) / (motherOverview._sum.totalRegisteredMothers || 1)) * 100,
                     overdue: motherOverview._sum.overdue || 0,
+                    dropoutRate: Number(weightedMotherDropoutRate.toFixed(2)), // ✅ Use weighted average
                 },
                 nutrition: {
                     totalRecords: growthAgg._sum.totalWeightRecords || 0,

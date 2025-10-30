@@ -437,7 +437,7 @@ async function updateMotherFactsForWards(wardList) {
 
   log(`🤰 Updating MotherAnalyticsFact for wards ${wardSql} ...`);
 
-  // backdated detection
+  // --- backdated detection ---
   const backdated = await prisma.$queryRawUnsafe(`
     SELECT 1 FROM "TDDose" td
     JOIN "Mother" m ON m.id = td."motherId"
@@ -451,15 +451,15 @@ async function updateMotherFactsForWards(wardList) {
     log('⚠️ Backdated TD edits detected in affected wards (dateGiven < today).', '⚠️');
   }
 
-  // delete today's mother facts for these wards
+  // --- delete today's mother facts ---
   await prisma.$executeRawUnsafe(`
     DELETE FROM "MotherAnalyticsFact"
     WHERE "day" = CURRENT_DATE
       AND "ward" IN ${wardSql};
   `);
-  log('Deleted existing MotherAnalyticsFact rows for affected wards (today).');
+  log('Deleted existing MotherAnalyticsFact rows for today.');
 
-  // re-insert overall summary scoped to wards
+  // --- overall summary with coverage/dropoutRate ---
   await prisma.$executeRawUnsafe(`
     WITH mother_td_status AS (
       SELECT
@@ -479,29 +479,38 @@ async function updateMotherFactsForWards(wardList) {
         COUNT(*) AS totalRegisteredMothers,
         SUM(total_td_doses) AS tdDosesGiven,
         COUNT(CASE WHEN total_td_doses = 0 THEN 1 END) AS mothersWithZeroTD,
-        COUNT(CASE WHEN highest_dose >= 2 THEN 1 END) AS mothersWithFullTD
+        COUNT(CASE WHEN highest_dose >= 2 THEN 1 END) AS mothersWithFullTD,
+        -- coverage = % of mothers with >=1 TD
+        ROUND(100.0 * (COUNT(*) - COUNT(CASE WHEN total_td_doses = 0 THEN 1 END)) / COUNT(*), 2) AS coverage,
+        -- dropoutRate = % of mothers who started but didn't finish
+        ROUND(
+          100.0 * COUNT(CASE WHEN total_td_doses > 0 AND highest_dose < 2 THEN 1 END) / 
+          NULLIF(COUNT(*) - COUNT(CASE WHEN total_td_doses = 0 THEN 1 END), 0), 2
+        ) AS dropoutRate
       FROM mother_td_status
       GROUP BY ward, casteCode
     )
     INSERT INTO "MotherAnalyticsFact" (
       "day","ward","doseNumber","casteCode",
       "totalRegisteredMothers","tdDosesGiven","mothersWithZeroTD",
-      "mothersWithFullTD","dueToday","overdue","createdAt","updatedAt"
+      "mothersWithFullTD","dueToday","overdue","coverage","dropoutRate",
+      "createdAt","updatedAt"
     )
     SELECT
       CURRENT_DATE, ward, 0, casteCode,
       totalRegisteredMothers, tdDosesGiven, mothersWithZeroTD,
-      mothersWithFullTD, 0, 0,
+      mothersWithFullTD, 0, 0, coverage, dropoutRate,
       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     FROM aggregated;
   `);
 
-  // per-dose breakdown scoped to wards
+  // --- per-dose breakdown ---
   await prisma.$executeRawUnsafe(`
     INSERT INTO "MotherAnalyticsFact" (
       "day","ward","doseNumber","casteCode",
       "totalRegisteredMothers","tdDosesGiven","mothersWithZeroTD",
-      "mothersWithFullTD","dueToday","overdue","createdAt","updatedAt"
+      "mothersWithFullTD","dueToday","overdue","coverage","dropoutRate",
+      "createdAt","updatedAt"
     )
     SELECT
       CURRENT_DATE,
@@ -511,6 +520,9 @@ async function updateMotherFactsForWards(wardList) {
       COUNT(DISTINCT m.id) AS totalRegisteredMothers,
       COUNT(td.id) AS tdDosesGiven,
       0, 0, 0, 0,
+      -- coverage/dropoutRate per dose (simplified: 100% for each dose entry)
+      100.0 AS coverage,
+      0 AS dropoutRate,
       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     FROM "Mother" m
     INNER JOIN "TDDose" td ON td."motherId" = m.id
@@ -518,8 +530,9 @@ async function updateMotherFactsForWards(wardList) {
     GROUP BY COALESCE(m."wardNumber", 1), td."doseNumber", m."casteCode";
   `);
 
-  log('✅ MotherFacts reprocessed for affected wards.');
+  log('✅ MotherFacts reprocessed with coverage and dropoutRate.');
 }
+
 
 /* =================================================
    GROWTH - per-ward incremental reprocessing

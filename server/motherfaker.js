@@ -103,3 +103,90 @@ generateMotherData(100000, 500).catch((err) => {
     console.error('❌ Error generating data:', err);
     prisma.$disconnect();
 });
+// import { prisma } from './utils/prisma.js'
+
+// async function seedMothers() {
+//     try {
+//         console.log("🧪 Seeding test mothers...");
+
+//         const mothers = [
+//             {
+//                 name: "M1_Full_TD",
+//                 wardNumber: 1,
+//                 phoneNumber: "9800000101",
+//                 dateOfBirth: new Date("1995-02-14"),
+//                 pregnancyCount: 1,
+//                 previousTDTakenCount: 3,
+//                 remarks: "",
+//                 createdById: 3,
+//                 casteCode: 1,
+//                 tole: "Ward-1 Tope",
+//                 tdDoses: [
+//                     { doseNumber: 1, dateGiven: new Date(), createdById: 3, administeredById: 3 },
+//                     { doseNumber: 2, dateGiven: new Date(), createdById: 3, administeredById: 3 },
+//                     { doseNumber: 3, dateGiven: new Date(), createdById: 3, administeredById: 3 },
+//                 ],
+//             },
+//             {
+//                 name: "M2_Partial_TD",
+//                 wardNumber: 1,
+//                 phoneNumber: "9800000102",
+//                 dateOfBirth: new Date("1994-05-20"),
+//                 pregnancyCount: 2,
+//                 previousTDTakenCount: 1,
+//                 remarks: "",
+//                 createdById: 3,
+//                 casteCode: 2,
+//                 tole: "Ward-1 Tope",
+//                 tdDoses: [
+//                     { doseNumber: 1, dateGiven: new Date(), createdById: 3, administeredById: 3 },
+//                 ],
+//             },
+//             {
+//                 name: "M3_Zero_TD",
+//                 wardNumber: 2,
+//                 phoneNumber: "9800000103",
+//                 dateOfBirth: new Date("1992-08-10"),
+//                 pregnancyCount: 1,
+//                 previousTDTakenCount: 0,
+//                 remarks: "",
+//                 createdById: 3,
+//                 casteCode: 3,
+//                 tole: "Ward-2 Tope",
+//                 tdDoses: [],
+//             },
+//             {
+//                 name: "M4_Overdue_TD",
+//                 wardNumber: 2,
+//                 phoneNumber: "9800000104",
+//                 dateOfBirth: new Date("1990-12-01"),
+//                 pregnancyCount: 3,
+//                 previousTDTakenCount: 2,
+//                 remarks: "",
+//                 createdById: 3,
+//                 casteCode: 1,
+//                 tole: "Ward-2 Tope",
+//                 tdDoses: [
+//                     { doseNumber: 1, dateGiven: new Date("2025-01-01"), createdById: 3, administeredById: 3 },
+//                 ],
+//             },
+//         ];
+
+//         for (const mother of mothers) {
+//             await prisma.mother.create({
+//                 data: {
+//                     ...mother,
+//                     tdDoses: { create: mother.tdDoses },
+//                 },
+//             });
+//         }
+
+//         console.log("✅ Mothers seeded successfully!");
+//     } catch (error) {
+//         console.error("❌ Error seeding mothers:", error);
+//     } finally {
+//         await prisma.$disconnect();
+//     }
+// }
+
+// seedMothers();

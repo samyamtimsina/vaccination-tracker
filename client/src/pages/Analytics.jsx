@@ -465,9 +465,10 @@ const AnalyticsDashboard = () => {
                                         <span className="font-bold text-info">{safeFixed(data.overview?.mothers?.tdCoverage)}%</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Overdue:</span>
-                                        <span className="font-bold text-error">{data.overview?.mothers?.overdue ?? 0}</span>
+                                        <span>Dropout:</span>
+                                        <span className="font-bold text-error">{safeFixed(data.overview?.mothers?.dropoutRate)}%</span>
                                     </div>
+
                                 </div>
                             </div>
                         </div>

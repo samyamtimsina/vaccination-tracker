@@ -354,7 +354,6 @@ model ChildAnalyticsFact {
   @@index([gender])
   @@index([ageGroup])
 }
-
 model MotherAnalyticsFact {
   id                      Int      @id @default(autoincrement())
   day                     DateTime @db.Date
@@ -367,6 +366,8 @@ model MotherAnalyticsFact {
   mothersWithFullTD       Int      @default(0)
   dueToday                Int      @default(0)
   overdue                 Int      @default(0)
+  coverage                Float?   @default(0)
+  dropoutRate             Float?   @default(0)
 
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
@@ -376,6 +377,7 @@ model MotherAnalyticsFact {
   @@index([ward])
   @@index([casteCode])
 }
+
 
 model GrowthAnalyticsFact {
   id                       Int      @id @default(autoincrement())
