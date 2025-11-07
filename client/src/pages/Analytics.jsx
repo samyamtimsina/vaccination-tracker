@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import axiosClient from '../api/axiosClient';
-import { format, subDays } from 'date-fns';
+import { format, subDays, subMonths, parseISO } from 'date-fns';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
-    PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line
+    PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, 
+    AreaChart, Area, ComposedChart, RadarChart, PolarGrid,
+    PolarAngleAxis, PolarRadiusAxis, Radar
 } from 'recharts';
 import { debounce } from 'lodash';
 
@@ -11,14 +13,12 @@ const wards = Array.from({ length: 20 }, (_, i) => i + 1);
 const genders = ['ALL', 'MALE', 'FEMALE'];
 const ageGroups = ['ALL', '0-1y', '1-5y', '5y+'];
 const casteCodes = Array.from({ length: 10 }, (_, i) => i + 1);
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#E74C3C'];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#E74C3C', '#2ECC71', '#9B59B6'];
 
 const safeFixed = (v, decimals = 4) => {
     if (typeof v !== 'number' || !isFinite(v)) return v || 0;
-    // Use more precision for near-100% to avoid clipping
     const effectiveDecimals = (v >= 99) ? 4 : 2;
     const fixed = v.toFixed(effectiveDecimals);
-    // Trim trailing zeros/decimals for clean display (e.g., 100.0000 → 100)
     return fixed.replace(/\.?0+$/, '');
 };
 
@@ -33,10 +33,12 @@ const AnalyticsDashboard = () => {
         ageGroup: '',
         startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
         endDate: format(new Date(), 'yyyy-MM-dd'),
-        groupBy: '',
         granularity: 'day',
         compareStartDate: format(subDays(new Date(), 60), 'yyyy-MM-dd'),
         compareEndDate: format(subDays(new Date(), 31), 'yyyy-MM-dd'),
+        monthRange: '12',
+        dropoutGroup: 'vaccine',
+        windowType: '1M'
     });
 
     const [data, setData] = useState({
@@ -47,10 +49,11 @@ const AnalyticsDashboard = () => {
         growth: {},
         tdCoverage: [],
         dueOverdue: {},
-        trends: { days: [], coverage: [], dropout: [], timeliness: [], nutrition: [] },
+        trends: { days: [], coverage: [], dropout: [], timeliness: [], nutrition: [], monthlyDropout: [] },
         wardPerformance: [],
         disparities: { gender: [], caste: [] },
-        comparison: {}
+        comparison: {},
+        rollingDropout: []
     });
 
     const [vaccineMap, setVaccineMap] = useState({});
@@ -78,13 +81,24 @@ const AnalyticsDashboard = () => {
         return vaccineMap[vaccineTypeId] || `Vaccine ${vaccineTypeId}`;
     };
 
+    const getGroupLabel = (groupValue, groupType) => {
+        const val = Number(groupValue);
+        switch (groupType) {
+            case 'vaccine': return getVaccineName(val);
+            case 'ward': return `Ward ${val}`;
+            case 'caste': return `Caste ${val}`;
+            case 'gender': 
+            case 'ageGroup': return String(groupValue).toUpperCase();
+            default: return String(groupValue);
+        }
+    };
+
     const fetchData = useCallback(async (signal) => {
         setLoading(true);
         try {
             const query = new URLSearchParams(filters).toString();
             let requests = [];
 
-            // ... (API request definition logic remains the same)
             if (activeTab === 'overview') {
                 requests = [
                     axiosClient.get(`/api/analytics/overview?${query}`, { signal }),
@@ -96,7 +110,10 @@ const AnalyticsDashboard = () => {
                     axiosClient.get(`/api/analytics/due-overdue?${query}`, { signal })
                 ];
             } else if (activeTab === 'trends') {
-                requests = [axiosClient.get(`/api/analytics/trends?${query}`, { signal })];
+                requests = [
+                    axiosClient.get(`/api/analytics/trends?${query}`, { signal }),
+                    axiosClient.get(`/api/analytics/monthly-dropout?${query}`, { signal })
+                ];
             } else if (activeTab === 'ward-performance') {
                 requests = [axiosClient.get(`/api/analytics/ward-performance?${query}`, { signal })];
             } else if (activeTab === 'equity') {
@@ -108,12 +125,14 @@ const AnalyticsDashboard = () => {
                 ];
             } else if (activeTab === 'comparison') {
                 requests = [axiosClient.get(`/api/analytics/comparison?${query}`, { signal })];
+            } else if (activeTab === 'monthly-dropout') {
+                requests = [axiosClient.get(`/api/analytics/monthly-dropout?${query}`, { signal })];
+            } else if (activeTab === 'rolling-dropout') {
+                requests = [axiosClient.get(`/api/analytics/rolling-dropout?${query}`, { signal })];
             }
-            // ... (End of API request definition logic)
 
             const results = await Promise.all(requests);
 
-            // Initialize a single variable to hold all the processed data for logging
             let processedData = {};
 
             if (activeTab === 'overview') {
@@ -126,16 +145,12 @@ const AnalyticsDashboard = () => {
                     tdCoverage: results[5].data.data || [],
                     dueOverdue: results[6].data.data || {}
                 };
-                setData(prev => ({
-                    ...prev,
-                    ...processedData // Use the consolidated variable for state update
-                }));
             } else if (activeTab === 'trends') {
-                processedData = { trends: results[0].data.data };
-                setData(prev => ({ ...prev, ...processedData }));
+                processedData = {
+                    trends: { ...results[0].data.data, monthlyDropout: results[1].data.data || [] }
+                };
             } else if (activeTab === 'ward-performance') {
                 processedData = { wardPerformance: results[0].data.data };
-                setData(prev => ({ ...prev, ...processedData }));
             } else if (activeTab === 'equity') {
                 processedData = {
                     disparities: {
@@ -143,18 +158,20 @@ const AnalyticsDashboard = () => {
                         caste: results[1].data.data
                     }
                 };
-                setData(prev => ({
-                    ...prev,
-                    ...processedData
-                }));
             } else if (activeTab === 'comparison') {
                 processedData = { comparison: results[0].data.data };
-                setData(prev => ({ ...prev, ...processedData }));
+            } else if (activeTab === 'monthly-dropout') {
+                processedData = { trends: { monthlyDropout: results[0].data.data || [] } };
+            } else if (activeTab === 'rolling-dropout') {
+                processedData = { rollingDropout: results[0].data.data };
             }
 
-            // Log the single variable containing all processed data
-            console.log(`Data fetched for ${activeTab}:`, processedData);
+            setData(prev => ({
+                ...prev,
+                ...processedData
+            }));
 
+            console.log(`Data fetched for ${activeTab}:`, processedData);
             setLastUpdated(new Date());
         } catch (err) {
             if (err.name !== 'CanceledError') {
@@ -200,10 +217,12 @@ const AnalyticsDashboard = () => {
             ageGroup: '',
             startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
             endDate: format(new Date(), 'yyyy-MM-dd'),
-            groupBy: '',
             granularity: 'day',
             compareStartDate: format(subDays(new Date(), 60), 'yyyy-MM-dd'),
             compareEndDate: format(subDays(new Date(), 31), 'yyyy-MM-dd'),
+            monthRange: '12',
+            dropoutGroup: 'vaccine',
+            windowType: '1M'
         });
     };
 
@@ -241,6 +260,7 @@ const AnalyticsDashboard = () => {
         }
     };
 
+    // Data processing functions
     const coverageChartData = useMemo(() => {
         const vaccines = data.coverage?.byVaccine || [];
         return vaccines
@@ -250,10 +270,11 @@ const AnalyticsDashboard = () => {
                 vaccineName: getVaccineName(v.vaccineTypeId),
                 coverage: Number(v.coverage || 0),
                 vaccinated: v.vaccinated || 0,
-                total: v.total || 0
+                total: v.total || 0,
+                dropoutRate: data.dropout.find(d => d.vaccineTypeId === v.vaccineTypeId)?.dropoutRate || 0
             }))
             .sort((a, b) => b.coverage - a.coverage);
-    }, [data.coverage, vaccineMap]);
+    }, [data.coverage, data.dropout, vaccineMap]);
 
     const dropoutChartData = useMemo(() => {
         const dropouts = data.dropout || [];
@@ -273,15 +294,155 @@ const AnalyticsDashboard = () => {
         ];
     }, [data.overview]);
 
-    const CustomTooltip = ({ active, payload, label }) => {
+    const processMonthlyDropoutData = useCallback((rawData, groupBy, monthRange) => {
+        if (!rawData || rawData.length === 0) return { chartData: [], groups: [], radarData: [], summary: { totalMonths: 0, totalGroups: 0, avgDropoutRate: 0 } };
+
+        const cutoff = subMonths(new Date(), parseInt(monthRange || 12));
+        const filtered = rawData
+            .map(d => ({ ...d, parsedDate: parseISO(d.snapshotMonth + '-01') }))
+            .filter(d => d.parsedDate >= cutoff);
+
+        let groupField = groupBy;
+        if (groupBy === 'vaccine') groupField = 'vaccineTypeId';
+        else if (groupBy === 'caste') groupField = 'casteCode';
+
+        const monthlyAggregates = new Map();
+        const groupStats = new Map();
+
+        filtered.forEach(item => {
+            const monthKey = format(item.parsedDate, 'yyyy-MM');
+            const groupValue = item[groupField];
+            
+            if (!monthlyAggregates.has(monthKey)) {
+                monthlyAggregates.set(monthKey, new Map());
+            }
+            if (!groupStats.has(groupValue)) {
+                groupStats.set(groupValue, []);
+            }
+
+            monthlyAggregates.get(monthKey).set(groupValue, item);
+            groupStats.get(groupValue).push(item);
+        });
+
+        const months = Array.from(monthlyAggregates.keys()).sort();
+        const groups = Array.from(groupStats.keys())
+            .filter(g => g != null && g !== 0)
+            .sort((a, b) => (typeof a === 'number' ? a - b : String(a).localeCompare(String(b))));
+
+        const chartData = months.map(month => {
+            const row = { month: format(parseISO(month + '-01'), 'MMM yy') };
+            const monthData = monthlyAggregates.get(month);
+            
+            groups.forEach(group => {
+                const item = monthData?.get(group);
+                row[group] = item ? item.dropoutRate : null;
+                row[`${group}_due`] = item ? item.totalDue : 0;
+                row[`${group}_completed`] = item ? item.totalCompleted : 0;
+            });
+
+            return row;
+        });
+
+        const radarData = groups.map(group => {
+            const items = groupStats.get(group);
+            const avgDropout = items.reduce((sum, item) => sum + item.dropoutRate, 0) / items.length;
+            const totalDue = items.reduce((sum, item) => sum + item.totalDue, 0);
+            const totalCompleted = items.reduce((sum, item) => sum + item.totalCompleted, 0);
+            const completionRate = totalDue > 0 ? (totalCompleted / totalDue) * 100 : 0;
+
+            return {
+                subject: getGroupLabel(group, groupBy),
+                dropoutRate: avgDropout,
+                completionRate: completionRate,
+                fullMark: 100
+            };
+        });
+
+        return {
+            chartData,
+            groups,
+            radarData,
+            summary: {
+                totalMonths: months.length,
+                totalGroups: groups.length,
+                avgDropoutRate: filtered.reduce((sum, item) => sum + item.dropoutRate, 0) / filtered.length
+            }
+        };
+    }, []);
+
+    const monthlyDropoutData = useMemo(() => {
+        return processMonthlyDropoutData(
+            data.trends?.monthlyDropout, 
+            filters.dropoutGroup, 
+            filters.monthRange
+        );
+    }, [data.trends?.monthlyDropout, filters.dropoutGroup, filters.monthRange, processMonthlyDropoutData]);
+
+    const rollingDropoutChartData = useMemo(() => {
+        const raw = data.rollingDropout || [];
+        if (raw.length === 0) return [];
+
+        const monthMap = new Map();
+        raw.forEach(item => {
+            const monthKey = item.snapshotMonth;
+            if (!monthMap.has(monthKey)) {
+                monthMap.set(monthKey, []);
+            }
+            monthMap.get(monthKey).push(item.dropoutRate);
+        });
+
+        return Array.from(monthMap.entries())
+            .map(([month, rates]) => ({
+                snapshotMonth: month,
+                dropoutRate: rates.reduce((sum, rate) => sum + rate, 0) / rates.length
+            }))
+            .sort((a, b) => a.snapshotMonth.localeCompare(b.snapshotMonth));
+    }, [data.rollingDropout]);
+
+    // Enhanced Components
+    const StatCard = ({ title, value, subtitle, trend, color = 'primary', icon }) => (
+        <div className={`card bg-base-100 border-l-4 border-${color} shadow-lg`}>
+            <div className="card-body p-4">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h3 className="text-sm font-semibold text-gray-600">{title}</h3>
+                        <p className="text-2xl font-bold mt-1">{value}</p>
+                        {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+                    </div>
+                    {icon && <div className="text-2xl">{icon}</div>}
+                </div>
+                {trend && (
+                    <div className={`text-xs mt-2 ${trend.value > 0 ? 'text-success' : 'text-error'}`}>
+                        {trend.value > 0 ? '↗' : '↘'} {Math.abs(trend.value)}% {trend.label}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    const EnhancedTooltip = ({ active, payload, label, type = 'default' }) => {
         if (active && payload && payload.length) {
             return (
-                <div className="bg-white p-3 border border-gray-300 rounded shadow text-sm">
-                    <p className="font-semibold">{label}</p>
+                <div className="bg-white p-4 border border-gray-300 rounded-lg shadow-xl text-sm max-w-xs">
+                    <p className="font-bold text-base border-b pb-2 mb-2">{label}</p>
                     {payload.map((entry, index) => (
-                        <p key={index} style={{ color: entry.color }}>
-                            {entry.name}: {typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}
-                        </p>
+                        <div key={index} className="flex justify-between items-center py-1">
+                            <div className="flex items-center">
+                                <div 
+                                    className="w-3 h-3 rounded-full mr-2" 
+                                    style={{ backgroundColor: entry.color }}
+                                />
+                                <span>{entry.name}</span>
+                            </div>
+                            <span className="font-semibold">
+                                {typeof entry.value === 'number' 
+                                    ? type === 'percentage' 
+                                        ? `${entry.value.toFixed(2)}%`
+                                        : entry.value.toLocaleString()
+                                    : entry.value
+                                }
+                            </span>
+                        </div>
                     ))}
                 </div>
             );
@@ -289,251 +450,96 @@ const AnalyticsDashboard = () => {
         return null;
     };
 
-    return (
-        <div className="p-4 space-y-6">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">📊 Analytics Dashboard</h1>
-                <div className="flex items-center gap-3">
-                    {lastUpdated && (
-                        <div className="text-sm text-gray-500">
-                            Updated: {lastUpdated.toLocaleTimeString()}
-                        </div>
-                    )}
-                    <button
-                        className="btn btn-sm btn-outline"
-                        onClick={handleRefreshCache}
-                    >
-                        🔄 Refresh
-                    </button>
-                    <div className="dropdown dropdown-end">
-                        <label tabIndex={0} className="btn btn-sm btn-primary">
-                            {exportLoading ? '⏳' : '📥'} Export
-                        </label>
-                        <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 z-10">
-                            <li><a onClick={() => handleExport('overview')}>Overview</a></li>
-                            <li><a onClick={() => handleExport('coverage')}>Coverage</a></li>
-                            <li><a onClick={() => handleExport('trends')}>Trends</a></li>
-                            <li><a onClick={() => handleExport('ward-performance')}>Ward Performance</a></li>
-                            <li><a onClick={() => handleExport('disparities')}>Disparities</a></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
+    // Tab Components
+    const OverviewTab = () => {
+        const { children, mothers, nutrition } = data.overview;
+        
+        const performanceData = [
+            { subject: 'Coverage', A: children?.coverageRate || 0, fullMark: 100 },
+            { subject: 'Timeliness', A: data.dueOverdue?.timelinessRate || 0, fullMark: 100 },
+            { subject: 'Nutrition', A: 100 - (nutrition?.underweightRate || 0), fullMark: 100 },
+            { subject: 'TD Coverage', A: mothers?.tdCoverage || 0, fullMark: 100 },
+            { subject: 'Retention', A: 100 - (children?.dropoutRate || 0), fullMark: 100 }
+        ];
 
-            {/* Filters */}
-            <div className="bg-base-200 p-4 rounded-lg">
-                <div className="flex flex-wrap gap-4 items-end mb-4">
-                    <div className="flex-1 min-w-[150px]">
-                        <label className="label font-semibold">Ward</label>
-                        <select className="select select-bordered w-full" name="ward" value={filters.ward} onChange={handleFilterChange}>
-                            <option value="">All Wards</option>
-                            {wards.map(w => <option key={w} value={w}>Ward {w}</option>)}
-                        </select>
-                    </div>
-                    <div className="flex-1 min-w-[150px]">
-                        <label className="label font-semibold">Caste</label>
-                        <select className="select select-bordered w-full" name="casteCode" value={filters.casteCode} onChange={handleFilterChange}>
-                            <option value="">All Castes</option>
-                            {casteCodes.map(c => <option key={c} value={c}>Caste {c}</option>)}
-                        </select>
-                    </div>
-                    <div className="flex-1 min-w-[150px]">
-                        <label className="label font-semibold">Gender</label>
-                        <select className="select select-bordered w-full" name="gender" value={filters.gender} onChange={handleFilterChange}>
-                            <option value="">All</option>
-                            {genders.map(g => <option key={g} value={g}>{g}</option>)}
-                        </select>
-                    </div>
-                    <div className="flex-1 min-w-[150px]">
-                        <label className="label font-semibold">Age Group</label>
-                        <select className="select select-bordered w-full" name="ageGroup" value={filters.ageGroup} onChange={handleFilterChange}>
-                            <option value="">All</option>
-                            {ageGroups.map(a => <option key={a} value={a}>{a}</option>)}
-                        </select>
-                    </div>
+        return (
+            <div className="space-y-6">
+                {/* Summary Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <StatCard 
+                        title="Total Children" 
+                        value={children?.totalRegistered?.toLocaleString() || '0'} 
+                        icon="👶"
+                        color="primary"
+                    />
+                    <StatCard 
+                        title="Vaccination Coverage" 
+                        value={`${(children?.coverageRate || 0).toFixed(1)}%`}
+                        subtitle={`${children?.vaccinated || 0} vaccinated`}
+                        icon="💉"
+                        color="success"
+                    />
+                    <StatCard 
+                        title="Mothers Registered" 
+                        value={mothers?.totalRegistered?.toLocaleString() || '0'}
+                        icon="🤰"
+                        color="info"
+                    />
+                    <StatCard 
+                        title="TD Coverage" 
+                        value={`${(mothers?.tdCoverage || 0).toFixed(1)}%`}
+                        icon="🛡️"
+                        color="warning"
+                    />
                 </div>
 
-                <div className="flex flex-wrap gap-4 items-end">
-                    <div className="flex-1 min-w-[150px]">
-                        <label className="label font-semibold">Start Date</label>
-                        <input type="date" className="input input-bordered w-full" name="startDate" value={filters.startDate} onChange={handleFilterChange} />
-                    </div>
-                    <div className="flex-1 min-w-[150px]">
-                        <label className="label font-semibold">End Date</label>
-                        <input type="date" className="input input-bordered w-full" name="endDate" value={filters.endDate} onChange={handleFilterChange} />
-                    </div>
-
-                    {compareMode && (
-                        <>
-                            <div className="flex-1 min-w-[150px]">
-                                <label className="label font-semibold">Compare Start</label>
-                                <input type="date" className="input input-bordered w-full" name="compareStartDate" value={filters.compareStartDate} onChange={handleFilterChange} />
-                            </div>
-                            <div className="flex-1 min-w-[150px]">
-                                <label className="label font-semibold">Compare End</label>
-                                <input type="date" className="input input-bordered w-full" name="compareEndDate" value={filters.compareEndDate} onChange={handleFilterChange} />
-                            </div>
-                        </>
-                    )}
-
-                    <div className="flex gap-2">
-                        <button className="btn btn-primary" onClick={() => fetchData()} disabled={loading}>
-                            {loading ? '🔄' : '🔍'} Apply
-                        </button>
-                        <button className="btn btn-outline" onClick={clearFilters}>
-                            🗑️ Clear
-                        </button>
-                        <label className="btn btn-outline cursor-pointer">
-                            <input
-                                type="checkbox"
-                                className="toggle toggle-primary mr-2"
-                                checked={compareMode}
-                                onChange={(e) => setCompareMode(e.target.checked)}
-                            />
-                            Compare
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="tabs tabs-boxed bg-base-200 p-1">
-                {['overview', 'trends', 'ward-performance', 'equity', 'comparison'].map(tab => (
-                    <a
-                        key={tab}
-                        className={`tab ${activeTab === tab ? 'tab-active' : ''}`}
-                        onClick={() => setActiveTab(tab)}
-                    >
-                        {tab.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                    </a>
-                ))}
-            </div>
-
-            {loading && (
-                <div className="flex justify-center items-center h-64">
-                    <span className="loading loading-spinner loading-lg"></span>
-                </div>
-            )}
-
-            {/* Overview Tab */}
-            {activeTab === 'overview' && !loading && (
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="card bg-base-100 shadow-xl">
-                            <div className="card-body">
-                                <h2 className="card-title">🧒 Children</h2>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span>Registered:</span>
-                                        <span className="font-bold">{data.overview?.children?.totalRegistered?.toLocaleString() ?? 0}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Vaccinated:</span>
-                                        <span className="font-bold text-success">{data.overview?.children?.vaccinated?.toLocaleString() ?? 0}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Coverage:</span>
-                                        <span className="font-bold text-info">{safeFixed(data.overview?.children?.coverageRate)}%</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Dropout:</span>
-                                        <span className="font-bold text-error">{safeFixed(data.overview?.children?.dropoutRate)}%</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Overdue:</span>
-                                        <span className="font-bold text-error">{data.overview?.children?.overdue ?? 0}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="card bg-base-100 shadow-xl">
-                            <div className="card-body">
-                                <h2 className="card-title">🤰 Mothers</h2>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span>Registered:</span>
-                                        <span className="font-bold">{data.overview?.mothers?.totalRegistered?.toLocaleString() ?? 0}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>TD Doses:</span>
-                                        <span className="font-bold text-success">{data.overview?.mothers?.tdDosesGiven?.toLocaleString() ?? 0}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Coverage:</span>
-                                        <span className="font-bold text-info">{safeFixed(data.overview?.mothers?.tdCoverage)}%</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Dropout:</span>
-                                        <span className="font-bold text-error">{safeFixed(data.overview?.mothers?.dropoutRate)}%</span>
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="card bg-base-100 shadow-xl">
-                            <div className="card-body">
-                                <h2 className="card-title">⚖️ Nutrition</h2>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span>Records:</span>
-                                        <span className="font-bold">{data.overview?.nutrition?.totalRecords?.toLocaleString() ?? 0}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Avg Weight:</span>
-                                        <span className="font-bold">{safeFixed(data.overview?.nutrition?.avgWeightKg)} kg</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Underweight:</span>
-                                        <span className="font-bold text-warning">{safeFixed(data.overview?.nutrition?.underweightRate)}%</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Normal:</span>
-                                        <span className="font-bold text-success">{safeFixed(data.overview?.nutrition?.normalRate)}%</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="card bg-base-100 p-4 shadow-xl">
-                            <h3 className="font-bold text-lg mb-4">💉 Vaccine Coverage</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Coverage vs Dropout Comparison */}
+                    <div className="card bg-base-100 shadow-xl">
+                        <div className="card-body">
+                            <h3 className="card-title">Coverage vs Dropout Rates</h3>
                             <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={coverageChartData}>
+                                <ComposedChart data={coverageChartData}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="vaccineName" angle={-45} textAnchor="end" height={80} />
-                                    <YAxis />
-                                    <Tooltip content={<CustomTooltip />} />
+                                    <YAxis yAxisId="left" />
+                                    <YAxis yAxisId="right" orientation="right" />
+                                    <Tooltip content={<EnhancedTooltip type="percentage" />} />
                                     <Legend />
-                                    <Bar dataKey="coverage" name="Coverage %" fill="#0088FE" />
-                                </BarChart>
+                                    <Bar yAxisId="left" dataKey="coverage" name="Coverage %" fill="#0088FE" />
+                                    <Line yAxisId="right" type="monotone" dataKey="dropoutRate" name="Dropout %" stroke="#FF8042" strokeWidth={2} />
+                                </ComposedChart>
                             </ResponsiveContainer>
                         </div>
+                    </div>
 
-                        <div className="card bg-base-100 p-4 shadow-xl">
-                            <h3 className="font-bold text-lg mb-4">📉 Dropout Rates</h3>
+                    {/* Performance Radar */}
+                    <div className="card bg-base-100 shadow-xl">
+                        <div className="card-body">
+                            <h3 className="card-title">Performance Overview</h3>
                             <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={dropoutChartData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="vaccineName" angle={-45} textAnchor="end" height={80} />
-                                    <YAxis />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Legend />
-                                    <Bar dataKey="dropoutRate" name="Dropout %" fill="#FF8042" />
-                                </BarChart>
+                                <RadarChart data={performanceData}>
+                                    <PolarGrid />
+                                    <PolarAngleAxis dataKey="subject" />
+                                    <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                                    <Radar name="Performance" dataKey="A" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                                </RadarChart>
                             </ResponsiveContainer>
                         </div>
+                    </div>
+                </div>
 
-                        <div className="card bg-base-100 p-4 shadow-xl">
-                            <h3 className="font-bold text-lg mb-4">🍎 Growth Monitoring</h3>
-                            <ResponsiveContainer width="100%" height={300}>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Growth Distribution */}
+                    <div className="card bg-base-100 shadow-xl">
+                        <div className="card-body">
+                            <h3 className="card-title">Growth Distribution</h3>
+                            <ResponsiveContainer width="100%" height={250}>
                                 <PieChart>
                                     <Pie
                                         data={growthPieData}
-                                        dataKey="value"
+                                        cx="50%"
+                                        cy="50%"
                                         nameKey="name"
                                         outerRadius={100}
                                         label={({ name, rate }) => `${name}: ${safeFixed(rate)}%`}
@@ -542,16 +548,19 @@ const AnalyticsDashboard = () => {
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip content={<CustomTooltip />} />
+                                    <Tooltip content={<EnhancedTooltip type="percentage" />} />
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>
+                    </div>
 
-                        <div className="card bg-base-100 p-4 shadow-xl">
-                            <h3 className="font-bold text-lg mb-4">📅 Due & Overdue</h3>
+                    {/* Due & Overdue */}
+                    <div className="card bg-base-100 shadow-xl">
+                        <div className="card-body">
+                            <h3 className="card-title">Due & Overdue Status</h3>
                             <div className="grid grid-cols-2 gap-4 text-center">
                                 <div className="stat">
-                                    <div className="stat-title">Due</div>
+                                    <div className="stat-title">Due Today</div>
                                     <div className="stat-value text-info text-2xl">{data.dueOverdue?.dueToday ?? 0}</div>
                                 </div>
                                 <div className="stat">
@@ -570,238 +579,413 @@ const AnalyticsDashboard = () => {
                         </div>
                     </div>
                 </div>
-            )}
+            </div>
+        );
+    };
 
-            {/* Trends Tab */}
-            {activeTab === 'trends' && !loading && (
-                <div className="space-y-6">
-                    <div className="flex justify-end">
-                        <select
-                            className="select select-bordered"
-                            name="granularity"
-                            value={filters.granularity}
-                            onChange={handleFilterChange}
-                        >
+    const MonthlyDropoutTab = () => {
+        return (
+            <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Area Chart */}
+                    <div className="card bg-base-100 shadow-xl lg:col-span-2">
+                        <div className="card-body">
+                            <h3 className="card-title">Monthly Dropout Trends</h3>
+                            <ResponsiveContainer width="100%" height={400}>
+                                <AreaChart data={monthlyDropoutData.chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="month" />
+                                    <YAxis domain={[0, 100]} />
+                                    <Tooltip content={<EnhancedTooltip type="percentage" />} />
+                                    <Legend />
+                                    {monthlyDropoutData.groups.map((group, index) => (
+                                        <Area
+                                            key={group}
+                                            dataKey={group}
+                                            name={getGroupLabel(group, filters.dropoutGroup)}
+                                            stackId="1"
+                                            stroke={COLORS[index % COLORS.length]}
+                                            fill={COLORS[index % COLORS.length]}
+                                            fillOpacity={0.6}
+                                        />
+                                    ))}
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Stats and Radar */}
+                    <div className="space-y-6">
+                        <div className="card bg-base-100 shadow-xl">
+                            <div className="card-body">
+                                <h3 className="card-title">Dropout Summary</h3>
+                                <div className="space-y-3">
+                                    <StatCard 
+                                        title="Average Dropout" 
+                                        value={`${monthlyDropoutData.summary.avgDropoutRate.toFixed(1)}%`}
+                                        color="warning"
+                                    />
+                                    <StatCard 
+                                        title="Groups Tracked" 
+                                        value={monthlyDropoutData.summary.totalGroups}
+                                        color="info"
+                                    />
+                                    <StatCard 
+                                        title="Months Analyzed" 
+                                        value={monthlyDropoutData.summary.totalMonths}
+                                        color="success"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="card bg-base-100 shadow-xl">
+                            <div className="card-body">
+                                <h3 className="card-title">Group Performance</h3>
+                                <ResponsiveContainer width="100%" height={200}>
+                                    <RadarChart data={monthlyDropoutData.radarData}>
+                                        <PolarGrid />
+                                        <PolarAngleAxis dataKey="subject" />
+                                        <PolarRadiusAxis domain={[0, 100]} />
+                                        <Radar name="Dropout Rate" dataKey="dropoutRate" stroke="#FF8042" fill="#FF8042" fillOpacity={0.6} />
+                                    </RadarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Data Table */}
+                <div className="card bg-base-100 shadow-xl">
+                    <div className="card-body">
+                        <h3 className="card-title">Detailed Monthly Data</h3>
+                        <div className="overflow-x-auto">
+                            <table className="table table-zebra w-full">
+                                <thead>
+                                    <tr>
+                                        <th>Month</th>
+                                        {monthlyDropoutData.groups.map(group => (
+                                            <th key={group}>{getGroupLabel(group, filters.dropoutGroup)}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {monthlyDropoutData.chartData.map((row, idx) => (
+                                        <tr key={idx}>
+                                            <td className="font-semibold">{row.month}</td>
+                                            {monthlyDropoutData.groups.map(group => (
+                                                <td key={group}>
+                                                    <div className={`badge ${row[group] > 20 ? 'badge-error' : row[group] > 10 ? 'badge-warning' : 'badge-success'}`}>
+                                                        {row[group] ? `${row[group].toFixed(1)}%` : 'N/A'}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {row[`${group}_due`]} due, {row[`${group}_completed`]} completed
+                                                    </div>
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const TrendsTab = () => {
+        return (
+            <div className="space-y-6">
+                <div className="flex justify-end gap-4">
+                    <select
+                        className="select select-bordered"
+                        name="granularity"
+                        value={filters.granularity}
+                        onChange={handleFilterChange}
+                    >
+                        <option value="day">Daily</option>
+                        <option value="week">Weekly</option>
+                        <option value="month">Monthly</option>
+                    </select>
+                    <select
+                        className="select select-bordered"
+                        name="monthRange"
+                        value={filters.monthRange}
+                        onChange={handleFilterChange}
+                    >
+                        <option value="3">3 Months</option>
+                        <option value="6">6 Months</option>
+                        <option value="12">12 Months</option>
+                    </select>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6">
+                    <div className="card bg-base-100 p-4 shadow-xl">
+                        <h3 className="font-bold text-lg mb-4">📈 Coverage Trend</h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={data.trends?.coverage || []}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="day" />
+                                <YAxis />
+                                <Tooltip content={<EnhancedTooltip type="percentage" />} />
+                                <Legend />
+                                <Line type="monotone" dataKey="coveragePct" name="Coverage %" stroke="#0088FE" strokeWidth={2} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className="card bg-base-100 p-4 shadow-xl">
+                        <h3 className="font-bold text-lg mb-4">📉 Dropout Trend</h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={data.trends?.dropout || []}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="day" />
+                                <YAxis />
+                                <Tooltip content={<EnhancedTooltip type="percentage" />} />
+                                <Legend />
+                                <Line type="monotone" dataKey="dropoutRate" name="Dropout %" stroke="#FF8042" strokeWidth={2} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className="card bg-base-100 p-4 shadow-xl">
+                        <h3 className="font-bold text-lg mb-4">⏰ Timeliness Trend</h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={data.trends?.timeliness || []}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="day" />
+                                <YAxis />
+                                <Tooltip content={<EnhancedTooltip type="percentage" />} />
+                                <Legend />
+                                <Line type="monotone" dataKey="timelinessRate" name="Timeliness %" stroke="#00C49F" strokeWidth={2} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const FilterSection = () => (
+        <div className="bg-base-200 p-6 rounded-xl shadow-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-4">
+                <div>
+                    <label className="label font-semibold text-sm">Ward</label>
+                    <select className="select select-bordered w-full select-sm" name="ward" value={filters.ward} onChange={handleFilterChange}>
+                        <option value="">All Wards</option>
+                        {wards.map(w => <option key={w} value={w}>Ward {w}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="label font-semibold text-sm">Caste</label>
+                    <select className="select select-bordered w-full select-sm" name="casteCode" value={filters.casteCode} onChange={handleFilterChange}>
+                        <option value="">All Castes</option>
+                        {casteCodes.map(c => <option key={c} value={c}>Caste {c}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="label font-semibold text-sm">Gender</label>
+                    <select className="select select-bordered w-full select-sm" name="gender" value={filters.gender} onChange={handleFilterChange}>
+                        <option value="">All</option>
+                        {genders.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="label font-semibold text-sm">Age Group</label>
+                    <select className="select select-bordered w-full select-sm" name="ageGroup" value={filters.ageGroup} onChange={handleFilterChange}>
+                        <option value="">All</option>
+                        {ageGroups.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="label font-semibold text-sm">Start Date</label>
+                    <input type="date" className="input input-bordered w-full input-sm" name="startDate" value={filters.startDate} onChange={handleFilterChange} />
+                </div>
+                <div>
+                    <label className="label font-semibold text-sm">End Date</label>
+                    <input type="date" className="input input-bordered w-full input-sm" name="endDate" value={filters.endDate} onChange={handleFilterChange} />
+                </div>
+            </div>
+            
+            {(activeTab === 'trends' || activeTab === 'monthly-dropout') && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
+                    <div>
+                        <label className="label font-semibold text-sm">Granularity</label>
+                        <select className="select select-bordered w-full select-sm" name="granularity" value={filters.granularity} onChange={handleFilterChange}>
                             <option value="day">Daily</option>
                             <option value="week">Weekly</option>
                             <option value="month">Monthly</option>
                         </select>
                     </div>
+                    <div>
+                        <label className="label font-semibold text-sm">Month Range</label>
+                        <select className="select select-bordered w-full select-sm" name="monthRange" value={filters.monthRange} onChange={handleFilterChange}>
+                            <option value="3">3 Months</option>
+                            <option value="6">6 Months</option>
+                            <option value="12">12 Months</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="label font-semibold text-sm">Group By</label>
+                        <select className="select select-bordered w-full select-sm" name="dropoutGroup" value={filters.dropoutGroup} onChange={handleFilterChange}>
+                            <option value="vaccine">Vaccine</option>
+                            <option value="ward">Ward</option>
+                            <option value="gender">Gender</option>
+                            <option value="ageGroup">Age Group</option>
+                            <option value="caste">Caste</option>
+                        </select>
+                    </div>
+                    <div className="flex items-end">
+                        <button className="btn btn-primary btn-sm w-full" onClick={debouncedFetch} disabled={loading}>
+                            {loading ? '🔄' : '🔍'} Apply
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 
-                    <div className="grid grid-cols-1 gap-6">
-                        <div className="card bg-base-100 p-4 shadow-xl">
-                            <h3 className="font-bold text-lg mb-4">📈 Coverage Trend</h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={data.trends?.coverage || []}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="day" />
-                                    <YAxis />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="coveragePct" name="Coverage %" stroke="#0088FE" strokeWidth={2} />
-                                </LineChart>
-                            </ResponsiveContainer>
+    return (
+        <div className="p-6 space-y-6">
+            {/* Header */}
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold">📊 Analytics Dashboard</h1>
+                    <p className="text-gray-600">Comprehensive vaccination and growth monitoring analytics</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    {lastUpdated && (
+                        <div className="text-sm text-gray-500">
+                            Updated: {lastUpdated.toLocaleTimeString()}
                         </div>
+                    )}
+                    <button className="btn btn-primary" onClick={handleRefreshCache}>
+                        🔄 Refresh Data
+                    </button>
+                    <div className="dropdown dropdown-end">
+                        <label tabIndex={0} className="btn btn-sm btn-primary">
+                            {exportLoading ? '⏳' : '📥'} Export
+                        </label>
+                        <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 z-10">
+                            <li><a onClick={() => handleExport('overview')}>Overview</a></li>
+                            <li><a onClick={() => handleExport('coverage')}>Coverage</a></li>
+                            <li><a onClick={() => handleExport('trends')}>Trends</a></li>
+                            <li><a onClick={() => handleExport('ward-performance')}>Ward Performance</a></li>
+                            <li><a onClick={() => handleExport('disparities')}>Disparities</a></li>
+                            <li><a onClick={() => handleExport('monthly-dropout')}>Monthly Dropout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
 
-                        <div className="card bg-base-100 p-4 shadow-xl">
-                            <h3 className="font-bold text-lg mb-4">📉 Dropout Trend</h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={data.trends?.dropout || []}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="day" />
-                                    <YAxis />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="dropoutRate" name="Dropout %" stroke="#FF8042" strokeWidth={2} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
+            {/* Filters */}
+            <FilterSection />
 
-                        <div className="card bg-base-100 p-4 shadow-xl">
-                            <h3 className="font-bold text-lg mb-4">⏰ Timeliness Trend</h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={data.trends?.timeliness || []}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="day" />
-                                    <YAxis />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="timelinessRate" name="Timeliness %" stroke="#00C49F" strokeWidth={2} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
+            {/* Tabs */}
+            <div className="tabs tabs-boxed bg-base-200">
+                {[
+                    { id: 'overview', label: 'Overview', icon: '📈' },
+                    { id: 'trends', label: 'Trends', icon: '📊' },
+                    { id: 'monthly-dropout', label: 'Monthly Dropout', icon: '🌊' },
+                    { id: 'ward-performance', label: 'Ward Performance', icon: '🏆' },
+                    { id: 'equity', label: 'Equity Analysis', icon: '⚖️' },
+                    { id: 'comparison', label: 'Comparison', icon: '🔄' }
+                ].map(tab => (
+                    <a
+                        key={tab.id}
+                        className={`tab tab-lg ${activeTab === tab.id ? 'tab-active' : ''}`}
+                        onClick={() => setActiveTab(tab.id)}
+                    >
+                        <span className="mr-2">{tab.icon}</span>
+                        {tab.label}
+                    </a>
+                ))}
+            </div>
 
-                        <div className="card bg-base-100 p-4 shadow-xl">
-                            <h3 className="font-bold text-lg mb-4">🍎 Nutrition Trend</h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={data.trends?.nutrition || []}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="day" />
-                                    <YAxis />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="avgWeightKg" name="Avg Weight (kg)" stroke="#0088FE" strokeWidth={2} />
-                                    <Line type="monotone" dataKey="underweightRate" name="Underweight %" stroke="#FF8042" />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
+            {/* Loading */}
+            {loading && (
+                <div className="flex justify-center items-center py-12">
+                    <div className="flex flex-col items-center gap-4">
+                        <span className="loading loading-spinner loading-lg text-primary"></span>
+                        <p className="text-gray-600">Loading analytics data...</p>
                     </div>
                 </div>
             )}
 
-            {/* Ward Performance Tab */}
-            {activeTab === 'ward-performance' && !loading && (
-                <div className="space-y-6">
-                    <div className="card bg-base-100 p-4 shadow-xl">
-                        <h3 className="font-bold text-lg mb-4">🏆 Top Performing Wards</h3>
-                        <ResponsiveContainer width="100%" height={400}>
-                            <BarChart data={data.wardPerformance || []} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" />
-                                <YAxis dataKey="ward" type="category" width={80} />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Legend />
-                                <Bar dataKey="coverage" name="Coverage %" fill="#0088FE" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-
-                    <div className="card bg-base-100 shadow-xl overflow-x-auto">
-                        <table className="table table-zebra">
-                            <thead>
-                                <tr>
-                                    <th>Ward</th>
-                                    <th>Coverage %</th>
-                                    <th>Overdue</th>
-                                    <th>Dropout %</th>
-                                    <th>Underweight %</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(data.wardPerformance || []).map((ward, idx) => (
-                                    <tr key={idx}>
-                                        <td className="font-bold">Ward {ward.ward}</td>
-                                        <td className="text-success">{safeFixed(ward.coverage)}%</td>
-                                        <td className="text-error">{ward.overdue}</td>
-                                        <td className="text-warning">{safeFixed(ward.dropoutRate)}%</td>
-                                        <td className="text-warning">{safeFixed(ward.underweightRate)}%</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
-
-            {/* Equity Tab */}
-            {activeTab === 'equity' && !loading && (
-                <div className="space-y-6">
-                    <div className="card bg-base-100 p-4 shadow-xl">
-                        <h3 className="font-bold text-lg mb-4">👥 Coverage by Gender</h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={data.disparities?.gender || []}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="group" />
-                                <YAxis />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Legend />
-                                <Bar dataKey="coverage" name="Coverage %" fill="#0088FE" />
-                                <Bar dataKey="dropoutRate" name="Dropout %" fill="#FF8042" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-
-                    <div className="card bg-base-100 p-4 shadow-xl">
-                        <h3 className="font-bold text-lg mb-4">🏘️ Coverage by Caste</h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={data.disparities?.caste || []}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="group" />
-                                <YAxis />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Legend />
-                                <Bar dataKey="coverage" name="Coverage %" fill="#00C49F" />
-                                <Bar dataKey="underweightRate" name="Underweight %" fill="#FFBB28" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="card bg-base-100 shadow-xl overflow-x-auto">
-                            <div className="card-body">
-                                <h3 className="font-bold">Gender Breakdown</h3>
-                                <table className="table table-sm">
-                                    <thead>
-                                        <tr><th>Gender</th><th>Coverage</th><th>Total</th></tr>
-                                    </thead>
-                                    <tbody>
-                                        {(data.disparities?.gender || []).map((g, i) => (
-                                            <tr key={i}>
-                                                <td>{g.group}</td>
-                                                <td>{safeFixed(g.coverage)}%</td>
-                                                <td>{g.totalChildren}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+            {/* Tab Content */}
+            {!loading && (
+                <div className="min-h-96">
+                    {activeTab === 'overview' && <OverviewTab />}
+                    {activeTab === 'trends' && <TrendsTab />}
+                    {activeTab === 'monthly-dropout' && <MonthlyDropoutTab />}
+                    {activeTab === 'ward-performance' && (
+                        <div className="space-y-6">
+                            <div className="card bg-base-100 p-4 shadow-xl">
+                                <h3 className="font-bold text-lg mb-4">🏆 Top Performing Wards</h3>
+                                <ResponsiveContainer width="100%" height={400}>
+                                    <BarChart data={data.wardPerformance || []} layout="vertical">
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis type="number" />
+                                        <YAxis dataKey="ward" type="category" width={80} />
+                                        <Tooltip content={<EnhancedTooltip type="percentage" />} />
+                                        <Legend />
+                                        <Bar dataKey="coverage" name="Coverage %" fill="#0088FE" />
+                                    </BarChart>
+                                </ResponsiveContainer>
                             </div>
                         </div>
-
-                        <div className="card bg-base-100 shadow-xl overflow-x-auto">
-                            <div className="card-body">
-                                <h3 className="font-bold">Caste Breakdown</h3>
-                                <table className="table table-sm">
-                                    <thead>
-                                        <tr><th>Caste</th><th>Coverage</th><th>Total</th></tr>
-                                    </thead>
-                                    <tbody>
-                                        {(data.disparities?.caste || []).map((c, i) => (
-                                            <tr key={i}>
-                                                <td>Caste {c.group}</td>
-                                                <td>{safeFixed(c.coverage)}%</td>
-                                                <td>{c.totalChildren}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                    )}
+                    {activeTab === 'equity' && (
+                        <div className="space-y-6">
+                            <div className="card bg-base-100 p-4 shadow-xl">
+                                <h3 className="font-bold text-lg mb-4">👥 Coverage by Gender</h3>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <BarChart data={data.disparities?.gender || []}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="group" />
+                                        <YAxis />
+                                        <Tooltip content={<EnhancedTooltip type="percentage" />} />
+                                        <Legend />
+                                        <Bar dataKey="coverage" name="Coverage %" fill="#0088FE" />
+                                        <Bar dataKey="dropoutRate" name="Dropout %" fill="#FF8042" />
+                                    </BarChart>
+                                </ResponsiveContainer>
                             </div>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Comparison Tab */}
-            {activeTab === 'comparison' && !loading && (
-                <div className="space-y-6">
-                    <div className="alert alert-info">
-                        <span>Comparing {filters.compareStartDate} to {filters.compareEndDate} vs {filters.startDate} to {filters.endDate}</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {Object.entries(data.comparison || {}).map(([key, value]) => (
-                            <div key={key} className="card bg-base-100 shadow-xl">
-                                <div className="card-body">
-                                    <h3 className="card-title text-sm">{key.replace(/([A-Z])/g, ' $1').trim()}</h3>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between">
-                                            <span className="text-sm">Current:</span>
-                                            <span className="font-bold">{value.current}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-sm">Previous:</span>
-                                            <span className="font-bold">{value.previous}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-sm">Change:</span>
-                                            <span className={`font-bold flex items-center ${value.changePct > 0 ? 'text-success' : 'text-error'}`}>
-                                                {value.changePct > 0 ? '↑' : '↓'} {Math.abs(value.changePct)}%
-                                            </span>
+                    )}
+                    {activeTab === 'comparison' && (
+                        <div className="space-y-6">
+                            <div className="alert alert-info">
+                                <span>Comparing {filters.compareStartDate} to {filters.compareEndDate} vs {filters.startDate} to {filters.endDate}</span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {Object.entries(data.comparison || {}).map(([key, value]) => (
+                                    <div key={key} className="card bg-base-100 shadow-xl">
+                                        <div className="card-body">
+                                            <h3 className="card-title text-sm">{key.replace(/([A-Z])/g, ' $1').trim()}</h3>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between">
+                                                    <span className="text-sm">Current:</span>
+                                                    <span className="font-bold">{value.current}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-sm">Previous:</span>
+                                                    <span className="font-bold">{value.previous}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-sm">Change:</span>
+                                                    <span className={`font-bold flex items-center ${value.changePct > 0 ? 'text-success' : 'text-error'}`}>
+                                                        {value.changePct > 0 ? '↑' : '↓'} {Math.abs(value.changePct)}%
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

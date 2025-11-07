@@ -10,6 +10,7 @@ import {
     getTDCoverage,
     getDueOverdue,
     debugAnalyticsData,
+    getMonthlyDropout,
 
     // Advanced analytics
     getTrends,
@@ -21,6 +22,9 @@ import {
     // Utility + system
     getFactsStatusController,
     refreshCache,
+
+    // New endpoints
+    getRollingDropout,
 } from '../controllers/analyticsController.js';
 
 const router = express.Router();
@@ -59,6 +63,10 @@ router.get('/export', exportAnalytics);               // Export CSVs
 router.get('/status', getFactsStatusController);       // Data health + last processed info
 router.get('/refresh-cache', refreshCache);            // Clear cache (GET for easier triggering)
 router.get('/debug', debugAnalyticsData);
+
+// In your routes file, e.g., analyticsRoutes.js
+router.get('/monthly-dropout', getMonthlyDropout);
+router.get('/rolling-dropout', getRollingDropout);
 
 /* -------------------------------------------------------------------------- */
 export default router;

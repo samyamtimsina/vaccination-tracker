@@ -189,6 +189,8 @@ model VaccineType {
   doses     Dose[]
   dueVaccines ChildDueVaccine[]
   records   VaccinationRecord[]
+  monthlyDropoutFacts       ChildMonthlyDropoutFact[]
+  childRollingDropoutFact   ChildRollingDropoutFact[]
 }
 
 model Dose {
@@ -401,4 +403,59 @@ model GrowthAnalyticsFact {
   @@index([casteCode])
   @@index([gender])
   @@index([ageGroup])
+}
+model ChildMonthlyDropoutFact {
+  id                Int       @id @default(autoincrement())
+  snapshotMonth     DateTime  @db.Date      // Start of the month (BS month)
+  ward              Int
+  vaccineTypeId     Int
+  doseNumber        Int       @default(0)
+  gender            String?   
+  ageGroup          String?   
+  casteCode         Int?
+  
+  totalDue          Int       @default(0)   // Children due this month
+  totalCompleted    Int       @default(0)   // Children who completed within window
+  dropoutCount      Int       @default(0)   // Missed within 30-day window
+
+  dropoutRate       Float?    @default(0)   // Calculated as dropoutCount / totalDue * 100
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  vaccineType       VaccineType @relation(fields: [vaccineTypeId], references: [id])
+
+  @@unique([snapshotMonth, ward, vaccineTypeId, doseNumber, gender, ageGroup, casteCode])
+  @@index([snapshotMonth])
+  @@index([ward])
+  @@index([vaccineTypeId])
+  @@index([doseNumber])
+}
+// Add to your existing schema
+model ChildRollingDropoutFact {
+  id                Int       @id @default(autoincrement())
+  snapshotMonth     DateTime  @db.Date      // Start of the month
+  windowType        String    // '1M', '3M', '6M', '12M'
+  ward              Int
+  vaccineTypeId     Int
+  doseNumber        Int       @default(0)
+  gender            String?   
+  ageGroup          String?   
+  casteCode         Int?
+  
+  totalDue          Int       @default(0)
+  totalCompleted    Int       @default(0)
+  dropoutCount      Int       @default(0)
+  dropoutRate       Float?    @default(0)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  vaccineType       VaccineType @relation(fields: [vaccineTypeId], references: [id])
+
+  @@unique([snapshotMonth, windowType, ward, vaccineTypeId, doseNumber, gender, ageGroup, casteCode])
+  @@index([snapshotMonth])
+  @@index([windowType])
+  @@index([ward])
+  @@index([vaccineTypeId])
 }

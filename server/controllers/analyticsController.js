@@ -1,6 +1,6 @@
 import { prisma } from '../utils/prisma.js';
 import { cachedAnalytics, clearCache, getFactsStatus } from '../utils/analyticsCache.js';
-import { format, startOfWeek, startOfMonth, eachDayOfInterval, parseISO } from 'date-fns';
+import { format, startOfWeek, startOfMonth, eachDayOfInterval, parseISO, subMonths } from 'date-fns';
 
 /* ========================================================================== */
 /* UTILITY FUNCTIONS */
@@ -234,7 +234,7 @@ export const getSystemOverview = async (req, res) => {
                 where: motherOverviewWhere,
             });
 
-            // ✅ FIXED: Calculate weighted average for mother dropout rate
+            //  FIXED: Calculate weighted average for mother dropout rate
             const motherDropoutWhere = buildWhereFilters({ ward, casteCode, startDate, endDate });
             motherDropoutWhere.doseNumber = 0;
             motherDropoutWhere.dropoutRate = { not: null }; // Exclude null values
@@ -455,7 +455,7 @@ export const getDropoutRates = async (req, res) => {
 export const getZeroDoseChildren = async (req, res) => {
     const { ward, casteCode, gender, ageGroup, startDate, endDate } = req.query;
     try {
-        // ✅ FIXED: Only use vaccineTypeId = 0 summary rows
+        //  FIXED: Only use vaccineTypeId = 0 summary rows
         const where = buildWhereFilters({ ward, casteCode, gender, ageGroup, startDate, endDate });
         where.vaccineTypeId = 0;
         where.doseNumber = 0;
@@ -1139,6 +1139,166 @@ export const getFactsStatusController = async (req, res) => {
         });
     } catch (err) {
         console.error('getFactsStatusController error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+
+};
+/**
+ * GET /api/analytics/monthly-dropout
+ * Fetch monthly dropout rates, grouped by specified field (vaccine, ward, etc.)
+ */
+export const getMonthlyDropout = async (req, res) => {
+    const {
+        ward, casteCode, gender, ageGroup, vaccineTypeId,
+        startDate, endDate,
+        monthRange = '12',
+        dropoutGroup = 'vaccine'  // vaccine, ward, gender, ageGroup, caste
+    } = req.query;
+
+    const groupBy = dropoutGroup;
+    const monthsBack = parseInt(monthRange, 10) || 12;
+    const cacheKey = `monthly-dropout:${ward}:${casteCode}:${gender}:${ageGroup}:${vaccineTypeId}:${startDate || ''}:${endDate || ''}:${monthRange}:${groupBy}`;
+
+    try {
+        const data = await cachedAnalytics(cacheKey, async () => {
+            // Use monthRange to determine the date range for snapshots
+            const gteDate = subMonths(new Date(), monthsBack);
+            const lteDate = new Date();
+
+            const where = {
+                snapshotMonth: {
+                    gte: gteDate,
+                    lte: lteDate
+                }
+            };
+
+            if (ward && ward !== '' && ward !== 'ALL') where.ward = Number(ward);
+            if (casteCode && casteCode !== '' && casteCode !== 'ALL') where.casteCode = Number(casteCode);
+            if (gender && gender !== '' && gender !== 'ALL') where.gender = gender;
+            if (ageGroup && ageGroup !== '' && ageGroup !== 'ALL') where.ageGroup = ageGroup;
+            if (vaccineTypeId && vaccineTypeId !== '' && vaccineTypeId !== 'ALL') where.vaccineTypeId = Number(vaccineTypeId);
+
+            // Fetch raw data - order only by snapshotMonth to avoid field path issues
+            const rawData = await prisma.childMonthlyDropoutFact.findMany({
+                where,
+                select: {
+                    snapshotMonth: true,
+                    ward: true,
+                    vaccineTypeId: true,
+                    gender: true,
+                    ageGroup: true,
+                    casteCode: true,
+                    dropoutRate: true,
+                    totalDue: true,
+                    totalCompleted: true,
+                    dropoutCount: true
+                },
+                orderBy: [
+                    { snapshotMonth: 'asc' }
+                ]
+            });
+
+            if (rawData.length === 0) return [];
+
+            // Return with formatted snapshotMonth as string for easier frontend handling
+            return rawData.map(row => ({
+                snapshotMonth: format(row.snapshotMonth, 'yyyy-MM'),  // Format as '2025-11' string
+                ward: row.ward,
+                vaccineTypeId: row.vaccineTypeId,
+                gender: row.gender || 'ALL',
+                ageGroup: row.ageGroup || 'ALL',
+                casteCode: row.casteCode || 0,
+                dropoutRate: Number(row.dropoutRate || 0),
+                totalDue: row.totalDue,
+                totalCompleted: row.totalCompleted,
+                dropoutCount: row.dropoutCount
+            }));
+        });
+
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error('getMonthlyDropout error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+// analyticsController.js - Add this new endpoint
+
+/**
+ * GET /api/analytics/rolling-dropout
+ * Returns rolling dropout data (1M, 3M, 6M, 12M)
+ */
+export const getRollingDropout = async (req, res) => {
+    const {
+        ward, casteCode, gender, ageGroup, vaccineTypeId,
+        startDate, endDate,
+        windowType = '1M', // 1M, 3M, 6M, 12M
+        groupBy = 'vaccine' // vaccine, ward, gender, ageGroup, caste
+    } = req.query;
+
+    const cacheKey = `rolling-dropout:${ward}:${casteCode}:${gender}:${ageGroup}:${vaccineTypeId}:${startDate}:${endDate}:${windowType}:${groupBy}`;
+
+    try {
+        const data = await cachedAnalytics(cacheKey, async () => {
+            const where = {
+                windowType: windowType
+            };
+
+            // Date range filtering
+            if (startDate && endDate) {
+                where.snapshotMonth = {
+                    gte: new Date(startDate),
+                    lte: new Date(endDate)
+                };
+            }
+
+            // Demographic filtering
+            if (ward && ward !== '' && ward !== 'ALL') where.ward = Number(ward);
+            if (casteCode && casteCode !== '' && casteCode !== 'ALL') where.casteCode = Number(casteCode);
+            if (gender && gender !== '' && gender !== 'ALL') where.gender = gender;
+            if (ageGroup && ageGroup !== '' && ageGroup !== 'ALL') where.ageGroup = ageGroup;
+            if (vaccineTypeId && vaccineTypeId !== '' && vaccineTypeId !== 'ALL') where.vaccineTypeId = Number(vaccineTypeId);
+
+            // Fetch rolling dropout data
+            const rollingData = await prisma.childRollingDropoutFact.findMany({
+                where,
+                select: {
+                    snapshotMonth: true,
+                    windowType: true,
+                    ward: true,
+                    vaccineTypeId: true,
+                    gender: true,
+                    ageGroup: true,
+                    casteCode: true,
+                    totalDue: true,
+                    totalCompleted: true,
+                    dropoutCount: true,
+                    dropoutRate: true
+                },
+                orderBy: [
+                    { snapshotMonth: 'asc' },
+                    { ward: 'asc' }
+                ]
+            });
+
+            // Format and group data
+            return rollingData.map(row => ({
+                snapshotMonth: format(row.snapshotMonth, 'yyyy-MM'),
+                windowType: row.windowType,
+                ward: row.ward,
+                vaccineTypeId: row.vaccineTypeId,
+                gender: row.gender || 'ALL',
+                ageGroup: row.ageGroup || 'ALL',
+                casteCode: row.casteCode || 0,
+                totalDue: row.totalDue,
+                totalCompleted: row.totalCompleted,
+                dropoutCount: row.dropoutCount,
+                dropoutRate: Number(row.dropoutRate || 0)
+            }));
+        });
+
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error('getRollingDropout error:', err);
         res.status(500).json({ success: false, message: 'Server error', error: err.message });
     }
 };
