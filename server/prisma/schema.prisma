@@ -191,6 +191,8 @@ model VaccineType {
   records   VaccinationRecord[]
   monthlyDropoutFacts       ChildMonthlyDropoutFact[]
   childRollingDropoutFact   ChildRollingDropoutFact[]
+  monthlyVaccineInventory MonthlyVaccineInventory[]
+  monthlyDoseCount MonthlyDoseCount[]
 }
 
 model Dose {
@@ -458,4 +460,54 @@ model ChildRollingDropoutFact {
   @@index([windowType])
   @@index([ward])
   @@index([vaccineTypeId])
+}
+
+// Add to your existing schema
+model MonthlyVaccineInventory {
+  id            Int       @id @default(autoincrement())
+  snapshotMonth DateTime  @db.Date
+  vaccineTypeId Int
+  received      Int       @default(0)
+  spent         Int       @default(0)
+  opened        Int       @default(0)
+  spoiled       Int       @default(0)
+  returned      Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  vaccineType   VaccineType @relation(fields: [vaccineTypeId], references: [id])
+
+  @@unique([snapshotMonth, vaccineTypeId])
+  @@index([snapshotMonth])
+  @@index([vaccineTypeId])
+}
+
+model MonthlyDoseCount {
+  id            Int       @id @default(autoincrement())
+  snapshotMonth DateTime  @db.Date
+  vaccineTypeId Int
+  doseNumber    Int
+  countGiven    Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  vaccineType   VaccineType @relation(fields: [vaccineTypeId], references: [id])
+
+  @@unique([snapshotMonth, vaccineTypeId, doseNumber])
+  @@index([snapshotMonth])
+  @@index([vaccineTypeId])
+}
+
+model MonthlySpecialFact {
+  id              Int       @id @default(autoincrement())
+  snapshotMonth   DateTime  @db.Date
+  fullWithin23m   Int       @default(0)
+  started24To59m  Int       @default(0)
+  aefiNormal      Int       @default(0)
+  aefiSerious     Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([snapshotMonth])
+  @@index([snapshotMonth])
 }

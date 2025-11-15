@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import axiosClient from '../api/axiosClient';
-import { format, subDays, subMonths, parseISO } from 'date-fns';
+import { format, subDays, subMonths, parseISO, startOfMonth } from 'date-fns';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
-    PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, 
+    PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line,
     AreaChart, Area, ComposedChart, RadarChart, PolarGrid,
     PolarAngleAxis, PolarRadiusAxis, Radar
 } from 'recharts';
@@ -22,6 +22,24 @@ const safeFixed = (v, decimals = 4) => {
     return fixed.replace(/\.?0+$/, '');
 };
 
+// Add API error handler
+const handleApiError = (error) => {
+    if (error.response) {
+        console.error('API Error Response:', {
+            status: error.response.status,
+            data: error.response.data,
+            headers: error.response.headers
+        });
+        return error.response.data;
+    } else if (error.request) {
+        console.error('API No Response:', error.request);
+        return { success: false, message: 'No response from server' };
+    } else {
+        console.error('API Error:', error.message);
+        return { success: false, message: error.message };
+    }
+};
+
 const AnalyticsDashboard = () => {
     const [activeTab, setActiveTab] = useState('overview');
     const [compareMode, setCompareMode] = useState(false);
@@ -38,7 +56,8 @@ const AnalyticsDashboard = () => {
         compareEndDate: format(subDays(new Date(), 31), 'yyyy-MM-dd'),
         monthRange: '12',
         dropoutGroup: 'vaccine',
-        windowType: '1M'
+        windowType: '1M',
+        inventoryMonth: format(startOfMonth(new Date()), 'yyyy-MM-dd')
     });
 
     const [data, setData] = useState({
@@ -53,13 +72,15 @@ const AnalyticsDashboard = () => {
         wardPerformance: [],
         disparities: { gender: [], caste: [] },
         comparison: {},
-        rollingDropout: []
+        rollingDropout: [],
+        inventory: { vaccineTypes: [], doseCounts: [], inventories: [], special: null }
     });
 
     const [vaccineMap, setVaccineMap] = useState({});
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(null);
     const [exportLoading, setExportLoading] = useState(false);
+    const [inventoryEditing, setInventoryEditing] = useState(false);
 
     const fetchVaccineSchedule = useCallback(async () => {
         try {
@@ -87,7 +108,7 @@ const AnalyticsDashboard = () => {
             case 'vaccine': return getVaccineName(val);
             case 'ward': return `Ward ${val}`;
             case 'caste': return `Caste ${val}`;
-            case 'gender': 
+            case 'gender':
             case 'ageGroup': return String(groupValue).toUpperCase();
             default: return String(groupValue);
         }
@@ -129,6 +150,8 @@ const AnalyticsDashboard = () => {
                 requests = [axiosClient.get(`/api/analytics/monthly-dropout?${query}`, { signal })];
             } else if (activeTab === 'rolling-dropout') {
                 requests = [axiosClient.get(`/api/analytics/rolling-dropout?${query}`, { signal })];
+            } else if (activeTab === 'inventory') {
+                requests = [axiosClient.get(`/api/analytics/inventory?${query}`, { signal })];
             }
 
             const results = await Promise.all(requests);
@@ -164,6 +187,8 @@ const AnalyticsDashboard = () => {
                 processedData = { trends: { monthlyDropout: results[0].data.data || [] } };
             } else if (activeTab === 'rolling-dropout') {
                 processedData = { rollingDropout: results[0].data.data };
+            } else if (activeTab === 'inventory') {
+                processedData = { inventory: results[0].data.data || { vaccineTypes: [], doseCounts: [], inventories: [], special: null } };
             }
 
             setData(prev => ({
@@ -222,7 +247,8 @@ const AnalyticsDashboard = () => {
             compareEndDate: format(subDays(new Date(), 31), 'yyyy-MM-dd'),
             monthRange: '12',
             dropoutGroup: 'vaccine',
-            windowType: '1M'
+            windowType: '1M',
+            inventoryMonth: format(startOfMonth(new Date()), 'yyyy-MM-dd')
         });
     };
 
@@ -312,7 +338,7 @@ const AnalyticsDashboard = () => {
         filtered.forEach(item => {
             const monthKey = format(item.parsedDate, 'yyyy-MM');
             const groupValue = item[groupField];
-            
+
             if (!monthlyAggregates.has(monthKey)) {
                 monthlyAggregates.set(monthKey, new Map());
             }
@@ -332,7 +358,7 @@ const AnalyticsDashboard = () => {
         const chartData = months.map(month => {
             const row = { month: format(parseISO(month + '-01'), 'MMM yy') };
             const monthData = monthlyAggregates.get(month);
-            
+
             groups.forEach(group => {
                 const item = monthData?.get(group);
                 row[group] = item ? item.dropoutRate : null;
@@ -372,8 +398,8 @@ const AnalyticsDashboard = () => {
 
     const monthlyDropoutData = useMemo(() => {
         return processMonthlyDropoutData(
-            data.trends?.monthlyDropout, 
-            filters.dropoutGroup, 
+            data.trends?.monthlyDropout,
+            filters.dropoutGroup,
             filters.monthRange
         );
     }, [data.trends?.monthlyDropout, filters.dropoutGroup, filters.monthRange, processMonthlyDropoutData]);
@@ -398,6 +424,60 @@ const AnalyticsDashboard = () => {
             }))
             .sort((a, b) => a.snapshotMonth.localeCompare(b.snapshotMonth));
     }, [data.rollingDropout]);
+
+    // Inventory data processing
+    const processInventoryData = useMemo(() => {
+        const { vaccineTypes = [], doseCounts = [], inventories = [], special = null } = data.inventory;
+
+        const vaccineMap = new Map();
+
+        // Initialize vaccine map with all vaccine types
+        vaccineTypes.forEach(v => {
+            vaccineMap.set(v.id, {
+                ...v,
+                doses: {},
+                inventory: {
+                    received: 0,
+                    spent: 0,
+                    opened: 0,
+                    spoiled: 0,
+                    returned: 0
+                }
+            });
+        });
+
+        // Populate dose counts
+        doseCounts.forEach(dc => {
+            const vac = vaccineMap.get(dc.vaccineTypeId);
+            if (vac) {
+                vac.doses[dc.doseNumber] = dc.countGiven;
+            }
+        });
+
+        // Populate inventory data
+        inventories.forEach(inv => {
+            const vac = vaccineMap.get(inv.vaccineTypeId);
+            if (vac) {
+                vac.inventory = {
+                    received: inv.received || 0,
+                    spent: inv.spent || 0,
+                    opened: inv.opened || 0,
+                    spoiled: inv.spoiled || 0,
+                    returned: inv.returned || 0
+                };
+            }
+        });
+
+        return {
+            vaccines: Array.from(vaccineMap.values()),
+            special: special || {
+                fullWithin23m: 0,
+                started24To59m: 0,
+                aefiNormal: 0,
+                aefiSerious: 0
+            }
+        };
+    }, [data.inventory]);
 
     // Enhanced Components
     const StatCard = ({ title, value, subtitle, trend, color = 'primary', icon }) => (
@@ -428,15 +508,15 @@ const AnalyticsDashboard = () => {
                     {payload.map((entry, index) => (
                         <div key={index} className="flex justify-between items-center py-1">
                             <div className="flex items-center">
-                                <div 
-                                    className="w-3 h-3 rounded-full mr-2" 
+                                <div
+                                    className="w-3 h-3 rounded-full mr-2"
                                     style={{ backgroundColor: entry.color }}
                                 />
                                 <span>{entry.name}</span>
                             </div>
                             <span className="font-semibold">
-                                {typeof entry.value === 'number' 
-                                    ? type === 'percentage' 
+                                {typeof entry.value === 'number'
+                                    ? type === 'percentage'
                                         ? `${entry.value.toFixed(2)}%`
                                         : entry.value.toLocaleString()
                                     : entry.value
@@ -450,10 +530,368 @@ const AnalyticsDashboard = () => {
         return null;
     };
 
+    // Inventory Tab Component with Auto-fill
+    const InventoryTab = () => {
+        const [editData, setEditData] = useState(processInventoryData);
+        const [autoFilling, setAutoFilling] = useState(false);
+
+        useEffect(() => {
+            setEditData(processInventoryData);
+        }, [processInventoryData]);
+
+        // AUTO-FILL HANDLER
+        const handleAutoFill = async () => {
+            setAutoFilling(true);
+            try {
+                const invMonth = filters.inventoryMonth;
+                console.log('🚀 Starting auto-fill for month:', invMonth);
+
+                const resp = await axiosClient.get('/api/analytics/inventory/auto-fill', {
+                    params: { snapshotMonth: invMonth }
+                });
+
+                console.log('📦 Full API response:', resp);
+                console.log('📊 Response data:', resp.data);
+
+                if (!resp.data) {
+                    throw new Error('No response data received from server');
+                }
+
+                if (!resp.data.success) {
+                    throw new Error(resp.data.message || 'Auto-fill failed on server');
+                }
+
+                if (!resp.data.data) {
+                    console.error('❌ No data property in response:', resp.data);
+                    throw new Error('No data received from server');
+                }
+
+                const { doseCounts, inventories, special } = resp.data.data;
+
+                console.log('🔍 Extracted data:', { doseCounts, inventories, special });
+
+                if (!doseCounts) {
+                    console.error('❌ doseCounts is undefined');
+                    throw new Error('Dose counts data is missing');
+                }
+
+                if (!inventories) {
+                    console.error('❌ inventories is undefined');
+                    throw new Error('Inventory data is missing');
+                }
+
+                if (!special) {
+                    console.error('❌ special is undefined');
+                    throw new Error('Special counts data is missing');
+                }
+
+                if (!Array.isArray(doseCounts)) {
+                    console.error('❌ doseCounts is not an array:', typeof doseCounts, doseCounts);
+                    throw new Error('Dose counts should be an array');
+                }
+
+                if (!Array.isArray(inventories)) {
+                    console.error('❌ inventories is not an array:', typeof inventories, inventories);
+                    throw new Error('Inventories should be an array');
+                }
+
+                console.log('✅ Data validation passed');
+                console.log('📝 Dose counts:', doseCounts.length, 'items');
+                console.log('📦 Inventories:', inventories.length, 'items');
+                console.log('⭐ Special:', special);
+
+                // FIXED: Properly map the API data to editData state
+                setEditData(prev => {
+                    // Create a fresh vaccines array with the new data
+                    const newVaccines = prev.vaccines.map(v => {
+                        // Find inventory data for this vaccine
+                        const vaccineInventory = inventories.find(inv => inv.vaccineTypeId === v.id);
+
+                        // Create doses object for this vaccine
+                        const newDoses = {};
+                        doseCounts
+                            .filter(dc => dc.vaccineTypeId === v.id)
+                            .forEach(dc => {
+                                newDoses[dc.doseNumber] = dc.countGiven || 0;
+                            });
+
+                        console.log(`📊 Mapping vaccine ${v.name} (${v.id}):`, {
+                            doses: newDoses,
+                            inventory: vaccineInventory
+                        });
+
+                        return {
+                            ...v,
+                            doses: { ...newDoses }, // Replace with new doses
+                            inventory: vaccineInventory ? {
+                                received: vaccineInventory.received || 0,
+                                spent: vaccineInventory.spent || 0,
+                                opened: vaccineInventory.opened || 0,
+                                spoiled: vaccineInventory.spoiled || 0,
+                                returned: vaccineInventory.returned || 0
+                            } : {
+                                received: 0,
+                                spent: 0,
+                                opened: 0,
+                                spoiled: 0,
+                                returned: 0
+                            }
+                        };
+                    });
+
+                    console.log('🔄 Updated editData:', {
+                        vaccines: newVaccines,
+                        special: { ...prev.special, ...special }
+                    });
+
+                    return {
+                        vaccines: newVaccines,
+                        special: { ...prev.special, ...special }
+                    };
+                });
+
+                // Enable editing mode automatically after autofill
+                setInventoryEditing(true);
+
+                alert('Auto-fill completed successfully! Check the table for updated values.');
+
+            } catch (err) {
+                console.error('💥 Auto-fill error:', err);
+                alert(`Failed to auto-fill: ${err.message}. Check console for details.`);
+            } finally {
+                setAutoFilling(false);
+            }
+        };
+
+        const handleDoseChange = (vaccineId, doseNumber, value) => {
+            setEditData(prev => ({
+                ...prev,
+                vaccines: prev.vaccines.map(v =>
+                    v.id === vaccineId
+                        ? { ...v, doses: { ...v.doses, [doseNumber]: parseInt(value) || 0 } }
+                        : v
+                )
+            }));
+        };
+
+        const handleInventoryChange = (vaccineId, field, value) => {
+            setEditData(prev => ({
+                ...prev,
+                vaccines: prev.vaccines.map(v =>
+                    v.id === vaccineId
+                        ? { ...v, inventory: { ...v.inventory, [field]: parseInt(value) || 0 } }
+                        : v
+                )
+            }));
+        };
+
+        const handleSpecialChange = (field, value) => {
+            setEditData(prev => ({
+                ...prev,
+                special: { ...prev.special, [field]: parseInt(value) || 0 }
+            }));
+        };
+
+        const saveData = async () => {
+            try {
+                console.log('💾 Starting save process...');
+
+                const payload = {
+                    snapshotMonth: filters.inventoryMonth,
+                    doseCounts: editData.vaccines.flatMap(v => {
+                        const doseEntries = [];
+                        for (let doseNum = 1; doseNum <= 3; doseNum++) {
+                            doseEntries.push({
+                                vaccineTypeId: v.id,
+                                doseNumber: doseNum,
+                                countGiven: v.doses[doseNum] || 0
+                            });
+                        }
+                        return doseEntries;
+                    }),
+                    inventories: editData.vaccines.map(v => ({
+                        vaccineTypeId: v.id,
+                        received: v.inventory.received || 0,
+                        spent: v.inventory.spent || 0,
+                        opened: v.inventory.opened || 0,
+                        spoiled: v.inventory.spoiled || 0,
+                        returned: v.inventory.returned || 0
+                    })),
+                    special: {
+                        fullWithin23m: editData.special.fullWithin23m || 0,
+                        started24To59m: editData.special.started24To59m || 0,
+                        aefiNormal: editData.special.aefiNormal || 0,
+                        aefiSerious: editData.special.aefiSerious || 0
+                    }
+                };
+
+                console.log('📤 Payload being sent:', JSON.stringify(payload, null, 2));
+
+                const response = await axiosClient.post('/api/analytics/inventory', payload);
+
+                console.log('✅ Save successful:', response.data);
+
+                if (response.data.success) {
+                    alert('✅ Data saved successfully!');
+                    setInventoryEditing(false);
+                    debouncedFetch();
+                } else {
+                    throw new Error(response.data.message || 'Unknown save error');
+                }
+            } catch (err) {
+                console.error('💥 Save error details:', err);
+                const errorInfo = handleApiError(err);
+                alert(`❌ Save failed: ${errorInfo.message || err.message}`);
+            }
+        };
+
+        return (
+            <div className="space-y-6">
+                {/* Header with month picker + buttons */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <label className="label font-semibold">Select Month</label>
+                        <input
+                            type="month"
+                            className="input input-bordered"
+                            value={format(parseISO(filters.inventoryMonth), 'yyyy-MM')}
+                            onChange={(e) => handleFilterChange({
+                                target: { name: 'inventoryMonth', value: `${e.target.value}-01` }
+                            })}
+                        />
+                    </div>
+
+                    <div className="flex gap-2">
+                        {/* AUTO-FILL BUTTON */}
+                        <button
+                            className={`btn btn-outline ${autoFilling ? 'btn-disabled' : ''}`}
+                            onClick={handleAutoFill}
+                            disabled={autoFilling}
+                        >
+                            {autoFilling ? '⏳ Filling...' : '🚀 Auto-fill from current month'}
+                        </button>
+
+                        {inventoryEditing ? (
+                            <>
+                                <button className="btn btn-primary" onClick={saveData}>💾 Save</button>
+                                <button
+                                    className="btn btn-outline"
+                                    onClick={() => {
+                                        console.log('🔍 Current editData state:', editData);
+                                        alert('Check console for current state');
+                                    }}
+                                >
+                                    🔍 Debug State
+                                </button>
+                                <button className="btn btn-ghost" onClick={() => setInventoryEditing(false)}>❌ Cancel</button>
+                            </>
+                        ) : (
+                            <button className="btn btn-primary" onClick={() => setInventoryEditing(true)}>✏️ Edit</button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Vaccine Table */}
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra w-full">
+                        <thead>
+                            <tr>
+                                <th>खोपको प्रकार</th>
+                                <th colSpan="3">खोप पाएका बच्चाहरुको संख्या</th>
+                                <th colSpan="5">खोप इन्भेन्टरी</th>
+                            </tr>
+                            <tr>
+                                <th></th>
+                                <th>पहिलो</th>
+                                <th>दोस्रो</th>
+                                <th>तेस्रो</th>
+                                <th>यस महिनामा प्राप्त</th>
+                                <th>खर्च भएको</th>
+                                <th>खोप दिन खोलेको</th>
+                                <th>अन्य कारणले बिग्रेको</th>
+                                <th>फिर्ता</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {editData.vaccines.map(vaccine => (
+                                <tr key={vaccine.id}>
+                                    <td className="font-semibold">{vaccine.name}</td>
+
+                                    {/* Dose counts */}
+                                    {[1, 2, 3].map(doseNum => (
+                                        <td key={doseNum}>
+                                            {inventoryEditing ? (
+                                                <input
+                                                    type="number"
+                                                    className="input input-sm w-20"
+                                                    value={vaccine.doses[doseNum] || 0}
+                                                    onChange={(e) => handleDoseChange(vaccine.id, doseNum, e.target.value)}
+                                                />
+                                            ) : (
+                                                vaccine.doses[doseNum] || 0
+                                            )}
+                                        </td>
+                                    ))}
+
+                                    {/* Inventory fields */}
+                                    {['received', 'spent', 'opened', 'spoiled', 'returned'].map((field) => (
+                                        <td key={field}>
+                                            {inventoryEditing ? (
+                                                <input
+                                                    type="number"
+                                                    className="input input-sm w-20"
+                                                    value={vaccine.inventory[field] || 0}
+                                                    onChange={(e) => handleInventoryChange(vaccine.id, field, e.target.value)}
+                                                />
+                                            ) : (
+                                                vaccine.inventory[field] || 0
+                                            )}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Special Counts Section */}
+                <div className="card bg-base-100 p-6 shadow-xl">
+                    <h3 className="font-bold text-lg mb-4">विशेष गणनाहरू</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {[
+                            { key: 'fullWithin23m', label: '२३ म. भित्र पूर्णखोप प्राप्त गरेका बच्चा' },
+                            { key: 'started24To59m', label: '२४ – ५९ म. मा खोप शुरु गरेका बच्चा' },
+                            { key: 'aefiNormal', label: 'AEFI Cases (सामान्य)' },
+                            { key: 'aefiSerious', label: 'AEFI Cases (गम्भीर)' }
+                        ].map(({ key, label }) => (
+                            <div key={key} className="form-control">
+                                <label className="label">
+                                    <span className="label-text font-semibold">{label}</span>
+                                </label>
+                                {inventoryEditing ? (
+                                    <input
+                                        type="number"
+                                        className="input input-bordered"
+                                        value={editData.special[key] || 0}
+                                        onChange={(e) => handleSpecialChange(key, e.target.value)}
+                                    />
+                                ) : (
+                                    <div className="p-2 border rounded-lg bg-base-200">
+                                        {editData.special[key] || 0}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     // Tab Components
     const OverviewTab = () => {
         const { children, mothers, nutrition } = data.overview;
-        
+
         const performanceData = [
             { subject: 'Coverage', A: children?.coverageRate || 0, fullMark: 100 },
             { subject: 'Timeliness', A: data.dueOverdue?.timelinessRate || 0, fullMark: 100 },
@@ -466,27 +904,27 @@ const AnalyticsDashboard = () => {
             <div className="space-y-6">
                 {/* Summary Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard 
-                        title="Total Children" 
-                        value={children?.totalRegistered?.toLocaleString() || '0'} 
+                    <StatCard
+                        title="Total Children"
+                        value={children?.totalRegistered?.toLocaleString() || '0'}
                         icon="👶"
                         color="primary"
                     />
-                    <StatCard 
-                        title="Vaccination Coverage" 
+                    <StatCard
+                        title="Vaccination Coverage"
                         value={`${(children?.coverageRate || 0).toFixed(1)}%`}
                         subtitle={`${children?.vaccinated || 0} vaccinated`}
                         icon="💉"
                         color="success"
                     />
-                    <StatCard 
-                        title="Mothers Registered" 
+                    <StatCard
+                        title="Mothers Registered"
                         value={mothers?.totalRegistered?.toLocaleString() || '0'}
                         icon="🤰"
                         color="info"
                     />
-                    <StatCard 
-                        title="TD Coverage" 
+                    <StatCard
+                        title="TD Coverage"
                         value={`${(mothers?.tdCoverage || 0).toFixed(1)}%`}
                         icon="🛡️"
                         color="warning"
@@ -620,18 +1058,18 @@ const AnalyticsDashboard = () => {
                             <div className="card-body">
                                 <h3 className="card-title">Dropout Summary</h3>
                                 <div className="space-y-3">
-                                    <StatCard 
-                                        title="Average Dropout" 
+                                    <StatCard
+                                        title="Average Dropout"
                                         value={`${monthlyDropoutData.summary.avgDropoutRate.toFixed(1)}%`}
                                         color="warning"
                                     />
-                                    <StatCard 
-                                        title="Groups Tracked" 
+                                    <StatCard
+                                        title="Groups Tracked"
                                         value={monthlyDropoutData.summary.totalGroups}
                                         color="info"
                                     />
-                                    <StatCard 
-                                        title="Months Analyzed" 
+                                    <StatCard
+                                        title="Months Analyzed"
                                         value={monthlyDropoutData.summary.totalMonths}
                                         color="success"
                                     />
@@ -807,7 +1245,7 @@ const AnalyticsDashboard = () => {
                     <input type="date" className="input input-bordered w-full input-sm" name="endDate" value={filters.endDate} onChange={handleFilterChange} />
                 </div>
             </div>
-            
+
             {(activeTab === 'trends' || activeTab === 'monthly-dropout') && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
                     <div>
@@ -874,6 +1312,7 @@ const AnalyticsDashboard = () => {
                             <li><a onClick={() => handleExport('ward-performance')}>Ward Performance</a></li>
                             <li><a onClick={() => handleExport('disparities')}>Disparities</a></li>
                             <li><a onClick={() => handleExport('monthly-dropout')}>Monthly Dropout</a></li>
+                            <li><a onClick={() => handleExport('inventory')}>Inventory</a></li>
                         </ul>
                     </div>
                 </div>
@@ -888,6 +1327,7 @@ const AnalyticsDashboard = () => {
                     { id: 'overview', label: 'Overview', icon: '📈' },
                     { id: 'trends', label: 'Trends', icon: '📊' },
                     { id: 'monthly-dropout', label: 'Monthly Dropout', icon: '🌊' },
+                    { id: 'inventory', label: 'Inventory', icon: '📦' },
                     { id: 'ward-performance', label: 'Ward Performance', icon: '🏆' },
                     { id: 'equity', label: 'Equity Analysis', icon: '⚖️' },
                     { id: 'comparison', label: 'Comparison', icon: '🔄' }
@@ -919,6 +1359,7 @@ const AnalyticsDashboard = () => {
                     {activeTab === 'overview' && <OverviewTab />}
                     {activeTab === 'trends' && <TrendsTab />}
                     {activeTab === 'monthly-dropout' && <MonthlyDropoutTab />}
+                    {activeTab === 'inventory' && <InventoryTab />}
                     {activeTab === 'ward-performance' && (
                         <div className="space-y-6">
                             <div className="card bg-base-100 p-4 shadow-xl">

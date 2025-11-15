@@ -1302,6 +1302,438 @@ export const getRollingDropout = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error', error: err.message });
     }
 };
+/* ========================================================================== */
+/* INVENTORY ENDPOINTS */
+/* ========================================================================== */
+
+/**
+ * GET /api/analytics/inventory
+ * Get monthly inventory and dose data
+ */
+export const getMonthlyInventory = async (req, res) => {
+    const { snapshotMonth } = req.query;
+
+    try {
+        // Parse the month date - ensure it's the first day of the month
+        const monthDate = snapshotMonth ? new Date(snapshotMonth) : new Date();
+        monthDate.setDate(1);
+        monthDate.setHours(0, 0, 0, 0);
+
+        const [vaccineTypes, doseCounts, inventories, special] = await Promise.all([
+            prisma.vaccineType.findMany({
+                select: { id: true, name: true },
+                where: { isActive: true }
+            }),
+            prisma.monthlyDoseCount.findMany({
+                where: { snapshotMonth: monthDate },
+                include: { vaccineType: true }
+            }),
+            prisma.monthlyVaccineInventory.findMany({
+                where: { snapshotMonth: monthDate },
+                include: { vaccineType: true }
+            }),
+            prisma.monthlySpecialFact.findFirst({
+                where: { snapshotMonth: monthDate }
+            })
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                vaccineTypes,
+                doseCounts,
+                inventories,
+                special: special || {
+                    fullWithin23m: 0,
+                    started24To59m: 0,
+                    aefiNormal: 0,
+                    aefiSerious: 0
+                }
+            }
+        });
+    } catch (err) {
+        console.error('getMonthlyInventory error:', err);
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+/**
+ * POST /api/analytics/inventory
+ * Save monthly inventory data
+ */
+export const saveMonthlyInventory = async (req, res) => {
+    const { snapshotMonth, doseCounts, inventories, special } = req.body;
+
+    try {
+        // Validate required fields
+        if (!snapshotMonth) {
+            return res.status(400).json({
+                success: false,
+                message: 'snapshotMonth is required'
+            });
+        }
+
+        const monthDate = new Date(snapshotMonth);
+        monthDate.setDate(1);
+        monthDate.setHours(0, 0, 0, 0);
+
+        await prisma.$transaction(async (tx) => {
+            // Delete existing data for this month
+            await tx.monthlyDoseCount.deleteMany({
+                where: { snapshotMonth: monthDate }
+            });
+            await tx.monthlyVaccineInventory.deleteMany({
+                where: { snapshotMonth: monthDate }
+            });
+            await tx.monthlySpecialFact.deleteMany({
+                where: { snapshotMonth: monthDate }
+            });
+
+            // Insert new dose counts
+            if (doseCounts && Array.isArray(doseCounts)) {
+                for (const dc of doseCounts) {
+                    if (dc.vaccineTypeId && dc.doseNumber !== undefined) {
+                        await tx.monthlyDoseCount.create({
+                            data: {
+                                snapshotMonth: monthDate,
+                                vaccineTypeId: dc.vaccineTypeId,
+                                doseNumber: dc.doseNumber,
+                                countGiven: dc.countGiven || 0
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Insert new inventory data
+            if (inventories && Array.isArray(inventories)) {
+                for (const inv of inventories) {
+                    if (inv.vaccineTypeId) {
+                        await tx.monthlyVaccineInventory.create({
+                            data: {
+                                snapshotMonth: monthDate,
+                                vaccineTypeId: inv.vaccineTypeId,
+                                received: inv.received || 0,
+                                spent: inv.spent || 0,
+                                opened: inv.opened || 0,
+                                spoiled: inv.spoiled || 0,
+                                returned: inv.returned || 0
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Insert special counts
+            if (special) {
+                await tx.monthlySpecialFact.create({
+                    data: {
+                        snapshotMonth: monthDate,
+                        fullWithin23m: special.fullWithin23m || 0,
+                        started24To59m: special.started24To59m || 0,
+                        aefiNormal: special.aefiNormal || 0,
+                        aefiSerious: special.aefiSerious || 0
+                    }
+                });
+            }
+        });
+
+        res.json({
+            success: true,
+            message: 'Monthly inventory data saved successfully'
+        });
+    } catch (err) {
+        console.error('saveMonthlyInventory error:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to save inventory data',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * GET /api/analytics/inventory/history
+ * Get inventory history for multiple months
+ */
+export const getInventoryHistory = async (req, res) => {
+    const { startMonth, endMonth, vaccineTypeId } = req.query;
+
+    try {
+        const startDate = startMonth ? new Date(startMonth) : subMonths(new Date(), 12);
+        const endDate = endMonth ? new Date(endMonth) : new Date();
+
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setDate(1);
+        endDate.setHours(0, 0, 0, 0);
+
+        const where = {
+            snapshotMonth: {
+                gte: startDate,
+                lte: endDate
+            }
+        };
+
+        if (vaccineTypeId) {
+            where.vaccineTypeId = Number(vaccineTypeId);
+        }
+
+        const [doseCounts, inventories, specialFacts] = await Promise.all([
+            prisma.monthlyDoseCount.findMany({
+                where,
+                include: { vaccineType: true },
+                orderBy: { snapshotMonth: 'asc' }
+            }),
+            prisma.monthlyVaccineInventory.findMany({
+                where,
+                include: { vaccineType: true },
+                orderBy: { snapshotMonth: 'asc' }
+            }),
+            prisma.monthlySpecialFact.findMany({
+                where: {
+                    snapshotMonth: {
+                        gte: startDate,
+                        lte: endDate
+                    }
+                },
+                orderBy: { snapshotMonth: 'asc' }
+            })
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                doseCounts,
+                inventories,
+                specialFacts
+            }
+        });
+    } catch (err) {
+        console.error('getInventoryHistory error:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * GET /api/analytics/inventory/auto-fill
+ * Auto-fill inventory data for the current month from live data
+ */
+/**
+ * GET /api/analytics/inventory/auto-fill
+ * Auto-fill inventory data for the current month from live data
+ */
+/**
+ * GET /api/analytics/inventory/auto-fill
+ * Auto-fill inventory data for the current month from live data
+ */
+/**
+ * GET /api/analytics/inventory/auto-fill
+ * Auto-fill inventory data from VaccinationRecord table for the selected month
+ */
+/**
+ * GET /api/analytics/inventory/auto-fill
+ * Auto-fill inventory data from VaccinationRecord table for the selected month
+ */
+export const autoFillInventory = async (req, res) => {
+    const { snapshotMonth } = req.query;
+
+    try {
+        // Parse the target month
+        const targetMonth = snapshotMonth ? new Date(snapshotMonth) : new Date();
+        targetMonth.setDate(1);
+        targetMonth.setHours(0, 0, 0, 0);
+
+        // Calculate date range for the target month
+        const startOfMonth = new Date(targetMonth);
+        const endOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
+        endOfMonth.setHours(23, 59, 59, 999);
+
+        console.log(`[AUTO-FILL] Getting vaccination records for: ${format(targetMonth, 'yyyy-MM')}`);
+        console.log(`[AUTO-FILL] Date range: ${format(startOfMonth, 'yyyy-MM-dd')} to ${format(endOfMonth, 'yyyy-MM-dd')}`);
+
+        // 1. Get all active vaccine types
+        const vaccineTypes = await prisma.vaccineType.findMany({
+            where: { isActive: true },
+            select: { id: true, name: true }
+        });
+
+        // 2. Count vaccination records for the target month, grouped by vaccineTypeId and doseNumber
+        const doseCounts = await prisma.vaccinationRecord.groupBy({
+            by: ['vaccineTypeId', 'doseNumber'],
+            where: {
+                dateGiven: {
+                    gte: startOfMonth,
+                    lte: endOfMonth
+                },
+                isComplete: true
+            },
+            _count: {
+                id: true
+            }
+        });
+
+        console.log(`[AUTO-FILL] Found ${doseCounts.length} dose count combinations`);
+
+        // 3. Create doseCounts array for frontend
+        const formattedDoseCounts = doseCounts.map(dc => ({
+            vaccineTypeId: dc.vaccineTypeId,
+            doseNumber: dc.doseNumber,
+            countGiven: dc._count.id
+        }));
+
+        // 4. Create inventory data - set "spent" = total doses given, others = 0
+        const inventories = vaccineTypes.map(vaccine => {
+            // Calculate total spent for this vaccine (sum of all doses)
+            const totalSpent = doseCounts
+                .filter(dc => dc.vaccineTypeId === vaccine.id)
+                .reduce((sum, dc) => sum + dc._count.id, 0);
+
+            console.log(`[AUTO-FILL] Vaccine ${vaccine.name} (${vaccine.id}): ${totalSpent} doses spent`);
+
+            return {
+                vaccineTypeId: vaccine.id,
+                received: 0, // User will enter this manually
+                spent: totalSpent, // Auto-filled from vaccination records
+                opened: 0,   // User will enter this manually
+                spoiled: 0,  // User will enter this manually
+                returned: 0  // User will enter this manually
+            };
+        });
+
+        // 5. Calculate special counts with improved queries
+        const special = await calculateSpecialCounts(startOfMonth, endOfMonth);
+
+        const response = {
+            doseCounts: formattedDoseCounts,
+            inventories: inventories,
+            special: special
+        };
+
+        console.log(`[AUTO-FILL] Auto-fill completed for ${format(targetMonth, 'yyyy-MM')}`);
+        console.log(`[AUTO-FILL] Total doses found: ${doseCounts.reduce((sum, dc) => sum + dc._count.id, 0)}`);
+
+        res.json({
+            success: true,
+            data: response
+        });
+
+    } catch (err) {
+        console.error('autoFillInventory error:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to auto-fill inventory data',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Calculate special counts from vaccination records
+ */
+async function calculateSpecialCounts(startOfMonth, endOfMonth) {
+    try {
+        const fullWithin23m = await calculateFullVaccinationWithin23Months(startOfMonth, endOfMonth);
+        const started24To59m = await calculateStartedVaccination24To59Months(startOfMonth, endOfMonth);
+        const { normal: aefiNormal, serious: aefiSerious } = await calculateAEFICases(startOfMonth, endOfMonth);
+
+        return {
+            fullWithin23m,
+            started24To59m,
+            aefiNormal,
+            aefiSerious
+        };
+    } catch (err) {
+        console.error('Error calculating special counts:', err);
+        return {
+            fullWithin23m: 0,
+            started24To59m: 0,
+            aefiNormal: 0,
+            aefiSerious: 0
+        };
+    }
+}
+
+/**
+ * Calculate children who completed full vaccination within 23 months
+ */
+async function calculateFullVaccinationWithin23Months(startOfMonth, endOfMonth) {
+    try {
+        const twentyThreeMonthsAgo = new Date();
+        twentyThreeMonthsAgo.setMonth(twentyThreeMonthsAgo.getMonth() - 23);
+
+        const result = await prisma.$queryRaw`
+            SELECT COUNT(DISTINCT c.id) 
+            FROM "Child" c
+            WHERE c."purnaKhop" = true
+            AND c."birthDate" >= ${twentyThreeMonthsAgo}::date
+            AND (
+                SELECT MAX(v."dateGiven") 
+                FROM "VaccinationRecord" v
+                INNER JOIN "Dose" d ON d."vaccineTypeId" = v."vaccineTypeId" 
+                    AND d."doseNumber" = v."doseNumber" 
+                    AND d."scheduleVersionId" = 1  -- Assuming default schedule version
+                WHERE v."citizenId" = c.id 
+                AND v."isComplete" = true 
+                AND d."isBooster" = false
+            ) BETWEEN ${startOfMonth} AND ${endOfMonth}
+        `;
+
+        return Number(result[0].count) || 0;
+    } catch (err) {
+        console.error('Error calculating full vaccination within 23 months:', err);
+        return 0;
+    }
+}
+
+/**
+ * Calculate children who started vaccination between 24-59 months
+ */
+async function calculateStartedVaccination24To59Months(startOfMonth, endOfMonth) {
+    try {
+        const twentyFourMonthsAgo = new Date();
+        twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
+
+        const fiftyNineMonthsAgo = new Date();
+        fiftyNineMonthsAgo.setMonth(fiftyNineMonthsAgo.getMonth() - 59);
+
+        const result = await prisma.$queryRaw`
+            SELECT COUNT(DISTINCT c.id) 
+            FROM "Child" c
+            WHERE c."birthDate" BETWEEN ${fiftyNineMonthsAgo}::date AND ${twentyFourMonthsAgo}::date
+            AND (
+                SELECT MIN(v."dateGiven") 
+                FROM "VaccinationRecord" v
+                WHERE v."citizenId" = c.id 
+                AND v."isComplete" = true
+            ) BETWEEN ${startOfMonth} AND ${endOfMonth}
+        `;
+
+        return Number(result[0].count) || 0;
+    } catch (err) {
+        console.error('Error calculating started vaccination 24-59 months:', err);
+        return 0;
+    }
+}
+
+/**
+ * Calculate AEFI cases - placeholder implementation
+ * You'll need to implement proper AEFI tracking in your system
+ */
+async function calculateAEFICases(startOfMonth, endOfMonth) {
+    // Placeholder - you should implement proper AEFI tracking
+    // This could be a separate AEFI model in your schema
+    console.log('[AUTO-FILL] AEFI calculation not implemented - returning placeholder values');
+
+    return {
+        normal: 0,
+        serious: 0
+    };
+}
 
 /**
  * POST /api/analytics/refresh-cache

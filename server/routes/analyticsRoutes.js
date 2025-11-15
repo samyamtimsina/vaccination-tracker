@@ -25,6 +25,10 @@ import {
 
     // New endpoints
     getRollingDropout,
+
+    getMonthlyInventory,
+    saveMonthlyInventory, getInventoryHistory,
+    autoFillInventory
 } from '../controllers/analyticsController.js';
 
 const router = express.Router();
@@ -36,6 +40,8 @@ router.get('/child/summary', getSystemOverview);
 router.get('/child/trends', getVaccineCoverage);
 router.get('/mother/summary', getTDCoverage);
 router.get('/growth/summary', getGrowthMonitoring);
+
+router.get('/inventory/auto-fill', autoFillInventory);
 
 /* -------------------------------------------------------------------------- */
 /* Main analytics routes (for dashboard)                                      */
@@ -67,6 +73,11 @@ router.get('/debug', debugAnalyticsData);
 // In your routes file, e.g., analyticsRoutes.js
 router.get('/monthly-dropout', getMonthlyDropout);
 router.get('/rolling-dropout', getRollingDropout);
+
+// Add these to your analytics routes
+router.get('/inventory', getMonthlyInventory);
+router.post('/inventory', saveMonthlyInventory);
+router.get('/inventory/history', getInventoryHistory);
 
 /* -------------------------------------------------------------------------- */
 export default router;
