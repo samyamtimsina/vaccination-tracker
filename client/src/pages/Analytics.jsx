@@ -534,10 +534,94 @@ const AnalyticsDashboard = () => {
     const InventoryTab = () => {
         const [editData, setEditData] = useState(processInventoryData);
         const [autoFilling, setAutoFilling] = useState(false);
+        const [initialLoading, setInitialLoading] = useState(false);
 
+        // Load data automatically when component mounts or month changes
         useEffect(() => {
-            setEditData(processInventoryData);
-        }, [processInventoryData]);
+            loadInventoryData();
+        }, [filters.inventoryMonth]);
+
+        // Load inventory data from the database
+        const loadInventoryData = async () => {
+            setInitialLoading(true);
+            try {
+                console.log('🔄 Loading inventory data for month:', filters.inventoryMonth);
+
+                const response = await axiosClient.get('/api/analytics/inventory', {
+                    params: { snapshotMonth: filters.inventoryMonth }
+                });
+
+                console.log('📥 Loaded inventory data:', response.data);
+
+                if (response.data.success && response.data.data) {
+                    const { vaccineTypes, doseCounts, inventories, special } = response.data.data;
+
+                    // Process the data similar to processInventoryData but for editData state
+                    const vaccineMap = new Map();
+
+                    // Initialize vaccine map with all vaccine types
+                    vaccineTypes.forEach(v => {
+                        vaccineMap.set(v.id, {
+                            ...v,
+                            doses: {},
+                            inventory: {
+                                received: 0,
+                                spent: 0,
+                                opened: 0,
+                                spoiled: 0,
+                                returned: 0
+                            }
+                        });
+                    });
+
+                    // Populate dose counts
+                    doseCounts.forEach(dc => {
+                        const vac = vaccineMap.get(dc.vaccineTypeId);
+                        if (vac) {
+                            vac.doses[dc.doseNumber] = dc.countGiven || 0;
+                        }
+                    });
+
+                    // Populate inventory data
+                    inventories.forEach(inv => {
+                        const vac = vaccineMap.get(inv.vaccineTypeId);
+                        if (vac) {
+                            vac.inventory = {
+                                received: inv.received || 0,
+                                spent: inv.spent || 0,
+                                opened: inv.opened || 0,
+                                spoiled: inv.spoiled || 0,
+                                returned: inv.returned || 0
+                            };
+                        }
+                    });
+
+                    const processedData = {
+                        vaccines: Array.from(vaccineMap.values()),
+                        special: special || {
+                            fullWithin23m: 0,
+                            started24To59m: 0,
+                            aefiNormal: 0,
+                            aefiSerious: 0
+                        }
+                    };
+
+                    console.log('✅ Processed inventory data:', processedData);
+                    setEditData(processedData);
+                } else {
+                    console.log('📭 No existing data found for this month, using empty state');
+                    // If no data exists, use the processInventoryData as fallback
+                    setEditData(processInventoryData);
+                }
+            } catch (err) {
+                console.error('💥 Error loading inventory data:', err);
+                alert('Failed to load inventory data');
+                // Fallback to empty state
+                setEditData(processInventoryData);
+            } finally {
+                setInitialLoading(false);
+            }
+        };
 
         // AUTO-FILL HANDLER
         const handleAutoFill = async () => {
@@ -734,7 +818,8 @@ const AnalyticsDashboard = () => {
                 if (response.data.success) {
                     alert('✅ Data saved successfully!');
                     setInventoryEditing(false);
-                    debouncedFetch();
+                    // Reload the data to reflect the changes
+                    loadInventoryData();
                 } else {
                     throw new Error(response.data.message || 'Unknown save error');
                 }
@@ -771,6 +856,15 @@ const AnalyticsDashboard = () => {
                             {autoFilling ? '⏳ Filling...' : '🚀 Auto-fill from current month'}
                         </button>
 
+                        {/* REFRESH BUTTON */}
+                        <button
+                            className="btn btn-outline"
+                            onClick={loadInventoryData}
+                            disabled={initialLoading}
+                        >
+                            {initialLoading ? '🔄' : '📥'} Refresh Data
+                        </button>
+
                         {inventoryEditing ? (
                             <>
                                 <button className="btn btn-primary" onClick={saveData}>💾 Save</button>
@@ -791,99 +885,113 @@ const AnalyticsDashboard = () => {
                     </div>
                 </div>
 
-                {/* Vaccine Table */}
-                <div className="overflow-x-auto">
-                    <table className="table table-zebra w-full">
-                        <thead>
-                            <tr>
-                                <th>खोपको प्रकार</th>
-                                <th colSpan="3">खोप पाएका बच्चाहरुको संख्या</th>
-                                <th colSpan="5">खोप इन्भेन्टरी</th>
-                            </tr>
-                            <tr>
-                                <th></th>
-                                <th>पहिलो</th>
-                                <th>दोस्रो</th>
-                                <th>तेस्रो</th>
-                                <th>यस महिनामा प्राप्त</th>
-                                <th>खर्च भएको</th>
-                                <th>खोप दिन खोलेको</th>
-                                <th>अन्य कारणले बिग्रेको</th>
-                                <th>फिर्ता</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {editData.vaccines.map(vaccine => (
-                                <tr key={vaccine.id}>
-                                    <td className="font-semibold">{vaccine.name}</td>
-
-                                    {/* Dose counts */}
-                                    {[1, 2, 3].map(doseNum => (
-                                        <td key={doseNum}>
-                                            {inventoryEditing ? (
-                                                <input
-                                                    type="number"
-                                                    className="input input-sm w-20"
-                                                    value={vaccine.doses[doseNum] || 0}
-                                                    onChange={(e) => handleDoseChange(vaccine.id, doseNum, e.target.value)}
-                                                />
-                                            ) : (
-                                                vaccine.doses[doseNum] || 0
-                                            )}
-                                        </td>
-                                    ))}
-
-                                    {/* Inventory fields */}
-                                    {['received', 'spent', 'opened', 'spoiled', 'returned'].map((field) => (
-                                        <td key={field}>
-                                            {inventoryEditing ? (
-                                                <input
-                                                    type="number"
-                                                    className="input input-sm w-20"
-                                                    value={vaccine.inventory[field] || 0}
-                                                    onChange={(e) => handleInventoryChange(vaccine.id, field, e.target.value)}
-                                                />
-                                            ) : (
-                                                vaccine.inventory[field] || 0
-                                            )}
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Special Counts Section */}
-                <div className="card bg-base-100 p-6 shadow-xl">
-                    <h3 className="font-bold text-lg mb-4">विशेष गणनाहरू</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {[
-                            { key: 'fullWithin23m', label: '२३ म. भित्र पूर्णखोप प्राप्त गरेका बच्चा' },
-                            { key: 'started24To59m', label: '२४ – ५९ म. मा खोप शुरु गरेका बच्चा' },
-                            { key: 'aefiNormal', label: 'AEFI Cases (सामान्य)' },
-                            { key: 'aefiSerious', label: 'AEFI Cases (गम्भीर)' }
-                        ].map(({ key, label }) => (
-                            <div key={key} className="form-control">
-                                <label className="label">
-                                    <span className="label-text font-semibold">{label}</span>
-                                </label>
-                                {inventoryEditing ? (
-                                    <input
-                                        type="number"
-                                        className="input input-bordered"
-                                        value={editData.special[key] || 0}
-                                        onChange={(e) => handleSpecialChange(key, e.target.value)}
-                                    />
-                                ) : (
-                                    <div className="p-2 border rounded-lg bg-base-200">
-                                        {editData.special[key] || 0}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                {/* Loading State */}
+                {initialLoading && (
+                    <div className="flex justify-center items-center py-8">
+                        <div className="flex flex-col items-center gap-2">
+                            <span className="loading loading-spinner loading-lg text-primary"></span>
+                            <p className="text-gray-600">Loading inventory data...</p>
+                        </div>
                     </div>
-                </div>
+                )}
+
+                {/* Vaccine Table */}
+                {!initialLoading && (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="table table-zebra w-full">
+                                <thead>
+                                    <tr>
+                                        <th>खोपको प्रकार</th>
+                                        <th colSpan="3">खोप पाएका बच्चाहरुको संख्या</th>
+                                        <th colSpan="5">खोप इन्भेन्टरी</th>
+                                    </tr>
+                                    <tr>
+                                        <th></th>
+                                        <th>पहिलो</th>
+                                        <th>दोस्रो</th>
+                                        <th>तेस्रो</th>
+                                        <th>यस महिनामा प्राप्त</th>
+                                        <th>खर्च भएको</th>
+                                        <th>खोप दिन खोलेको</th>
+                                        <th>अन्य कारणले बिग्रेको</th>
+                                        <th>फिर्ता</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {editData.vaccines.map(vaccine => (
+                                        <tr key={vaccine.id}>
+                                            <td className="font-semibold">{vaccine.name}</td>
+
+                                            {/* Dose counts */}
+                                            {[1, 2, 3].map(doseNum => (
+                                                <td key={doseNum}>
+                                                    {inventoryEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            className="input input-sm w-20"
+                                                            value={vaccine.doses[doseNum] || 0}
+                                                            onChange={(e) => handleDoseChange(vaccine.id, doseNum, e.target.value)}
+                                                        />
+                                                    ) : (
+                                                        vaccine.doses[doseNum] || 0
+                                                    )}
+                                                </td>
+                                            ))}
+
+                                            {/* Inventory fields */}
+                                            {['received', 'spent', 'opened', 'spoiled', 'returned'].map((field) => (
+                                                <td key={field}>
+                                                    {inventoryEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            className="input input-sm w-20"
+                                                            value={vaccine.inventory[field] || 0}
+                                                            onChange={(e) => handleInventoryChange(vaccine.id, field, e.target.value)}
+                                                        />
+                                                    ) : (
+                                                        vaccine.inventory[field] || 0
+                                                    )}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Special Counts Section */}
+                        <div className="card bg-base-100 p-6 shadow-xl">
+                            <h3 className="font-bold text-lg mb-4">विशेष गणनाहरू</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {[
+                                    { key: 'fullWithin23m', label: '२३ म. भित्र पूर्णखोप प्राप्त गरेका बच्चा' },
+                                    { key: 'started24To59m', label: '२४ – ५९ म. मा खोप शुरु गरेका बच्चा' },
+                                    { key: 'aefiNormal', label: 'AEFI Cases (सामान्य)' },
+                                    { key: 'aefiSerious', label: 'AEFI Cases (गम्भीर)' }
+                                ].map(({ key, label }) => (
+                                    <div key={key} className="form-control">
+                                        <label className="label">
+                                            <span className="label-text font-semibold">{label}</span>
+                                        </label>
+                                        {inventoryEditing ? (
+                                            <input
+                                                type="number"
+                                                className="input input-bordered"
+                                                value={editData.special[key] || 0}
+                                                onChange={(e) => handleSpecialChange(key, e.target.value)}
+                                            />
+                                        ) : (
+                                            <div className="p-2 border rounded-lg bg-base-200">
+                                                {editData.special[key] || 0}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
         );
     };
