@@ -530,18 +530,26 @@ const AnalyticsDashboard = () => {
         return null;
     };
 
-    // Inventory Tab Component with Auto-fill
     const InventoryTab = () => {
-        const [editData, setEditData] = useState(processInventoryData);
+        const [editData, setEditData] = useState({
+            vaccines: [],
+            special: {
+                fullWithin23m: 0,
+                started24To59m: 0,
+                aefiNormal: 0,
+                aefiSerious: 0
+            }
+        });
         const [autoFilling, setAutoFilling] = useState(false);
         const [initialLoading, setInitialLoading] = useState(false);
+        const [inventoryEditing, setInventoryEditing] = useState(false);
 
-        // Load data automatically when component mounts or month changes
+        // FIX: Simple useEffect without complex dependencies
         useEffect(() => {
             loadInventoryData();
-        }, [filters.inventoryMonth]);
+        }, [filters.inventoryMonth]); // Only depend on inventoryMonth
 
-        // Load inventory data from the database
+        // FIX: Simple load function without useCallback
         const loadInventoryData = async () => {
             setInitialLoading(true);
             try {
@@ -556,7 +564,6 @@ const AnalyticsDashboard = () => {
                 if (response.data.success && response.data.data) {
                     const { vaccineTypes, doseCounts, inventories, special } = response.data.data;
 
-                    // Process the data similar to processInventoryData but for editData state
                     const vaccineMap = new Map();
 
                     // Initialize vaccine map with all vaccine types
@@ -610,23 +617,43 @@ const AnalyticsDashboard = () => {
                     setEditData(processedData);
                 } else {
                     console.log('📭 No existing data found for this month, using empty state');
-                    // If no data exists, use the processInventoryData as fallback
-                    setEditData(processInventoryData);
+                    // Initialize with empty state but include vaccine types
+                    if (response.data.data?.vaccineTypes) {
+                        const emptyVaccines = response.data.data.vaccineTypes.map(v => ({
+                            ...v,
+                            doses: {},
+                            inventory: {
+                                received: 0,
+                                spent: 0,
+                                opened: 0,
+                                spoiled: 0,
+                                returned: 0
+                            }
+                        }));
+
+                        setEditData({
+                            vaccines: emptyVaccines,
+                            special: {
+                                fullWithin23m: 0,
+                                started24To59m: 0,
+                                aefiNormal: 0,
+                                aefiSerious: 0
+                            }
+                        });
+                    }
                 }
             } catch (err) {
                 console.error('💥 Error loading inventory data:', err);
                 alert('Failed to load inventory data');
-                // Fallback to empty state
-                setEditData(processInventoryData);
             } finally {
                 setInitialLoading(false);
             }
         };
 
-        // AUTO-FILL HANDLER
         const handleAutoFill = async () => {
-            setAutoFilling(true);
             try {
+                setAutoFilling(true);
+
                 const invMonth = filters.inventoryMonth;
                 console.log('🚀 Starting auto-fill for month:', invMonth);
 
@@ -634,114 +661,57 @@ const AnalyticsDashboard = () => {
                     params: { snapshotMonth: invMonth }
                 });
 
-                console.log('📦 Full API response:', resp);
-                console.log('📊 Response data:', resp.data);
-
-                if (!resp.data) {
-                    throw new Error('No response data received from server');
-                }
-
-                if (!resp.data.success) {
-                    throw new Error(resp.data.message || 'Auto-fill failed on server');
-                }
-
-                if (!resp.data.data) {
-                    console.error('❌ No data property in response:', resp.data);
-                    throw new Error('No data received from server');
+                if (!resp.data?.success) {
+                    throw new Error(resp.data?.message || 'Auto-fill failed');
                 }
 
                 const { doseCounts, inventories, special } = resp.data.data;
 
-                console.log('🔍 Extracted data:', { doseCounts, inventories, special });
+                console.log('📥 Auto-fill response data:', { doseCounts, inventories, special });
 
-                if (!doseCounts) {
-                    console.error('❌ doseCounts is undefined');
-                    throw new Error('Dose counts data is missing');
-                }
+                // FIX: Direct state update without batching
+                setEditData(currentEditData => {
+                    const updatedVaccines = currentEditData.vaccines.map(vaccine => {
+                        // Find doses for this vaccine
+                        const vaccineDoses = doseCounts?.filter(dc => dc.vaccineTypeId === vaccine.id) || [];
+                        const newDoses = { ...vaccine.doses };
 
-                if (!inventories) {
-                    console.error('❌ inventories is undefined');
-                    throw new Error('Inventory data is missing');
-                }
-
-                if (!special) {
-                    console.error('❌ special is undefined');
-                    throw new Error('Special counts data is missing');
-                }
-
-                if (!Array.isArray(doseCounts)) {
-                    console.error('❌ doseCounts is not an array:', typeof doseCounts, doseCounts);
-                    throw new Error('Dose counts should be an array');
-                }
-
-                if (!Array.isArray(inventories)) {
-                    console.error('❌ inventories is not an array:', typeof inventories, inventories);
-                    throw new Error('Inventories should be an array');
-                }
-
-                console.log('✅ Data validation passed');
-                console.log('📝 Dose counts:', doseCounts.length, 'items');
-                console.log('📦 Inventories:', inventories.length, 'items');
-                console.log('⭐ Special:', special);
-
-                // FIXED: Properly map the API data to editData state
-                setEditData(prev => {
-                    // Create a fresh vaccines array with the new data
-                    const newVaccines = prev.vaccines.map(v => {
-                        // Find inventory data for this vaccine
-                        const vaccineInventory = inventories.find(inv => inv.vaccineTypeId === v.id);
-
-                        // Create doses object for this vaccine
-                        const newDoses = {};
-                        doseCounts
-                            .filter(dc => dc.vaccineTypeId === v.id)
-                            .forEach(dc => {
-                                newDoses[dc.doseNumber] = dc.countGiven || 0;
-                            });
-
-                        console.log(`📊 Mapping vaccine ${v.name} (${v.id}):`, {
-                            doses: newDoses,
-                            inventory: vaccineInventory
+                        // Update dose counts from auto-fill
+                        vaccineDoses.forEach(dc => {
+                            newDoses[dc.doseNumber] = dc.countGiven || 0;
                         });
 
+                        // Find inventory for this vaccine
+                        const vaccineInventory = inventories?.find(inv => inv.vaccineTypeId === vaccine.id);
+
+                        // If no inventory found in auto-fill, keep existing
+                        const finalInventory = vaccineInventory || { ...vaccine.inventory };
+
                         return {
-                            ...v,
-                            doses: { ...newDoses }, // Replace with new doses
-                            inventory: vaccineInventory ? {
-                                received: vaccineInventory.received || 0,
-                                spent: vaccineInventory.spent || 0,
-                                opened: vaccineInventory.opened || 0,
-                                spoiled: vaccineInventory.spoiled || 0,
-                                returned: vaccineInventory.returned || 0
-                            } : {
-                                received: 0,
-                                spent: 0,
-                                opened: 0,
-                                spoiled: 0,
-                                returned: 0
-                            }
+                            ...vaccine,
+                            doses: newDoses,
+                            inventory: finalInventory
                         };
                     });
 
-                    console.log('🔄 Updated editData:', {
-                        vaccines: newVaccines,
-                        special: { ...prev.special, ...special }
-                    });
-
-                    return {
-                        vaccines: newVaccines,
-                        special: { ...prev.special, ...special }
+                    const newData = {
+                        vaccines: updatedVaccines,
+                        special: { ...currentEditData.special, ...special }
                     };
+
+                    console.log('🔄 New editData after auto-fill:', newData);
+                    return newData;
                 });
 
-                // Enable editing mode automatically after autofill
                 setInventoryEditing(true);
 
-                alert('Auto-fill completed successfully! Check the table for updated values.');
+                // FIX: Force a microtask to ensure state is updated before alert
+                await new Promise(resolve => setTimeout(resolve, 0));
+                alert('Auto-fill completed successfully!');
 
             } catch (err) {
                 console.error('💥 Auto-fill error:', err);
-                alert(`Failed to auto-fill: ${err.message}. Check console for details.`);
+                alert(`Auto-fill failed: ${err.message}`);
             } finally {
                 setAutoFilling(false);
             }
@@ -818,8 +788,8 @@ const AnalyticsDashboard = () => {
                 if (response.data.success) {
                     alert('✅ Data saved successfully!');
                     setInventoryEditing(false);
-                    // Reload the data to reflect the changes
-                    loadInventoryData();
+                    // Reload the data to reflect the changes from database
+                    await loadInventoryData();
                 } else {
                     throw new Error(response.data.message || 'Unknown save error');
                 }
@@ -828,6 +798,12 @@ const AnalyticsDashboard = () => {
                 const errorInfo = handleApiError(err);
                 alert(`❌ Save failed: ${errorInfo.message || err.message}`);
             }
+        };
+
+        // Add a manual refresh function for when month changes
+        const handleMonthChange = (e) => {
+            const newMonth = `${e.target.value}-01`;
+            setFilters(prev => ({ ...prev, inventoryMonth: newMonth }));
         };
 
         return (
@@ -840,9 +816,7 @@ const AnalyticsDashboard = () => {
                             type="month"
                             className="input input-bordered"
                             value={format(parseISO(filters.inventoryMonth), 'yyyy-MM')}
-                            onChange={(e) => handleFilterChange({
-                                target: { name: 'inventoryMonth', value: `${e.target.value}-01` }
-                            })}
+                            onChange={handleMonthChange}
                         />
                     </div>
 
@@ -853,7 +827,7 @@ const AnalyticsDashboard = () => {
                             onClick={handleAutoFill}
                             disabled={autoFilling}
                         >
-                            {autoFilling ? '⏳ Filling...' : '🚀 Auto-fill from current month'}
+                            {autoFilling ? '⏳ Filling...' : '🚀 Auto-fill'}
                         </button>
 
                         {/* REFRESH BUTTON */}
@@ -868,15 +842,6 @@ const AnalyticsDashboard = () => {
                         {inventoryEditing ? (
                             <>
                                 <button className="btn btn-primary" onClick={saveData}>💾 Save</button>
-                                <button
-                                    className="btn btn-outline"
-                                    onClick={() => {
-                                        console.log('🔍 Current editData state:', editData);
-                                        alert('Check console for current state');
-                                    }}
-                                >
-                                    🔍 Debug State
-                                </button>
                                 <button className="btn btn-ghost" onClick={() => setInventoryEditing(false)}>❌ Cancel</button>
                             </>
                         ) : (
@@ -896,7 +861,7 @@ const AnalyticsDashboard = () => {
                 )}
 
                 {/* Vaccine Table */}
-                {!initialLoading && (
+                {!initialLoading && editData.vaccines.length > 0 && (
                     <>
                         <div className="overflow-x-auto">
                             <table className="table table-zebra w-full">
@@ -991,6 +956,15 @@ const AnalyticsDashboard = () => {
                             </div>
                         </div>
                     </>
+                )}
+
+                {/* Empty State */}
+                {!initialLoading && editData.vaccines.length === 0 && (
+                    <div className="text-center py-12">
+                        <div className="text-gray-500 text-lg">
+                            No inventory data found for selected month. Use Auto-fill to generate data.
+                        </div>
+                    </div>
                 )}
             </div>
         );
