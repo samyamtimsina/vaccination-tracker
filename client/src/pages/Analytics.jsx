@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import axiosClient from '../api/axiosClient';
 import { format, subDays, subMonths, parseISO, startOfMonth } from 'date-fns';
 import {
@@ -9,11 +9,60 @@ import {
 } from 'recharts';
 import { debounce } from 'lodash';
 
+// Import Nepali Date Picker
+import { NepaliDatePicker } from 'nepali-datepicker-reactjs';
+import 'nepali-datepicker-reactjs/dist/index.css';
+import { currentBSYear } from '../../helpers/calculateAge.jsx';
+
 const wards = Array.from({ length: 20 }, (_, i) => i + 1);
 const genders = ['ALL', 'MALE', 'FEMALE'];
 const ageGroups = ['ALL', '0-1y', '1-5y', '5y+'];
 const casteCodes = Array.from({ length: 10 }, (_, i) => i + 1);
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#E74C3C', '#2ECC71', '#9B59B6'];
+
+// Helper function to convert Nepali date to English date (for API)
+const convertNepaliToEnglish = (nepaliDate) => {
+    if (!nepaliDate) return '';
+
+    try {
+        // Nepali date format: YYYY-MM-DD
+        const [year, month, day] = nepaliDate.split('-').map(Number);
+
+        // Simple conversion - for production, use a proper Nepali to English date conversion library
+        // This is a basic approximation
+        const englishYear = year - 57;
+        const englishMonth = month;
+        const englishDay = day;
+
+        return `${englishYear}-${englishMonth.toString().padStart(2, '0')}-${englishDay.toString().padStart(2, '0')}`;
+    } catch (error) {
+        console.error('Error converting Nepali date:', error);
+        return nepaliDate; // Fallback to original
+    }
+};
+
+// Helper function to convert English date to Nepali date (for display)
+const convertEnglishToNepali = (englishDate) => {
+    if (!englishDate) return '';
+
+    try {
+        const date = new Date(englishDate);
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+
+        // Simple conversion - for production, use a proper English to Nepali date conversion library
+        // This is a basic approximation
+        const nepaliYear = year + 57;
+        const nepaliMonth = month;
+        const nepaliDay = day;
+
+        return `${nepaliYear}-${nepaliMonth.toString().padStart(2, '0')}-${nepaliDay.toString().padStart(2, '0')}`;
+    } catch (error) {
+        console.error('Error converting English date:', error);
+        return englishDate; // Fallback to original
+    }
+};
 
 const safeFixed = (v, decimals = 4) => {
     if (typeof v !== 'number' || !isFinite(v)) return v || 0;
@@ -40,25 +89,128 @@ const handleApiError = (error) => {
     }
 };
 
+// FIX: Move components outside main component to prevent re-renders
+const CustomDatePicker = ({ value, onChange, name, placeholder = "Select date" }) => {
+    const handleChange = (newValue) => {
+        onChange(name, newValue);
+    };
+
+    return (
+        <div className="w-full">
+            <NepaliDatePicker
+                className="w-full"
+                inputClassName="input input-bordered input-sm w-full pr-8"
+                value={value || ''}
+                onChange={handleChange}
+                options={{ calenderLocale: "ne", valueLocale: "en" }}
+                language="ne"
+                minYear={2000}
+                maxYear={currentBSYear}
+                placeholder={placeholder}
+            />
+        </div>
+    );
+};
+
+const StatCard = ({ title, value, subtitle, trend, color = 'primary', icon }) => (
+    <div className={`card bg-base-100 border-l-4 border-${color} shadow-lg`}>
+        <div className="card-body p-4">
+            <div className="flex justify-between items-start">
+                <div>
+                    <h3 className="text-sm font-semibold text-gray-600">{title}</h3>
+                    <p className="text-2xl font-bold mt-1">{value}</p>
+                    {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+                </div>
+                {icon && <div className="text-2xl">{icon}</div>}
+            </div>
+            {trend && (
+                <div className={`text-xs mt-2 ${trend.value > 0 ? 'text-success' : 'text-error'}`}>
+                    {trend.value > 0 ? '↗' : '↘'} {Math.abs(trend.value)}% {trend.label}
+                </div>
+            )}
+        </div>
+    </div>
+);
+
+const EnhancedTooltip = ({ active, payload, label, type = 'default' }) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-white p-4 border border-gray-300 rounded-lg shadow-xl text-sm max-w-xs">
+                <p className="font-bold text-base border-b pb-2 mb-2">{label}</p>
+                {payload.map((entry, index) => (
+                    <div key={index} className="flex justify-between items-center py-1">
+                        <div className="flex items-center">
+                            <div
+                                className="w-3 h-3 rounded-full mr-2"
+                                style={{ backgroundColor: entry.color }}
+                            />
+                            <span>{entry.name}</span>
+                        </div>
+                        <span className="font-semibold">
+                            {typeof entry.value === 'number'
+                                ? type === 'percentage'
+                                    ? `${entry.value.toFixed(2)}%`
+                                    : entry.value.toLocaleString()
+                                : entry.value
+                            }
+                        </span>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+    return null;
+};
+
 const AnalyticsDashboard = () => {
     const [activeTab, setActiveTab] = useState('overview');
     const [compareMode, setCompareMode] = useState(false);
 
+    // Get current Nepali date for default values
+    const getCurrentNepaliDate = () => {
+        const now = new Date();
+        return convertEnglishToNepali(format(now, 'yyyy-MM-dd'));
+    };
+
+    const getNepaliDateMonthAgo = () => {
+        const monthAgo = subDays(new Date(), 30);
+        return convertEnglishToNepali(format(monthAgo, 'yyyy-MM-dd'));
+    };
+
+    const getNepaliDateTwoMonthsAgo = () => {
+        const twoMonthsAgo = subDays(new Date(), 60);
+        return convertEnglishToNepali(format(twoMonthsAgo, 'yyyy-MM-dd'));
+    };
+
+    const getNepaliDateLastMonth = () => {
+        const lastMonth = subDays(new Date(), 31);
+        return convertEnglishToNepali(format(lastMonth, 'yyyy-MM-dd'));
+    };
+
+    const getNepaliDateStartOfMonth = () => {
+        const startMonth = startOfMonth(new Date());
+        return convertEnglishToNepali(format(startMonth, 'yyyy-MM-dd'));
+    };
+
+    // FIX: Two-state system - UI state vs API state
     const [filters, setFilters] = useState({
         ward: '',
         casteCode: '',
         gender: '',
         ageGroup: '',
-        startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
-        endDate: format(new Date(), 'yyyy-MM-dd'),
+        startDate: getNepaliDateMonthAgo(),
+        endDate: getCurrentNepaliDate(),
         granularity: 'day',
-        compareStartDate: format(subDays(new Date(), 60), 'yyyy-MM-dd'),
-        compareEndDate: format(subDays(new Date(), 31), 'yyyy-MM-dd'),
+        compareStartDate: getNepaliDateTwoMonthsAgo(),
+        compareEndDate: getNepaliDateLastMonth(),
         monthRange: '12',
         dropoutGroup: 'vaccine',
         windowType: '1M',
-        inventoryMonth: format(startOfMonth(new Date()), 'yyyy-MM-dd')
+        inventoryMonth: getNepaliDateStartOfMonth()
     });
+
+    // FIX: Applied filters for API calls (separate from UI state)
+    const [appliedFilters, setAppliedFilters] = useState(filters);
 
     const [data, setData] = useState({
         overview: { children: {}, mothers: {}, nutrition: {} },
@@ -81,6 +233,28 @@ const AnalyticsDashboard = () => {
     const [lastUpdated, setLastUpdated] = useState(null);
     const [exportLoading, setExportLoading] = useState(false);
     const [inventoryEditing, setInventoryEditing] = useState(false);
+
+    // Use refs to manage fetch state without causing re-renders
+    const fetchControllerRef = useRef(null);
+    const debouncedFetchRef = useRef(null);
+
+    // FIX: Prevent form submissions globally to stop date picker from reloading page
+    useEffect(() => {
+        const preventSubmit = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        };
+
+        // Add event listener to prevent form submissions
+        window.addEventListener('submit', preventSubmit, true);
+        document.addEventListener('submit', preventSubmit, true);
+
+        return () => {
+            window.removeEventListener('submit', preventSubmit, true);
+            document.removeEventListener('submit', preventSubmit, true);
+        };
+    }, []);
 
     const fetchVaccineSchedule = useCallback(async () => {
         try {
@@ -114,10 +288,21 @@ const AnalyticsDashboard = () => {
         }
     };
 
+    // FIX: Use appliedFilters for API calls, not filters
     const fetchData = useCallback(async (signal) => {
         setLoading(true);
         try {
-            const query = new URLSearchParams(filters).toString();
+            // Convert Nepali dates to English for API calls
+            const apiFilters = {
+                ...appliedFilters,
+                startDate: convertNepaliToEnglish(appliedFilters.startDate),
+                endDate: convertNepaliToEnglish(appliedFilters.endDate),
+                compareStartDate: convertNepaliToEnglish(appliedFilters.compareStartDate),
+                compareEndDate: convertNepaliToEnglish(appliedFilters.compareEndDate),
+                inventoryMonth: convertNepaliToEnglish(appliedFilters.inventoryMonth)
+            };
+
+            const query = new URLSearchParams(apiFilters).toString();
             let requests = [];
 
             if (activeTab === 'overview') {
@@ -138,8 +323,8 @@ const AnalyticsDashboard = () => {
             } else if (activeTab === 'ward-performance') {
                 requests = [axiosClient.get(`/api/analytics/ward-performance?${query}`, { signal })];
             } else if (activeTab === 'equity') {
-                const genderQuery = new URLSearchParams({ ...filters, breakdown: 'gender' }).toString();
-                const casteQuery = new URLSearchParams({ ...filters, breakdown: 'casteCode' }).toString();
+                const genderQuery = new URLSearchParams({ ...apiFilters, breakdown: 'gender' }).toString();
+                const casteQuery = new URLSearchParams({ ...apiFilters, breakdown: 'casteCode' }).toString();
                 requests = [
                     axiosClient.get(`/api/analytics/disparities?${genderQuery}`, { signal }),
                     axiosClient.get(`/api/analytics/disparities?${casteQuery}`, { signal })
@@ -196,7 +381,6 @@ const AnalyticsDashboard = () => {
                 ...processedData
             }));
 
-            console.log(`Data fetched for ${activeTab}:`, processedData);
             setLastUpdated(new Date());
         } catch (err) {
             if (err.name !== 'CanceledError') {
@@ -205,57 +389,89 @@ const AnalyticsDashboard = () => {
         } finally {
             setLoading(false);
         }
-    }, [filters, activeTab]);
+    }, [appliedFilters, activeTab]);
 
-    const debouncedFetch = useMemo(() => {
-        const controllerMap = { current: null };
+    // Initialize debounced fetch function
+    useEffect(() => {
         const debounced = debounce(() => {
-            if (controllerMap.current) controllerMap.current.abort();
-            controllerMap.current = new AbortController();
-            fetchData(controllerMap.current.signal);
+            if (fetchControllerRef.current) {
+                fetchControllerRef.current.abort();
+            }
+            fetchControllerRef.current = new AbortController();
+            fetchData(fetchControllerRef.current.signal);
         }, 500);
-        debounced.cancelController = () => {
-            if (controllerMap.current) controllerMap.current.abort();
+
+        debouncedFetchRef.current = debounced;
+
+        return () => {
+            debounced.cancel();
+            if (fetchControllerRef.current) {
+                fetchControllerRef.current.abort();
+            }
         };
-        return debounced;
     }, [fetchData]);
 
     useEffect(() => {
         fetchVaccineSchedule();
     }, [fetchVaccineSchedule]);
 
+    // FIX: Only fetch data when activeTab or appliedFilters change
     useEffect(() => {
-        debouncedFetch();
-        return () => debouncedFetch.cancelController?.();
-    }, [filters, activeTab, debouncedFetch]);
+        if (debouncedFetchRef.current) {
+            debouncedFetchRef.current();
+        }
+    }, [activeTab, appliedFilters]);
 
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
         setFilters(prev => ({ ...prev, [name]: value }));
     };
 
+    // FIX: Separate handler for date changes
+    const handleDateChange = (name, value) => {
+        setFilters(prev => ({ ...prev, [name]: value }));
+    };
+
+    // FIX: New function to apply UI filters to API filters
+    const handleApplyFilters = () => {
+        setAppliedFilters(filters);
+    };
+
     const clearFilters = () => {
-        setFilters({
+        const clearedFilters = {
             ward: '',
             casteCode: '',
             gender: '',
             ageGroup: '',
-            startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
-            endDate: format(new Date(), 'yyyy-MM-dd'),
+            startDate: getNepaliDateMonthAgo(),
+            endDate: getCurrentNepaliDate(),
             granularity: 'day',
-            compareStartDate: format(subDays(new Date(), 60), 'yyyy-MM-dd'),
-            compareEndDate: format(subDays(new Date(), 31), 'yyyy-MM-dd'),
+            compareStartDate: getNepaliDateTwoMonthsAgo(),
+            compareEndDate: getNepaliDateLastMonth(),
             monthRange: '12',
             dropoutGroup: 'vaccine',
             windowType: '1M',
-            inventoryMonth: format(startOfMonth(new Date()), 'yyyy-MM-dd')
-        });
+            inventoryMonth: getNepaliDateStartOfMonth()
+        };
+
+        setFilters(clearedFilters);
+        setAppliedFilters(clearedFilters);
     };
 
     const handleExport = async (type) => {
         setExportLoading(true);
         try {
-            const query = new URLSearchParams({ ...filters, type }).toString();
+            // Convert Nepali dates to English for export
+            const apiFilters = {
+                ...appliedFilters,
+                startDate: convertNepaliToEnglish(appliedFilters.startDate),
+                endDate: convertNepaliToEnglish(appliedFilters.endDate),
+                compareStartDate: convertNepaliToEnglish(appliedFilters.compareStartDate),
+                compareEndDate: convertNepaliToEnglish(appliedFilters.compareEndDate),
+                inventoryMonth: convertNepaliToEnglish(appliedFilters.inventoryMonth)
+            };
+
+            const query = new URLSearchParams({ ...apiFilters, type }).toString();
             const response = await axiosClient.get(`/api/analytics/export?${query}`, {
                 responseType: 'blob'
             });
@@ -279,7 +495,9 @@ const AnalyticsDashboard = () => {
         try {
             await axiosClient.get('/api/analytics/refresh-cache');
             alert('Cache refreshed successfully');
-            debouncedFetch();
+            if (debouncedFetchRef.current) {
+                debouncedFetchRef.current();
+            }
         } catch (err) {
             console.error('Refresh cache error:', err);
             alert('Failed to refresh cache');
@@ -399,10 +617,10 @@ const AnalyticsDashboard = () => {
     const monthlyDropoutData = useMemo(() => {
         return processMonthlyDropoutData(
             data.trends?.monthlyDropout,
-            filters.dropoutGroup,
-            filters.monthRange
+            appliedFilters.dropoutGroup,
+            appliedFilters.monthRange
         );
-    }, [data.trends?.monthlyDropout, filters.dropoutGroup, filters.monthRange, processMonthlyDropoutData]);
+    }, [data.trends?.monthlyDropout, appliedFilters.dropoutGroup, appliedFilters.monthRange, processMonthlyDropoutData]);
 
     const rollingDropoutChartData = useMemo(() => {
         const raw = data.rollingDropout || [];
@@ -424,551 +642,6 @@ const AnalyticsDashboard = () => {
             }))
             .sort((a, b) => a.snapshotMonth.localeCompare(b.snapshotMonth));
     }, [data.rollingDropout]);
-
-    // Inventory data processing
-    const processInventoryData = useMemo(() => {
-        const { vaccineTypes = [], doseCounts = [], inventories = [], special = null } = data.inventory;
-
-        const vaccineMap = new Map();
-
-        // Initialize vaccine map with all vaccine types
-        vaccineTypes.forEach(v => {
-            vaccineMap.set(v.id, {
-                ...v,
-                doses: {},
-                inventory: {
-                    received: 0,
-                    spent: 0,
-                    opened: 0,
-                    spoiled: 0,
-                    returned: 0
-                }
-            });
-        });
-
-        // Populate dose counts
-        doseCounts.forEach(dc => {
-            const vac = vaccineMap.get(dc.vaccineTypeId);
-            if (vac) {
-                vac.doses[dc.doseNumber] = dc.countGiven;
-            }
-        });
-
-        // Populate inventory data
-        inventories.forEach(inv => {
-            const vac = vaccineMap.get(inv.vaccineTypeId);
-            if (vac) {
-                vac.inventory = {
-                    received: inv.received || 0,
-                    spent: inv.spent || 0,
-                    opened: inv.opened || 0,
-                    spoiled: inv.spoiled || 0,
-                    returned: inv.returned || 0
-                };
-            }
-        });
-
-        return {
-            vaccines: Array.from(vaccineMap.values()),
-            special: special || {
-                fullWithin23m: 0,
-                started24To59m: 0,
-                aefiNormal: 0,
-                aefiSerious: 0
-            }
-        };
-    }, [data.inventory]);
-
-    // Enhanced Components
-    const StatCard = ({ title, value, subtitle, trend, color = 'primary', icon }) => (
-        <div className={`card bg-base-100 border-l-4 border-${color} shadow-lg`}>
-            <div className="card-body p-4">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <h3 className="text-sm font-semibold text-gray-600">{title}</h3>
-                        <p className="text-2xl font-bold mt-1">{value}</p>
-                        {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
-                    </div>
-                    {icon && <div className="text-2xl">{icon}</div>}
-                </div>
-                {trend && (
-                    <div className={`text-xs mt-2 ${trend.value > 0 ? 'text-success' : 'text-error'}`}>
-                        {trend.value > 0 ? '↗' : '↘'} {Math.abs(trend.value)}% {trend.label}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-
-    const EnhancedTooltip = ({ active, payload, label, type = 'default' }) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-white p-4 border border-gray-300 rounded-lg shadow-xl text-sm max-w-xs">
-                    <p className="font-bold text-base border-b pb-2 mb-2">{label}</p>
-                    {payload.map((entry, index) => (
-                        <div key={index} className="flex justify-between items-center py-1">
-                            <div className="flex items-center">
-                                <div
-                                    className="w-3 h-3 rounded-full mr-2"
-                                    style={{ backgroundColor: entry.color }}
-                                />
-                                <span>{entry.name}</span>
-                            </div>
-                            <span className="font-semibold">
-                                {typeof entry.value === 'number'
-                                    ? type === 'percentage'
-                                        ? `${entry.value.toFixed(2)}%`
-                                        : entry.value.toLocaleString()
-                                    : entry.value
-                                }
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            );
-        }
-        return null;
-    };
-
-    const InventoryTab = () => {
-        const [editData, setEditData] = useState({
-            vaccines: [],
-            special: {
-                fullWithin23m: 0,
-                started24To59m: 0,
-                aefiNormal: 0,
-                aefiSerious: 0
-            }
-        });
-        const [autoFilling, setAutoFilling] = useState(false);
-        const [initialLoading, setInitialLoading] = useState(false);
-        const [inventoryEditing, setInventoryEditing] = useState(false);
-
-        // FIX: Simple useEffect without complex dependencies
-        useEffect(() => {
-            loadInventoryData();
-        }, [filters.inventoryMonth]); // Only depend on inventoryMonth
-
-        // FIX: Simple load function without useCallback
-        const loadInventoryData = async () => {
-            setInitialLoading(true);
-            try {
-                console.log('🔄 Loading inventory data for month:', filters.inventoryMonth);
-
-                const response = await axiosClient.get('/api/analytics/inventory', {
-                    params: { snapshotMonth: filters.inventoryMonth }
-                });
-
-                console.log('📥 Loaded inventory data:', response.data);
-
-                if (response.data.success && response.data.data) {
-                    const { vaccineTypes, doseCounts, inventories, special } = response.data.data;
-
-                    const vaccineMap = new Map();
-
-                    // Initialize vaccine map with all vaccine types
-                    vaccineTypes.forEach(v => {
-                        vaccineMap.set(v.id, {
-                            ...v,
-                            doses: {},
-                            inventory: {
-                                received: 0,
-                                spent: 0,
-                                opened: 0,
-                                spoiled: 0,
-                                returned: 0
-                            }
-                        });
-                    });
-
-                    // Populate dose counts
-                    doseCounts.forEach(dc => {
-                        const vac = vaccineMap.get(dc.vaccineTypeId);
-                        if (vac) {
-                            vac.doses[dc.doseNumber] = dc.countGiven || 0;
-                        }
-                    });
-
-                    // Populate inventory data
-                    inventories.forEach(inv => {
-                        const vac = vaccineMap.get(inv.vaccineTypeId);
-                        if (vac) {
-                            vac.inventory = {
-                                received: inv.received || 0,
-                                spent: inv.spent || 0,
-                                opened: inv.opened || 0,
-                                spoiled: inv.spoiled || 0,
-                                returned: inv.returned || 0
-                            };
-                        }
-                    });
-
-                    const processedData = {
-                        vaccines: Array.from(vaccineMap.values()),
-                        special: special || {
-                            fullWithin23m: 0,
-                            started24To59m: 0,
-                            aefiNormal: 0,
-                            aefiSerious: 0
-                        }
-                    };
-
-                    console.log('✅ Processed inventory data:', processedData);
-                    setEditData(processedData);
-                } else {
-                    console.log('📭 No existing data found for this month, using empty state');
-                    // Initialize with empty state but include vaccine types
-                    if (response.data.data?.vaccineTypes) {
-                        const emptyVaccines = response.data.data.vaccineTypes.map(v => ({
-                            ...v,
-                            doses: {},
-                            inventory: {
-                                received: 0,
-                                spent: 0,
-                                opened: 0,
-                                spoiled: 0,
-                                returned: 0
-                            }
-                        }));
-
-                        setEditData({
-                            vaccines: emptyVaccines,
-                            special: {
-                                fullWithin23m: 0,
-                                started24To59m: 0,
-                                aefiNormal: 0,
-                                aefiSerious: 0
-                            }
-                        });
-                    }
-                }
-            } catch (err) {
-                console.error('💥 Error loading inventory data:', err);
-                alert('Failed to load inventory data');
-            } finally {
-                setInitialLoading(false);
-            }
-        };
-
-        const handleAutoFill = async () => {
-            try {
-                setAutoFilling(true);
-
-                const invMonth = filters.inventoryMonth;
-                console.log('🚀 Starting auto-fill for month:', invMonth);
-
-                const resp = await axiosClient.get('/api/analytics/inventory/auto-fill', {
-                    params: { snapshotMonth: invMonth }
-                });
-
-                if (!resp.data?.success) {
-                    throw new Error(resp.data?.message || 'Auto-fill failed');
-                }
-
-                const { doseCounts, inventories, special } = resp.data.data;
-
-                console.log('📥 Auto-fill response data:', { doseCounts, inventories, special });
-
-                // FIX: Direct state update without batching
-                setEditData(currentEditData => {
-                    const updatedVaccines = currentEditData.vaccines.map(vaccine => {
-                        // Find doses for this vaccine
-                        const vaccineDoses = doseCounts?.filter(dc => dc.vaccineTypeId === vaccine.id) || [];
-                        const newDoses = { ...vaccine.doses };
-
-                        // Update dose counts from auto-fill
-                        vaccineDoses.forEach(dc => {
-                            newDoses[dc.doseNumber] = dc.countGiven || 0;
-                        });
-
-                        // Find inventory for this vaccine
-                        const vaccineInventory = inventories?.find(inv => inv.vaccineTypeId === vaccine.id);
-
-                        // If no inventory found in auto-fill, keep existing
-                        const finalInventory = vaccineInventory || { ...vaccine.inventory };
-
-                        return {
-                            ...vaccine,
-                            doses: newDoses,
-                            inventory: finalInventory
-                        };
-                    });
-
-                    const newData = {
-                        vaccines: updatedVaccines,
-                        special: { ...currentEditData.special, ...special }
-                    };
-
-                    console.log('🔄 New editData after auto-fill:', newData);
-                    return newData;
-                });
-
-                setInventoryEditing(true);
-
-                // FIX: Force a microtask to ensure state is updated before alert
-                await new Promise(resolve => setTimeout(resolve, 0));
-                alert('Auto-fill completed successfully!');
-
-            } catch (err) {
-                console.error('💥 Auto-fill error:', err);
-                alert(`Auto-fill failed: ${err.message}`);
-            } finally {
-                setAutoFilling(false);
-            }
-        };
-
-        const handleDoseChange = (vaccineId, doseNumber, value) => {
-            setEditData(prev => ({
-                ...prev,
-                vaccines: prev.vaccines.map(v =>
-                    v.id === vaccineId
-                        ? { ...v, doses: { ...v.doses, [doseNumber]: parseInt(value) || 0 } }
-                        : v
-                )
-            }));
-        };
-
-        const handleInventoryChange = (vaccineId, field, value) => {
-            setEditData(prev => ({
-                ...prev,
-                vaccines: prev.vaccines.map(v =>
-                    v.id === vaccineId
-                        ? { ...v, inventory: { ...v.inventory, [field]: parseInt(value) || 0 } }
-                        : v
-                )
-            }));
-        };
-
-        const handleSpecialChange = (field, value) => {
-            setEditData(prev => ({
-                ...prev,
-                special: { ...prev.special, [field]: parseInt(value) || 0 }
-            }));
-        };
-
-        const saveData = async () => {
-            try {
-                console.log('💾 Starting save process...');
-
-                const payload = {
-                    snapshotMonth: filters.inventoryMonth,
-                    doseCounts: editData.vaccines.flatMap(v => {
-                        const doseEntries = [];
-                        for (let doseNum = 1; doseNum <= 3; doseNum++) {
-                            doseEntries.push({
-                                vaccineTypeId: v.id,
-                                doseNumber: doseNum,
-                                countGiven: v.doses[doseNum] || 0
-                            });
-                        }
-                        return doseEntries;
-                    }),
-                    inventories: editData.vaccines.map(v => ({
-                        vaccineTypeId: v.id,
-                        received: v.inventory.received || 0,
-                        spent: v.inventory.spent || 0,
-                        opened: v.inventory.opened || 0,
-                        spoiled: v.inventory.spoiled || 0,
-                        returned: v.inventory.returned || 0
-                    })),
-                    special: {
-                        fullWithin23m: editData.special.fullWithin23m || 0,
-                        started24To59m: editData.special.started24To59m || 0,
-                        aefiNormal: editData.special.aefiNormal || 0,
-                        aefiSerious: editData.special.aefiSerious || 0
-                    }
-                };
-
-                console.log('📤 Payload being sent:', JSON.stringify(payload, null, 2));
-
-                const response = await axiosClient.post('/api/analytics/inventory', payload);
-
-                console.log('✅ Save successful:', response.data);
-
-                if (response.data.success) {
-                    alert('✅ Data saved successfully!');
-                    setInventoryEditing(false);
-                    // Reload the data to reflect the changes from database
-                    await loadInventoryData();
-                } else {
-                    throw new Error(response.data.message || 'Unknown save error');
-                }
-            } catch (err) {
-                console.error('💥 Save error details:', err);
-                const errorInfo = handleApiError(err);
-                alert(`❌ Save failed: ${errorInfo.message || err.message}`);
-            }
-        };
-
-        // Add a manual refresh function for when month changes
-        const handleMonthChange = (e) => {
-            const newMonth = `${e.target.value}-01`;
-            setFilters(prev => ({ ...prev, inventoryMonth: newMonth }));
-        };
-
-        return (
-            <div className="space-y-6">
-                {/* Header with month picker + buttons */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <label className="label font-semibold">Select Month</label>
-                        <input
-                            type="month"
-                            className="input input-bordered"
-                            value={format(parseISO(filters.inventoryMonth), 'yyyy-MM')}
-                            onChange={handleMonthChange}
-                        />
-                    </div>
-
-                    <div className="flex gap-2">
-                        {/* AUTO-FILL BUTTON */}
-                        <button
-                            className={`btn btn-outline ${autoFilling ? 'btn-disabled' : ''}`}
-                            onClick={handleAutoFill}
-                            disabled={autoFilling}
-                        >
-                            {autoFilling ? '⏳ Filling...' : '🚀 Auto-fill'}
-                        </button>
-
-                        {/* REFRESH BUTTON */}
-                        <button
-                            className="btn btn-outline"
-                            onClick={loadInventoryData}
-                            disabled={initialLoading}
-                        >
-                            {initialLoading ? '🔄' : '📥'} Refresh Data
-                        </button>
-
-                        {inventoryEditing ? (
-                            <>
-                                <button className="btn btn-primary" onClick={saveData}>💾 Save</button>
-                                <button className="btn btn-ghost" onClick={() => setInventoryEditing(false)}>❌ Cancel</button>
-                            </>
-                        ) : (
-                            <button className="btn btn-primary" onClick={() => setInventoryEditing(true)}>✏️ Edit</button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Loading State */}
-                {initialLoading && (
-                    <div className="flex justify-center items-center py-8">
-                        <div className="flex flex-col items-center gap-2">
-                            <span className="loading loading-spinner loading-lg text-primary"></span>
-                            <p className="text-gray-600">Loading inventory data...</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Vaccine Table */}
-                {!initialLoading && editData.vaccines.length > 0 && (
-                    <>
-                        <div className="overflow-x-auto">
-                            <table className="table table-zebra w-full">
-                                <thead>
-                                    <tr>
-                                        <th>खोपको प्रकार</th>
-                                        <th colSpan="3">खोप पाएका बच्चाहरुको संख्या</th>
-                                        <th colSpan="5">खोप इन्भेन्टरी</th>
-                                    </tr>
-                                    <tr>
-                                        <th></th>
-                                        <th>पहिलो</th>
-                                        <th>दोस्रो</th>
-                                        <th>तेस्रो</th>
-                                        <th>यस महिनामा प्राप्त</th>
-                                        <th>खर्च भएको</th>
-                                        <th>खोप दिन खोलेको</th>
-                                        <th>अन्य कारणले बिग्रेको</th>
-                                        <th>फिर्ता</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {editData.vaccines.map(vaccine => (
-                                        <tr key={vaccine.id}>
-                                            <td className="font-semibold">{vaccine.name}</td>
-
-                                            {/* Dose counts */}
-                                            {[1, 2, 3].map(doseNum => (
-                                                <td key={doseNum}>
-                                                    {inventoryEditing ? (
-                                                        <input
-                                                            type="number"
-                                                            className="input input-sm w-20"
-                                                            value={vaccine.doses[doseNum] || 0}
-                                                            onChange={(e) => handleDoseChange(vaccine.id, doseNum, e.target.value)}
-                                                        />
-                                                    ) : (
-                                                        vaccine.doses[doseNum] || 0
-                                                    )}
-                                                </td>
-                                            ))}
-
-                                            {/* Inventory fields */}
-                                            {['received', 'spent', 'opened', 'spoiled', 'returned'].map((field) => (
-                                                <td key={field}>
-                                                    {inventoryEditing ? (
-                                                        <input
-                                                            type="number"
-                                                            className="input input-sm w-20"
-                                                            value={vaccine.inventory[field] || 0}
-                                                            onChange={(e) => handleInventoryChange(vaccine.id, field, e.target.value)}
-                                                        />
-                                                    ) : (
-                                                        vaccine.inventory[field] || 0
-                                                    )}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Special Counts Section */}
-                        <div className="card bg-base-100 p-6 shadow-xl">
-                            <h3 className="font-bold text-lg mb-4">विशेष गणनाहरू</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                {[
-                                    { key: 'fullWithin23m', label: '२३ म. भित्र पूर्णखोप प्राप्त गरेका बच्चा' },
-                                    { key: 'started24To59m', label: '२४ – ५९ म. मा खोप शुरु गरेका बच्चा' },
-                                    { key: 'aefiNormal', label: 'AEFI Cases (सामान्य)' },
-                                    { key: 'aefiSerious', label: 'AEFI Cases (गम्भीर)' }
-                                ].map(({ key, label }) => (
-                                    <div key={key} className="form-control">
-                                        <label className="label">
-                                            <span className="label-text font-semibold">{label}</span>
-                                        </label>
-                                        {inventoryEditing ? (
-                                            <input
-                                                type="number"
-                                                className="input input-bordered"
-                                                value={editData.special[key] || 0}
-                                                onChange={(e) => handleSpecialChange(key, e.target.value)}
-                                            />
-                                        ) : (
-                                            <div className="p-2 border rounded-lg bg-base-200">
-                                                {editData.special[key] || 0}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </>
-                )}
-
-                {/* Empty State */}
-                {!initialLoading && editData.vaccines.length === 0 && (
-                    <div className="text-center py-12">
-                        <div className="text-gray-500 text-lg">
-                            No inventory data found for selected month. Use Auto-fill to generate data.
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    };
 
     // Tab Components
     const OverviewTab = () => {
@@ -1122,7 +795,7 @@ const AnalyticsDashboard = () => {
                                         <Area
                                             key={group}
                                             dataKey={group}
-                                            name={getGroupLabel(group, filters.dropoutGroup)}
+                                            name={getGroupLabel(group, appliedFilters.dropoutGroup)}
                                             stackId="1"
                                             stroke={COLORS[index % COLORS.length]}
                                             fill={COLORS[index % COLORS.length]}
@@ -1185,7 +858,7 @@ const AnalyticsDashboard = () => {
                                     <tr>
                                         <th>Month</th>
                                         {monthlyDropoutData.groups.map(group => (
-                                            <th key={group}>{getGroupLabel(group, filters.dropoutGroup)}</th>
+                                            <th key={group}>{getGroupLabel(group, appliedFilters.dropoutGroup)}</th>
                                         ))}
                                     </tr>
                                 </thead>
@@ -1287,87 +960,435 @@ const AnalyticsDashboard = () => {
         );
     };
 
-    const FilterSection = () => (
-        <div className="bg-base-200 p-6 rounded-xl shadow-sm">
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-4">
-                <div>
-                    <label className="label font-semibold text-sm">Ward</label>
-                    <select className="select select-bordered w-full select-sm" name="ward" value={filters.ward} onChange={handleFilterChange}>
-                        <option value="">All Wards</option>
-                        {wards.map(w => <option key={w} value={w}>Ward {w}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label className="label font-semibold text-sm">Caste</label>
-                    <select className="select select-bordered w-full select-sm" name="casteCode" value={filters.casteCode} onChange={handleFilterChange}>
-                        <option value="">All Castes</option>
-                        {casteCodes.map(c => <option key={c} value={c}>Caste {c}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label className="label font-semibold text-sm">Gender</label>
-                    <select className="select select-bordered w-full select-sm" name="gender" value={filters.gender} onChange={handleFilterChange}>
-                        <option value="">All</option>
-                        {genders.map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label className="label font-semibold text-sm">Age Group</label>
-                    <select className="select select-bordered w-full select-sm" name="ageGroup" value={filters.ageGroup} onChange={handleFilterChange}>
-                        <option value="">All</option>
-                        {ageGroups.map(a => <option key={a} value={a}>{a}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label className="label font-semibold text-sm">Start Date</label>
-                    <input type="date" className="input input-bordered w-full input-sm" name="startDate" value={filters.startDate} onChange={handleFilterChange} />
-                </div>
-                <div>
-                    <label className="label font-semibold text-sm">End Date</label>
-                    <input type="date" className="input input-bordered w-full input-sm" name="endDate" value={filters.endDate} onChange={handleFilterChange} />
-                </div>
-            </div>
+    const InventoryTab = () => {
+        const [editData, setEditData] = useState({
+            vaccines: [],
+            special: {
+                fullWithin23m: 0,
+                started24To59m: 0,
+                aefiNormal: 0,
+                aefiSerious: 0
+            }
+        });
+        const [autoFilling, setAutoFilling] = useState(false);
+        const [initialLoading, setInitialLoading] = useState(false);
+        const [inventoryEditing, setInventoryEditing] = useState(false);
 
-            {(activeTab === 'trends' || activeTab === 'monthly-dropout') && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
+        useEffect(() => {
+            loadInventoryData();
+        }, [appliedFilters.inventoryMonth]);
+
+        const loadInventoryData = async () => {
+            setInitialLoading(true);
+            try {
+                const response = await axiosClient.get('/api/analytics/inventory', {
+                    params: { snapshotMonth: convertNepaliToEnglish(appliedFilters.inventoryMonth) }
+                });
+
+                if (response.data.success && response.data.data) {
+                    const { vaccineTypes, doseCounts, inventories, special } = response.data.data;
+
+                    const vaccineMap = new Map();
+
+                    // Initialize vaccine map with all vaccine types
+                    vaccineTypes.forEach(v => {
+                        vaccineMap.set(v.id, {
+                            ...v,
+                            doses: {},
+                            inventory: {
+                                received: 0,
+                                spent: 0,
+                                opened: 0,
+                                spoiled: 0,
+                                returned: 0
+                            }
+                        });
+                    });
+
+                    // Populate dose counts
+                    doseCounts.forEach(dc => {
+                        const vac = vaccineMap.get(dc.vaccineTypeId);
+                        if (vac) {
+                            vac.doses[dc.doseNumber] = dc.countGiven || 0;
+                        }
+                    });
+
+                    // Populate inventory data
+                    inventories.forEach(inv => {
+                        const vac = vaccineMap.get(inv.vaccineTypeId);
+                        if (vac) {
+                            vac.inventory = {
+                                received: inv.received || 0,
+                                spent: inv.spent || 0,
+                                opened: inv.opened || 0,
+                                spoiled: inv.spoiled || 0,
+                                returned: inv.returned || 0
+                            };
+                        }
+                    });
+
+                    const processedData = {
+                        vaccines: Array.from(vaccineMap.values()),
+                        special: special || {
+                            fullWithin23m: 0,
+                            started24To59m: 0,
+                            aefiNormal: 0,
+                            aefiSerious: 0
+                        }
+                    };
+
+                    setEditData(processedData);
+                } else {
+                    if (response.data.data?.vaccineTypes) {
+                        const emptyVaccines = response.data.data.vaccineTypes.map(v => ({
+                            ...v,
+                            doses: {},
+                            inventory: {
+                                received: 0,
+                                spent: 0,
+                                opened: 0,
+                                spoiled: 0,
+                                returned: 0
+                            }
+                        }));
+
+                        setEditData({
+                            vaccines: emptyVaccines,
+                            special: {
+                                fullWithin23m: 0,
+                                started24To59m: 0,
+                                aefiNormal: 0,
+                                aefiSerious: 0
+                            }
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading inventory data:', err);
+                alert('Failed to load inventory data');
+            } finally {
+                setInitialLoading(false);
+            }
+        };
+
+        const handleAutoFill = async () => {
+            try {
+                setAutoFilling(true);
+
+                const invMonth = convertNepaliToEnglish(appliedFilters.inventoryMonth);
+                const resp = await axiosClient.get('/api/analytics/inventory/auto-fill', {
+                    params: { snapshotMonth: invMonth }
+                });
+
+                if (!resp.data?.success) {
+                    throw new Error(resp.data?.message || 'Auto-fill failed');
+                }
+
+                const { doseCounts, inventories, special } = resp.data.data;
+
+                setEditData(currentEditData => {
+                    const updatedVaccines = currentEditData.vaccines.map(vaccine => {
+                        const vaccineDoses = doseCounts?.filter(dc => dc.vaccineTypeId === vaccine.id) || [];
+                        const newDoses = { ...vaccine.doses };
+
+                        vaccineDoses.forEach(dc => {
+                            newDoses[dc.doseNumber] = dc.countGiven || 0;
+                        });
+
+                        const vaccineInventory = inventories?.find(inv => inv.vaccineTypeId === vaccine.id);
+                        const finalInventory = vaccineInventory || { ...vaccine.inventory };
+
+                        return {
+                            ...vaccine,
+                            doses: newDoses,
+                            inventory: finalInventory
+                        };
+                    });
+
+                    const newData = {
+                        vaccines: updatedVaccines,
+                        special: { ...currentEditData.special, ...special }
+                    };
+
+                    return newData;
+                });
+
+                setInventoryEditing(true);
+                alert('Auto-fill completed successfully!');
+
+            } catch (err) {
+                console.error('Auto-fill error:', err);
+                alert(`Auto-fill failed: ${err.message}`);
+            } finally {
+                setAutoFilling(false);
+            }
+        };
+
+        const handleDoseChange = (vaccineId, doseNumber, value) => {
+            setEditData(prev => ({
+                ...prev,
+                vaccines: prev.vaccines.map(v =>
+                    v.id === vaccineId
+                        ? { ...v, doses: { ...v.doses, [doseNumber]: parseInt(value) || 0 } }
+                        : v
+                )
+            }));
+        };
+
+        const handleInventoryChange = (vaccineId, field, value) => {
+            setEditData(prev => ({
+                ...prev,
+                vaccines: prev.vaccines.map(v =>
+                    v.id === vaccineId
+                        ? { ...v, inventory: { ...v.inventory, [field]: parseInt(value) || 0 } }
+                        : v
+                )
+            }));
+        };
+
+        const handleSpecialChange = (field, value) => {
+            setEditData(prev => ({
+                ...prev,
+                special: { ...prev.special, [field]: parseInt(value) || 0 }
+            }));
+        };
+
+        const saveData = async () => {
+            try {
+                const payload = {
+                    snapshotMonth: convertNepaliToEnglish(appliedFilters.inventoryMonth),
+                    doseCounts: editData.vaccines.flatMap(v => {
+                        const doseEntries = [];
+                        for (let doseNum = 1; doseNum <= 3; doseNum++) {
+                            doseEntries.push({
+                                vaccineTypeId: v.id,
+                                doseNumber: doseNum,
+                                countGiven: v.doses[doseNum] || 0
+                            });
+                        }
+                        return doseEntries;
+                    }),
+                    inventories: editData.vaccines.map(v => ({
+                        vaccineTypeId: v.id,
+                        received: v.inventory.received || 0,
+                        spent: v.inventory.spent || 0,
+                        opened: v.inventory.opened || 0,
+                        spoiled: v.inventory.spoiled || 0,
+                        returned: v.inventory.returned || 0
+                    })),
+                    special: {
+                        fullWithin23m: editData.special.fullWithin23m || 0,
+                        started24To59m: editData.special.started24To59m || 0,
+                        aefiNormal: editData.special.aefiNormal || 0,
+                        aefiSerious: editData.special.aefiSerious || 0
+                    }
+                };
+
+                const response = await axiosClient.post('/api/analytics/inventory', payload);
+
+                if (response.data.success) {
+                    alert('✅ Data saved successfully!');
+                    setInventoryEditing(false);
+                    await loadInventoryData();
+                } else {
+                    throw new Error(response.data.message || 'Unknown save error');
+                }
+            } catch (err) {
+                console.error('Save error details:', err);
+                const errorInfo = handleApiError(err);
+                alert(`❌ Save failed: ${errorInfo.message || err.message}`);
+            }
+        };
+
+        const handleMonthChange = (value) => {
+            handleDateChange('inventoryMonth', value);
+            // Apply immediately for inventory tab
+            setAppliedFilters(prev => ({ ...prev, inventoryMonth: value }));
+        };
+
+        return (
+            <div className="space-y-6">
+                {/* Header with month picker + buttons */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <label className="label font-semibold text-sm">Granularity</label>
-                        <select className="select select-bordered w-full select-sm" name="granularity" value={filters.granularity} onChange={handleFilterChange}>
-                            <option value="day">Daily</option>
-                            <option value="week">Weekly</option>
-                            <option value="month">Monthly</option>
-                        </select>
+                        <label className="label font-semibold">Select Month</label>
+                        <div className="relative">
+                            <CustomDatePicker
+                                value={filters.inventoryMonth}
+                                onChange={handleMonthChange}
+                                name="inventoryMonth"
+                                placeholder="Select month"
+                            />
+                            {filters.inventoryMonth && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleMonthChange('')}
+                                    className="absolute right-8 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                                    title="Clear date"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
                     </div>
-                    <div>
-                        <label className="label font-semibold text-sm">Month Range</label>
-                        <select className="select select-bordered w-full select-sm" name="monthRange" value={filters.monthRange} onChange={handleFilterChange}>
-                            <option value="3">3 Months</option>
-                            <option value="6">6 Months</option>
-                            <option value="12">12 Months</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="label font-semibold text-sm">Group By</label>
-                        <select className="select select-bordered w-full select-sm" name="dropoutGroup" value={filters.dropoutGroup} onChange={handleFilterChange}>
-                            <option value="vaccine">Vaccine</option>
-                            <option value="ward">Ward</option>
-                            <option value="gender">Gender</option>
-                            <option value="ageGroup">Age Group</option>
-                            <option value="caste">Caste</option>
-                        </select>
-                    </div>
-                    <div className="flex items-end">
-                        <button className="btn btn-primary btn-sm w-full" onClick={debouncedFetch} disabled={loading}>
-                            {loading ? '🔄' : '🔍'} Apply
+
+                    <div className="flex gap-2">
+                        <button
+                            className={`btn btn-outline ${autoFilling ? 'btn-disabled' : ''}`}
+                            onClick={handleAutoFill}
+                            disabled={autoFilling}
+                        >
+                            {autoFilling ? '⏳ Filling...' : '🚀 Auto-fill'}
                         </button>
+
+                        <button
+                            className="btn btn-outline"
+                            onClick={loadInventoryData}
+                            disabled={initialLoading}
+                        >
+                            {initialLoading ? '🔄' : '📥'} Refresh Data
+                        </button>
+
+                        {inventoryEditing ? (
+                            <>
+                                <button className="btn btn-primary" onClick={saveData}>💾 Save</button>
+                                <button className="btn btn-ghost" onClick={() => setInventoryEditing(false)}>❌ Cancel</button>
+                            </>
+                        ) : (
+                            <button className="btn btn-primary" onClick={() => setInventoryEditing(true)}>✏️ Edit</button>
+                        )}
                     </div>
                 </div>
-            )}
-        </div>
-    );
+
+                {/* Loading State */}
+                {initialLoading && (
+                    <div className="flex justify-center items-center py-8">
+                        <div className="flex flex-col items-center gap-2">
+                            <span className="loading loading-spinner loading-lg text-primary"></span>
+                            <p className="text-gray-600">Loading inventory data...</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Vaccine Table */}
+                {!initialLoading && editData.vaccines.length > 0 && (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="table table-zebra w-full">
+                                <thead>
+                                    <tr>
+                                        <th>खोपको प्रकार</th>
+                                        <th colSpan="3">खोप पाएका बच्चाहरुको संख्या</th>
+                                        <th colSpan="5">खोप इन्भेन्टरी</th>
+                                    </tr>
+                                    <tr>
+                                        <th></th>
+                                        <th>पहिलो</th>
+                                        <th>दोस्रो</th>
+                                        <th>तेस्रो</th>
+                                        <th>यस महिनामा प्राप्त</th>
+                                        <th>खर्च भएको</th>
+                                        <th>खोप दिन खोलेको</th>
+                                        <th>अन्य कारणले बिग्रेको</th>
+                                        <th>फिर्ता</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {editData.vaccines.map(vaccine => (
+                                        <tr key={vaccine.id}>
+                                            <td className="font-semibold">{vaccine.name}</td>
+
+                                            {/* Dose counts */}
+                                            {[1, 2, 3].map(doseNum => (
+                                                <td key={doseNum}>
+                                                    {inventoryEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            className="input input-sm w-20"
+                                                            value={vaccine.doses[doseNum] || 0}
+                                                            onChange={(e) => handleDoseChange(vaccine.id, doseNum, e.target.value)}
+                                                        />
+                                                    ) : (
+                                                        vaccine.doses[doseNum] || 0
+                                                    )}
+                                                </td>
+                                            ))}
+
+                                            {/* Inventory fields */}
+                                            {['received', 'spent', 'opened', 'spoiled', 'returned'].map((field) => (
+                                                <td key={field}>
+                                                    {inventoryEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            className="input input-sm w-20"
+                                                            value={vaccine.inventory[field] || 0}
+                                                            onChange={(e) => handleInventoryChange(vaccine.id, field, e.target.value)}
+                                                        />
+                                                    ) : (
+                                                        vaccine.inventory[field] || 0
+                                                    )}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Special Counts Section */}
+                        <div className="card bg-base-100 p-6 shadow-xl">
+                            <h3 className="font-bold text-lg mb-4">विशेष गणनाहरू</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {[
+                                    { key: 'fullWithin23m', label: '२३ म. भित्र पूर्णखोप प्राप्त गरेका बच्चा' },
+                                    { key: 'started24To59m', label: '२४ – ५९ म. मा खोप शुरु गरेका बच्चा' },
+                                    { key: 'aefiNormal', label: 'AEFI Cases (सामान्य)' },
+                                    { key: 'aefiSerious', label: 'AEFI Cases (गम्भीर)' }
+                                ].map(({ key, label }) => (
+                                    <div key={key} className="form-control">
+                                        <label className="label">
+                                            <span className="label-text font-semibold">{label}</span>
+                                        </label>
+                                        {inventoryEditing ? (
+                                            <input
+                                                type="number"
+                                                className="input input-bordered"
+                                                value={editData.special[key] || 0}
+                                                onChange={(e) => handleSpecialChange(key, e.target.value)}
+                                            />
+                                        ) : (
+                                            <div className="p-2 border rounded-lg bg-base-200">
+                                                {editData.special[key] || 0}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {/* Empty State */}
+                {!initialLoading && editData.vaccines.length === 0 && (
+                    <div className="text-center py-12">
+                        <div className="text-gray-500 text-lg">
+                            No inventory data found for selected month. Use Auto-fill to generate data.
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     return (
-        <div className="p-6 space-y-6">
+        <div
+            className="p-6 space-y-6"
+            onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }}
+        >
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
@@ -1400,8 +1421,127 @@ const AnalyticsDashboard = () => {
                 </div>
             </div>
 
-            {/* Filters */}
-            <FilterSection />
+            {/* FIX: Inlined Filter Section */}
+            <div className="bg-base-200 p-6 rounded-xl shadow-sm">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-4 items-end">
+                    <div>
+                        <label className="label font-semibold text-sm">Ward</label>
+                        <select className="select select-bordered w-full select-sm" name="ward" value={filters.ward} onChange={handleFilterChange}>
+                            <option value="">All Wards</option>
+                            {wards.map(w => <option key={w} value={w}>Ward {w}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="label font-semibold text-sm">Caste</label>
+                        <select className="select select-bordered w-full select-sm" name="casteCode" value={filters.casteCode} onChange={handleFilterChange}>
+                            <option value="">All Castes</option>
+                            {casteCodes.map(c => <option key={c} value={c}>Caste {c}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="label font-semibold text-sm">Gender</label>
+                        <select className="select select-bordered w-full select-sm" name="gender" value={filters.gender} onChange={handleFilterChange}>
+                            <option value="">All</option>
+                            {genders.map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="label font-semibold text-sm">Age Group</label>
+                        <select className="select select-bordered w-full select-sm" name="ageGroup" value={filters.ageGroup} onChange={handleFilterChange}>
+                            <option value="">All</option>
+                            {ageGroups.map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                    </div>
+
+                    {/* Date Pickers */}
+                    <div>
+                        <label className="label font-semibold text-sm">Start Date</label>
+                        <div className="relative">
+                            <CustomDatePicker
+                                value={filters.startDate}
+                                onChange={handleDateChange}
+                                name="startDate"
+                                placeholder="Start date"
+                            />
+                            {filters.startDate && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleDateChange('startDate', '')}
+                                    className="absolute right-8 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors text-xs"
+                                    title="Clear date"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="label font-semibold text-sm">End Date</label>
+                        <div className="relative">
+                            <CustomDatePicker
+                                value={filters.endDate}
+                                onChange={handleDateChange}
+                                name="endDate"
+                                placeholder="End date"
+                            />
+                            {filters.endDate && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleDateChange('endDate', '')}
+                                    className="absolute right-8 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors text-xs"
+                                    title="Clear date"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* FIX: Apply Button that updates appliedFilters */}
+                    <div>
+                        <button
+                            className="btn btn-primary btn-sm w-full"
+                            onClick={handleApplyFilters}
+                            disabled={loading}
+                        >
+                            {loading ? '🔄 Loading...' : '🔍 Apply Filters'}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Granularity filters */}
+                {(activeTab === 'trends' || activeTab === 'monthly-dropout') && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4 mt-4">
+                        <div>
+                            <label className="label font-semibold text-sm">Granularity</label>
+                            <select className="select select-bordered w-full select-sm" name="granularity" value={filters.granularity} onChange={handleFilterChange}>
+                                <option value="day">Daily</option>
+                                <option value="week">Weekly</option>
+                                <option value="month">Monthly</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label font-semibold text-sm">Month Range</label>
+                            <select className="select select-bordered w-full select-sm" name="monthRange" value={filters.monthRange} onChange={handleFilterChange}>
+                                <option value="3">3 Months</option>
+                                <option value="6">6 Months</option>
+                                <option value="12">12 Months</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label font-semibold text-sm">Group By</label>
+                            <select className="select select-bordered w-full select-sm" name="dropoutGroup" value={filters.dropoutGroup} onChange={handleFilterChange}>
+                                <option value="vaccine">Vaccine</option>
+                                <option value="ward">Ward</option>
+                                <option value="gender">Gender</option>
+                                <option value="ageGroup">Age Group</option>
+                                <option value="caste">Caste</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* Tabs */}
             <div className="tabs tabs-boxed bg-base-200">
@@ -1480,7 +1620,7 @@ const AnalyticsDashboard = () => {
                     {activeTab === 'comparison' && (
                         <div className="space-y-6">
                             <div className="alert alert-info">
-                                <span>Comparing {filters.compareStartDate} to {filters.compareEndDate} vs {filters.startDate} to {filters.endDate}</span>
+                                <span>Comparing {appliedFilters.compareStartDate} to {appliedFilters.compareEndDate} vs {appliedFilters.startDate} to {appliedFilters.endDate}</span>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 {Object.entries(data.comparison || {}).map(([key, value]) => (

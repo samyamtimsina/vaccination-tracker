@@ -32,8 +32,6 @@ import { calculateAge, currentBSYear } from '../../helpers/calculateAge.jsx';
 import { getFirstErrorMessage } from '../../helpers/getFirstErrorMessage.jsx';
 import { useTranslation } from 'react-i18next';
 
-// Enhanced vaccine categorization logic
-// Fixed vaccine categorization logic
 const getVaccineStatus = (dose, childAge) => {
   // Calculate child's total age in days
   const ageInDays = (childAge.years || 0) * 365.25 +
