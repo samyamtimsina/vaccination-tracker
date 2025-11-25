@@ -14,52 +14,45 @@ import { NepaliDatePicker } from 'nepali-datepicker-reactjs';
 import 'nepali-datepicker-reactjs/dist/index.css';
 import { currentBSYear } from '../../helpers/calculateAge.jsx';
 
+// Import Nepali Date Converter
+import { adToBs, bsToAd } from '@sbmdkl/nepali-date-converter';
+
 const wards = Array.from({ length: 20 }, (_, i) => i + 1);
 const genders = ['ALL', 'MALE', 'FEMALE'];
 const ageGroups = ['ALL', '0-1y', '1-5y', '5y+'];
 const casteCodes = Array.from({ length: 10 }, (_, i) => i + 1);
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#E74C3C', '#2ECC71', '#9B59B6'];
 
-// Helper function to convert Nepali date to English date (for API)
+// Date format helper
+const safeFormatDateYYMMDD = (dateString) => {
+    if (!dateString) return '';
+    return dateString.split('T')[0];
+};
+
+// Proper Nepali to English date conversion using the library
 const convertNepaliToEnglish = (nepaliDate) => {
     if (!nepaliDate) return '';
 
     try {
-        // Nepali date format: YYYY-MM-DD
-        const [year, month, day] = nepaliDate.split('-').map(Number);
-
-        // Simple conversion - for production, use a proper Nepali to English date conversion library
-        // This is a basic approximation
-        const englishYear = year - 57;
-        const englishMonth = month;
-        const englishDay = day;
-
-        return `${englishYear}-${englishMonth.toString().padStart(2, '0')}-${englishDay.toString().padStart(2, '0')}`;
+        // Convert BS to AD using the library
+        const englishDate = bsToAd(nepaliDate);
+        return safeFormatDateYYMMDD(englishDate);
     } catch (error) {
-        console.error('Error converting Nepali date:', error);
+        console.error('Error converting Nepali to English date:', error);
         return nepaliDate; // Fallback to original
     }
 };
 
-// Helper function to convert English date to Nepali date (for display)
+// Proper English to Nepali date conversion using the library
 const convertEnglishToNepali = (englishDate) => {
     if (!englishDate) return '';
 
     try {
-        const date = new Date(englishDate);
-        const year = date.getFullYear();
-        const month = date.getMonth() + 1;
-        const day = date.getDate();
-
-        // Simple conversion - for production, use a proper English to Nepali date conversion library
-        // This is a basic approximation
-        const nepaliYear = year + 57;
-        const nepaliMonth = month;
-        const nepaliDay = day;
-
-        return `${nepaliYear}-${nepaliMonth.toString().padStart(2, '0')}-${nepaliDay.toString().padStart(2, '0')}`;
+        // Convert AD to BS using the library
+        const nepaliDate = adToBs(englishDate);
+        return nepaliDate;
     } catch (error) {
-        console.error('Error converting English date:', error);
+        console.error('Error converting English to Nepali date:', error);
         return englishDate; // Fallback to original
     }
 };
@@ -288,6 +281,48 @@ const AnalyticsDashboard = () => {
         }
     };
 
+    // FIX: Process API response data to convert AD dates to BS for display
+    const processApiData = useCallback((apiData) => {
+        if (!apiData) return apiData;
+
+        const processObject = (obj) => {
+            if (!obj || typeof obj !== 'object') return obj;
+
+            if (Array.isArray(obj)) {
+                return obj.map(item => processObject(item));
+            }
+
+            const processed = { ...obj };
+
+            // Convert date fields from AD to BS for display
+            Object.keys(processed).forEach(key => {
+                const value = processed[key];
+
+                // Check if this is a date field (you might need to adjust these patterns)
+                if (typeof value === 'string' &&
+                    (key.toLowerCase().includes('date') ||
+                        key.toLowerCase().includes('month') ||
+                        key.toLowerCase().includes('day'))) {
+
+                    // Check if it's an AD date format (YYYY-MM-DD)
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                        try {
+                            processed[key] = convertEnglishToNepali(value);
+                        } catch (error) {
+                            console.warn(`Failed to convert date field ${key}:`, value);
+                        }
+                    }
+                } else if (typeof value === 'object' && value !== null) {
+                    processed[key] = processObject(value);
+                }
+            });
+
+            return processed;
+        };
+
+        return processObject(apiData);
+    }, []);
+
     // FIX: Use appliedFilters for API calls, not filters
     const fetchData = useCallback(async (signal) => {
         setLoading(true);
@@ -345,35 +380,38 @@ const AnalyticsDashboard = () => {
 
             if (activeTab === 'overview') {
                 processedData = {
-                    overview: results[0].data.data || {},
-                    coverage: results[1].data.data || { byVaccine: [], byWard: [] },
-                    dropout: results[2].data.data || [],
-                    zeroDose: results[3].data.data || {},
-                    growth: results[4].data.data || {},
-                    tdCoverage: results[5].data.data || [],
-                    dueOverdue: results[6].data.data || {}
+                    overview: processApiData(results[0].data.data) || {},
+                    coverage: processApiData(results[1].data.data) || { byVaccine: [], byWard: [] },
+                    dropout: processApiData(results[2].data.data) || [],
+                    zeroDose: processApiData(results[3].data.data) || {},
+                    growth: processApiData(results[4].data.data) || {},
+                    tdCoverage: processApiData(results[5].data.data) || [],
+                    dueOverdue: processApiData(results[6].data.data) || {}
                 };
             } else if (activeTab === 'trends') {
                 processedData = {
-                    trends: { ...results[0].data.data, monthlyDropout: results[1].data.data || [] }
+                    trends: {
+                        ...processApiData(results[0].data.data),
+                        monthlyDropout: processApiData(results[1].data.data) || []
+                    }
                 };
             } else if (activeTab === 'ward-performance') {
-                processedData = { wardPerformance: results[0].data.data };
+                processedData = { wardPerformance: processApiData(results[0].data.data) };
             } else if (activeTab === 'equity') {
                 processedData = {
                     disparities: {
-                        gender: results[0].data.data,
-                        caste: results[1].data.data
+                        gender: processApiData(results[0].data.data),
+                        caste: processApiData(results[1].data.data)
                     }
                 };
             } else if (activeTab === 'comparison') {
-                processedData = { comparison: results[0].data.data };
+                processedData = { comparison: processApiData(results[0].data.data) };
             } else if (activeTab === 'monthly-dropout') {
-                processedData = { trends: { monthlyDropout: results[0].data.data || [] } };
+                processedData = { trends: { monthlyDropout: processApiData(results[0].data.data) || [] } };
             } else if (activeTab === 'rolling-dropout') {
-                processedData = { rollingDropout: results[0].data.data };
+                processedData = { rollingDropout: processApiData(results[0].data.data) };
             } else if (activeTab === 'inventory') {
-                processedData = { inventory: results[0].data.data || { vaccineTypes: [], doseCounts: [], inventories: [], special: null } };
+                processedData = { inventory: processApiData(results[0].data.data) || { vaccineTypes: [], doseCounts: [], inventories: [], special: null } };
             }
 
             setData(prev => ({
@@ -389,7 +427,7 @@ const AnalyticsDashboard = () => {
         } finally {
             setLoading(false);
         }
-    }, [appliedFilters, activeTab]);
+    }, [appliedFilters, activeTab, processApiData]);
 
     // Initialize debounced fetch function
     useEffect(() => {
@@ -541,10 +579,22 @@ const AnalyticsDashboard = () => {
     const processMonthlyDropoutData = useCallback((rawData, groupBy, monthRange) => {
         if (!rawData || rawData.length === 0) return { chartData: [], groups: [], radarData: [], summary: { totalMonths: 0, totalGroups: 0, avgDropoutRate: 0 } };
 
+        // Convert BS dates to AD for date calculations
+        const processedData = rawData.map(item => {
+            try {
+                const adDate = convertNepaliToEnglish(item.snapshotMonth + '-01');
+                return {
+                    ...item,
+                    parsedDate: parseISO(adDate)
+                };
+            } catch (error) {
+                console.warn('Failed to parse date:', item.snapshotMonth);
+                return { ...item, parsedDate: new Date() };
+            }
+        });
+
         const cutoff = subMonths(new Date(), parseInt(monthRange || 12));
-        const filtered = rawData
-            .map(d => ({ ...d, parsedDate: parseISO(d.snapshotMonth + '-01') }))
-            .filter(d => d.parsedDate >= cutoff);
+        const filtered = processedData.filter(d => d.parsedDate >= cutoff);
 
         let groupField = groupBy;
         if (groupBy === 'vaccine') groupField = 'vaccineTypeId';
