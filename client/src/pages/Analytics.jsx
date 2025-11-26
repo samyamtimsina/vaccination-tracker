@@ -1024,15 +1024,28 @@ const AnalyticsDashboard = () => {
         const [initialLoading, setInitialLoading] = useState(false);
         const [inventoryEditing, setInventoryEditing] = useState(false);
 
+        // COMPLETELY SEPARATE STATE FOR INVENTORY - NO CONNECTION TO MAIN FILTERS
+        const [inventoryMonthDraft, setInventoryMonthDraft] = useState(filters.inventoryMonth);
+        const [appliedInventoryMonth, setAppliedInventoryMonth] = useState(appliedFilters.inventoryMonth);
+
         useEffect(() => {
-            loadInventoryData();
-        }, [appliedFilters.inventoryMonth]);
+            // Only load data when APPLIED inventory month changes
+            if (appliedInventoryMonth && appliedInventoryMonth.trim() !== '') {
+                loadInventoryData();
+            }
+        }, [appliedInventoryMonth]);
 
         const loadInventoryData = async () => {
+            // Use appliedInventoryMonth, NOT appliedFilters.inventoryMonth
+            if (!appliedInventoryMonth || appliedInventoryMonth.trim() === '') {
+                console.log('Skipping inventory load: No month selected');
+                return;
+            }
+
             setInitialLoading(true);
             try {
                 const response = await axiosClient.get('/api/analytics/inventory', {
-                    params: { snapshotMonth: convertNepaliToEnglish(appliedFilters.inventoryMonth) }
+                    params: { snapshotMonth: convertNepaliToEnglish(appliedInventoryMonth) }
                 });
 
                 if (response.data.success && response.data.data) {
@@ -1040,7 +1053,6 @@ const AnalyticsDashboard = () => {
 
                     const vaccineMap = new Map();
 
-                    // Initialize vaccine map with all vaccine types
                     vaccineTypes.forEach(v => {
                         vaccineMap.set(v.id, {
                             ...v,
@@ -1055,7 +1067,6 @@ const AnalyticsDashboard = () => {
                         });
                     });
 
-                    // Populate dose counts
                     doseCounts.forEach(dc => {
                         const vac = vaccineMap.get(dc.vaccineTypeId);
                         if (vac) {
@@ -1063,7 +1074,6 @@ const AnalyticsDashboard = () => {
                         }
                     });
 
-                    // Populate inventory data
                     inventories.forEach(inv => {
                         const vac = vaccineMap.get(inv.vaccineTypeId);
                         if (vac) {
@@ -1121,11 +1131,41 @@ const AnalyticsDashboard = () => {
             }
         };
 
+        // COMPLETELY DISCONNECTED FROM MAIN FILTERS
+        const handleDirectDateChange = (value) => {
+            console.log('Date selected:', value);
+            setInventoryMonthDraft(value);
+            // NO SETFILTERS CALL - COMPLETELY SEPARATE STATE
+        };
+
+        const handleApplyInventoryFilters = () => {
+            if (inventoryMonthDraft) {
+                setAppliedInventoryMonth(inventoryMonthDraft);
+                // Also update the main appliedFilters so exports work
+                setAppliedFilters(prev => ({ ...prev, inventoryMonth: inventoryMonthDraft }));
+            } else {
+                alert('Please select a month first');
+            }
+        };
+
+        const clearInventoryMonth = () => {
+            setInventoryMonthDraft('');
+            setAppliedInventoryMonth('');
+            // Also clear from main filters
+            setAppliedFilters(prev => ({ ...prev, inventoryMonth: '' }));
+        };
+
         const handleAutoFill = async () => {
+            // Use appliedInventoryMonth
+            if (!appliedInventoryMonth || appliedInventoryMonth.trim() === '') {
+                alert('Please select a month first and click "Apply"');
+                return;
+            }
+
             try {
                 setAutoFilling(true);
 
-                const invMonth = convertNepaliToEnglish(appliedFilters.inventoryMonth);
+                const invMonth = convertNepaliToEnglish(appliedInventoryMonth);
                 const resp = await axiosClient.get('/api/analytics/inventory/auto-fill', {
                     params: { snapshotMonth: invMonth }
                 });
@@ -1204,9 +1244,15 @@ const AnalyticsDashboard = () => {
         };
 
         const saveData = async () => {
+            // Use appliedInventoryMonth
+            if (!appliedInventoryMonth || appliedInventoryMonth.trim() === '') {
+                alert('Please select a month first and click "Apply"');
+                return;
+            }
+
             try {
                 const payload = {
-                    snapshotMonth: convertNepaliToEnglish(appliedFilters.inventoryMonth),
+                    snapshotMonth: convertNepaliToEnglish(appliedInventoryMonth),
                     doseCounts: editData.vaccines.flatMap(v => {
                         const doseEntries = [];
                         for (let doseNum = 1; doseNum <= 3; doseNum++) {
@@ -1250,43 +1296,60 @@ const AnalyticsDashboard = () => {
             }
         };
 
-        const handleMonthChange = (value) => {
-            handleDateChange('inventoryMonth', value);
-            // Apply immediately for inventory tab
-            setAppliedFilters(prev => ({ ...prev, inventoryMonth: value }));
-        };
-
         return (
             <div className="space-y-6">
-                {/* Header with month picker + buttons */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
+                    <div className="flex-1">
                         <label className="label font-semibold">Select Month</label>
-                        <div className="relative">
-                            <CustomDatePicker
-                                value={filters.inventoryMonth}
-                                onChange={handleMonthChange}
-                                name="inventoryMonth"
-                                placeholder="Select month"
-                            />
-                            {filters.inventoryMonth && (
-                                <button
-                                    type="button"
-                                    onClick={() => handleMonthChange('')}
-                                    className="absolute right-8 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
-                                    title="Clear date"
-                                >
-                                    ✕
-                                </button>
-                            )}
+                        <div className="flex gap-2 items-end">
+                            <div className="relative flex-1">
+                                <NepaliDatePicker
+                                    className="w-full"
+                                    inputClassName="input input-bordered input-sm w-full pr-8"
+                                    value={inventoryMonthDraft}
+                                    onChange={handleDirectDateChange}
+                                    options={{ calenderLocale: "ne", valueLocale: "en" }}
+                                    language="ne"
+                                    minYear={2000}
+                                    maxYear={currentBSYear}
+                                    placeholder="Select month"
+                                />
+                                {inventoryMonthDraft && (
+                                    <button
+                                        type="button"
+                                        onClick={clearInventoryMonth}
+                                        className="absolute right-8 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                                        title="Clear date"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={handleApplyInventoryFilters}
+                                disabled={initialLoading || !inventoryMonthDraft}
+                            >
+                                {initialLoading ? '🔄' : '📅'} Apply
+                            </button>
                         </div>
+                        {!inventoryMonthDraft && (
+                            <div className="text-xs text-gray-500 mt-1">
+                                Select a month and click "Apply" to load data
+                            </div>
+                        )}
+                        {inventoryMonthDraft && inventoryMonthDraft !== appliedInventoryMonth && (
+                            <div className="text-xs text-warning mt-1">
+                                ⚠️ Month selected but not applied. Click "Apply" to load data.
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex gap-2">
                         <button
                             className={`btn btn-outline ${autoFilling ? 'btn-disabled' : ''}`}
                             onClick={handleAutoFill}
-                            disabled={autoFilling}
+                            disabled={autoFilling || !appliedInventoryMonth}
                         >
                             {autoFilling ? '⏳ Filling...' : '🚀 Auto-fill'}
                         </button>
@@ -1294,7 +1357,7 @@ const AnalyticsDashboard = () => {
                         <button
                             className="btn btn-outline"
                             onClick={loadInventoryData}
-                            disabled={initialLoading}
+                            disabled={initialLoading || !appliedInventoryMonth}
                         >
                             {initialLoading ? '🔄' : '📥'} Refresh Data
                         </button>
@@ -1305,12 +1368,17 @@ const AnalyticsDashboard = () => {
                                 <button className="btn btn-ghost" onClick={() => setInventoryEditing(false)}>❌ Cancel</button>
                             </>
                         ) : (
-                            <button className="btn btn-primary" onClick={() => setInventoryEditing(true)}>✏️ Edit</button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => setInventoryEditing(true)}
+                                disabled={!appliedInventoryMonth}
+                            >
+                                ✏️ Edit
+                            </button>
                         )}
                     </div>
                 </div>
 
-                {/* Loading State */}
                 {initialLoading && (
                     <div className="flex justify-center items-center py-8">
                         <div className="flex flex-col items-center gap-2">
@@ -1320,8 +1388,18 @@ const AnalyticsDashboard = () => {
                     </div>
                 )}
 
-                {/* Vaccine Table */}
-                {!initialLoading && editData.vaccines.length > 0 && (
+                {!appliedInventoryMonth && !initialLoading && (
+                    <div className="text-center py-12">
+                        <div className="text-gray-500 text-lg">
+                            {inventoryMonthDraft
+                                ? "Click 'Apply' to load inventory data for the selected month"
+                                : "Please select a month and click 'Apply' to load inventory data"
+                            }
+                        </div>
+                    </div>
+                )}
+
+                {!initialLoading && appliedInventoryMonth && editData.vaccines.length > 0 && (
                     <>
                         <div className="overflow-x-auto">
                             <table className="table table-zebra w-full">
@@ -1348,7 +1426,6 @@ const AnalyticsDashboard = () => {
                                         <tr key={vaccine.id}>
                                             <td className="font-semibold">{vaccine.name}</td>
 
-                                            {/* Dose counts */}
                                             {[1, 2, 3].map(doseNum => (
                                                 <td key={doseNum}>
                                                     {inventoryEditing ? (
@@ -1364,7 +1441,6 @@ const AnalyticsDashboard = () => {
                                                 </td>
                                             ))}
 
-                                            {/* Inventory fields */}
                                             {['received', 'spent', 'opened', 'spoiled', 'returned'].map((field) => (
                                                 <td key={field}>
                                                     {inventoryEditing ? (
@@ -1385,7 +1461,6 @@ const AnalyticsDashboard = () => {
                             </table>
                         </div>
 
-                        {/* Special Counts Section */}
                         <div className="card bg-base-100 p-6 shadow-xl">
                             <h3 className="font-bold text-lg mb-4">विशेष गणनाहरू</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1418,8 +1493,7 @@ const AnalyticsDashboard = () => {
                     </>
                 )}
 
-                {/* Empty State */}
-                {!initialLoading && editData.vaccines.length === 0 && (
+                {!initialLoading && appliedInventoryMonth && editData.vaccines.length === 0 && (
                     <div className="text-center py-12">
                         <div className="text-gray-500 text-lg">
                             No inventory data found for selected month. Use Auto-fill to generate data.
