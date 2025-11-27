@@ -57,6 +57,52 @@ const convertEnglishToNepali = (englishDate) => {
     }
 };
 
+// BS Month Boundary Helper Functions
+const getBSMonthBoundaries = (nepaliDate) => {
+    if (!nepaliDate) return { start: '', end: '' };
+
+    try {
+        // Parse the BS date string (format: YYYY-MM-DD)
+        const parts = nepaliDate.split('-');
+        if (parts.length !== 3) return { start: '', end: '' };
+
+        const bsYear = parseInt(parts[0]);
+        const bsMonth = parseInt(parts[1]);
+        const bsDay = parseInt(parts[2]);
+
+        // Start of BS month (1st day)
+        const bsStartOfMonth = `${bsYear}-${bsMonth.toString().padStart(2, '0')}-01`;
+
+        // Calculate next BS month
+        let nextBsMonth = bsMonth + 1;
+        let nextBsYear = bsYear;
+
+        if (nextBsMonth > 12) {
+            nextBsMonth = 1;
+            nextBsYear = bsYear + 1;
+        }
+
+        // Start of next BS month (1st day)
+        const bsStartOfNextMonth = `${nextBsYear}-${nextBsMonth.toString().padStart(2, '0')}-01`;
+
+        // Convert BS boundaries to AD
+        const adStartOfMonth = convertNepaliToEnglish(bsStartOfMonth);
+        const adStartOfNextMonth = convertNepaliToEnglish(bsStartOfNextMonth);
+
+        // End of BS month is day before next BS month starts
+        const adEndOfMonth = new Date(adStartOfNextMonth);
+        adEndOfMonth.setDate(adEndOfMonth.getDate() - 1);
+
+        return {
+            start: adStartOfMonth,
+            end: format(adEndOfMonth, 'yyyy-MM-dd')
+        };
+    } catch (error) {
+        console.error('Error calculating BS month boundaries:', error);
+        return { start: '', end: '' };
+    }
+};
+
 const safeFixed = (v, decimals = 4) => {
     if (typeof v !== 'number' || !isFinite(v)) return v || 0;
     const effectiveDecimals = (v >= 99) ? 4 : 2;
@@ -225,7 +271,6 @@ const AnalyticsDashboard = () => {
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(null);
     const [exportLoading, setExportLoading] = useState(false);
-    const [inventoryEditing, setInventoryEditing] = useState(false);
 
     // Use refs to manage fetch state without causing re-renders
     const fetchControllerRef = useRef(null);
@@ -1024,28 +1069,33 @@ const AnalyticsDashboard = () => {
         const [initialLoading, setInitialLoading] = useState(false);
         const [inventoryEditing, setInventoryEditing] = useState(false);
 
-        // COMPLETELY SEPARATE STATE FOR INVENTORY - NO CONNECTION TO MAIN FILTERS
+        // COMPLETELY SEPARATE STATE FOR INVENTORY
         const [inventoryMonthDraft, setInventoryMonthDraft] = useState(filters.inventoryMonth);
         const [appliedInventoryMonth, setAppliedInventoryMonth] = useState(appliedFilters.inventoryMonth);
+        const [bsMonthBoundaries, setBsMonthBoundaries] = useState({ start: '', end: '' });
 
         useEffect(() => {
-            // Only load data when APPLIED inventory month changes
             if (appliedInventoryMonth && appliedInventoryMonth.trim() !== '') {
-                loadInventoryData();
+                // Calculate BS month boundaries when month is applied
+                const boundaries = getBSMonthBoundaries(appliedInventoryMonth);
+                setBsMonthBoundaries(boundaries);
+                loadInventoryData(boundaries);
             }
         }, [appliedInventoryMonth]);
 
-        const loadInventoryData = async () => {
-            // Use appliedInventoryMonth, NOT appliedFilters.inventoryMonth
-            if (!appliedInventoryMonth || appliedInventoryMonth.trim() === '') {
-                console.log('Skipping inventory load: No month selected');
+        const loadInventoryData = async (boundaries) => {
+            if (!appliedInventoryMonth || appliedInventoryMonth.trim() === '' || !boundaries.start) {
+                console.log('Skipping inventory load: No month or boundaries');
                 return;
             }
 
             setInitialLoading(true);
             try {
                 const response = await axiosClient.get('/api/analytics/inventory', {
-                    params: { snapshotMonth: convertNepaliToEnglish(appliedInventoryMonth) }
+                    params: {
+                        snapshotMonth: boundaries.start,
+                        snapshotMonthEnd: boundaries.end
+                    }
                 });
 
                 if (response.data.success && response.data.data) {
@@ -1131,11 +1181,9 @@ const AnalyticsDashboard = () => {
             }
         };
 
-        // COMPLETELY DISCONNECTED FROM MAIN FILTERS
         const handleDirectDateChange = (value) => {
-            console.log('Date selected:', value);
+            console.log('BS Date selected:', value);
             setInventoryMonthDraft(value);
-            // NO SETFILTERS CALL - COMPLETELY SEPARATE STATE
         };
 
         const handleApplyInventoryFilters = () => {
@@ -1151,13 +1199,12 @@ const AnalyticsDashboard = () => {
         const clearInventoryMonth = () => {
             setInventoryMonthDraft('');
             setAppliedInventoryMonth('');
-            // Also clear from main filters
+            setBsMonthBoundaries({ start: '', end: '' });
             setAppliedFilters(prev => ({ ...prev, inventoryMonth: '' }));
         };
 
         const handleAutoFill = async () => {
-            // Use appliedInventoryMonth
-            if (!appliedInventoryMonth || appliedInventoryMonth.trim() === '') {
+            if (!appliedInventoryMonth || appliedInventoryMonth.trim() === '' || !bsMonthBoundaries.start) {
                 alert('Please select a month first and click "Apply"');
                 return;
             }
@@ -1165,16 +1212,18 @@ const AnalyticsDashboard = () => {
             try {
                 setAutoFilling(true);
 
-                const invMonth = convertNepaliToEnglish(appliedInventoryMonth);
-                const resp = await axiosClient.get('/api/analytics/inventory/auto-fill', {
-                    params: { snapshotMonth: invMonth }
+                const response = await axiosClient.get('/api/analytics/inventory/auto-fill', {
+                    params: {
+                        snapshotMonth: bsMonthBoundaries.start,
+                        snapshotMonthEnd: bsMonthBoundaries.end
+                    }
                 });
 
-                if (!resp.data?.success) {
-                    throw new Error(resp.data?.message || 'Auto-fill failed');
+                if (!response.data?.success) {
+                    throw new Error(response.data?.message || 'Auto-fill failed');
                 }
 
-                const { doseCounts, inventories, special } = resp.data.data;
+                const { doseCounts, inventories, special } = response.data.data;
 
                 setEditData(currentEditData => {
                     const updatedVaccines = currentEditData.vaccines.map(vaccine => {
@@ -1244,15 +1293,15 @@ const AnalyticsDashboard = () => {
         };
 
         const saveData = async () => {
-            // Use appliedInventoryMonth
-            if (!appliedInventoryMonth || appliedInventoryMonth.trim() === '') {
+            if (!appliedInventoryMonth || appliedInventoryMonth.trim() === '' || !bsMonthBoundaries.start) {
                 alert('Please select a month first and click "Apply"');
                 return;
             }
 
             try {
                 const payload = {
-                    snapshotMonth: convertNepaliToEnglish(appliedInventoryMonth),
+                    snapshotMonth: bsMonthBoundaries.start,
+                    snapshotMonthEnd: bsMonthBoundaries.end,
                     doseCounts: editData.vaccines.flatMap(v => {
                         const doseEntries = [];
                         for (let doseNum = 1; doseNum <= 3; doseNum++) {
@@ -1285,7 +1334,7 @@ const AnalyticsDashboard = () => {
                 if (response.data.success) {
                     alert('✅ Data saved successfully!');
                     setInventoryEditing(false);
-                    await loadInventoryData();
+                    await loadInventoryData(bsMonthBoundaries);
                 } else {
                     throw new Error(response.data.message || 'Unknown save error');
                 }
@@ -1300,7 +1349,7 @@ const AnalyticsDashboard = () => {
             <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex-1">
-                        <label className="label font-semibold">Select Month</label>
+                        <label className="label font-semibold">Select BS Month</label>
                         <div className="flex gap-2 items-end">
                             <div className="relative flex-1">
                                 <NepaliDatePicker
@@ -1312,7 +1361,7 @@ const AnalyticsDashboard = () => {
                                     language="ne"
                                     minYear={2000}
                                     maxYear={currentBSYear}
-                                    placeholder="Select month"
+                                    placeholder="Select BS month"
                                 />
                                 {inventoryMonthDraft && (
                                     <button
@@ -1333,9 +1382,19 @@ const AnalyticsDashboard = () => {
                                 {initialLoading ? '🔄' : '📅'} Apply
                             </button>
                         </div>
+
+                        {/* Show BS month boundaries info */}
+                        {bsMonthBoundaries.start && (
+                            <div className="text-xs text-info mt-2">
+                                📅 BS Month Range: {convertEnglishToNepali(bsMonthBoundaries.start)} to {convertEnglishToNepali(bsMonthBoundaries.end)}
+                                <br />
+                                📅 AD Equivalent: {bsMonthBoundaries.start} to {bsMonthBoundaries.end}
+                            </div>
+                        )}
+
                         {!inventoryMonthDraft && (
                             <div className="text-xs text-gray-500 mt-1">
-                                Select a month and click "Apply" to load data
+                                Select a BS month and click "Apply" to load data
                             </div>
                         )}
                         {inventoryMonthDraft && inventoryMonthDraft !== appliedInventoryMonth && (
@@ -1356,7 +1415,7 @@ const AnalyticsDashboard = () => {
 
                         <button
                             className="btn btn-outline"
-                            onClick={loadInventoryData}
+                            onClick={() => loadInventoryData(bsMonthBoundaries)}
                             disabled={initialLoading || !appliedInventoryMonth}
                         >
                             {initialLoading ? '🔄' : '📥'} Refresh Data
@@ -1393,7 +1452,7 @@ const AnalyticsDashboard = () => {
                         <div className="text-gray-500 text-lg">
                             {inventoryMonthDraft
                                 ? "Click 'Apply' to load inventory data for the selected month"
-                                : "Please select a month and click 'Apply' to load inventory data"
+                                : "Please select a BS month and click 'Apply' to load inventory data"
                             }
                         </div>
                     </div>
