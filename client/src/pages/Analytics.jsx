@@ -319,14 +319,21 @@ const AnalyticsDashboard = () => {
     };
 
     const getGroupLabel = (groupValue, groupType) => {
-        const val = Number(groupValue);
+        if (groupValue == null || groupValue === '') return 'Unknown';
+
         switch (groupType) {
-            case 'vaccine': return getVaccineName(val);
-            case 'ward': return `Ward ${val}`;
-            case 'caste': return `Caste ${val}`;
+            case 'vaccine':
+                return getVaccineName(Number(groupValue)) || `Vaccine ${groupValue}`;
+            case 'ward':
+                return `Ward ${groupValue}`;
+            case 'caste':
+                return `Caste ${groupValue}`;
             case 'gender':
-            case 'ageGroup': return String(groupValue).toUpperCase();
-            default: return String(groupValue);
+                return String(groupValue).charAt(0).toUpperCase() + String(groupValue).slice(1).toLowerCase();
+            case 'ageGroup':
+                return String(groupValue);
+            default:
+                return String(groupValue);
         }
     };
 
@@ -370,6 +377,146 @@ const AnalyticsDashboard = () => {
         };
 
         return processObject(apiData);
+    }, []);
+
+    // FIXED: Proper monthly dropout data processing
+    const processMonthlyDropoutData = useCallback((rawData, groupBy, monthRange) => {
+        if (!rawData || rawData.length === 0) {
+            console.log('No monthly dropout data available');
+            return { chartData: [], groups: [], radarData: [], summary: { totalMonths: 0, totalGroups: 0, avgDropoutRate: 0 } };
+        }
+
+        console.log('Processing monthly dropout data:', {
+            rawDataCount: rawData.length,
+            groupBy,
+            monthRange,
+            sampleRecords: rawData.slice(0, 3)
+        });
+
+        // Convert BS dates to AD for date calculations
+        const processedData = rawData.map(item => {
+            try {
+                // Your data already has snapshotMonth in '2024-12' format
+                const adDate = parseISO(item.snapshotMonth + '-01'); // Convert to full date
+                return {
+                    ...item,
+                    parsedDate: adDate
+                };
+            } catch (error) {
+                console.warn('Failed to parse date:', item.snapshotMonth, error);
+                return { ...item, parsedDate: new Date() };
+            }
+        });
+
+        // Filter by month range
+        const cutoff = subMonths(new Date(), parseInt(monthRange || 12));
+        const filtered = processedData.filter(d => d.parsedDate >= cutoff);
+
+        console.log('After filtering:', {
+            original: processedData.length,
+            filtered: filtered.length,
+            cutoff: format(cutoff, 'yyyy-MM')
+        });
+
+        if (filtered.length === 0) {
+            console.log('No data after date filtering');
+            return { chartData: [], groups: [], radarData: [], summary: { totalMonths: 0, totalGroups: 0, avgDropoutRate: 0 } };
+        }
+
+        // Determine group field based on groupBy parameter
+        let groupField;
+        switch (groupBy) {
+            case 'vaccine': groupField = 'vaccineTypeId'; break;
+            case 'ward': groupField = 'ward'; break;
+            case 'gender': groupField = 'gender'; break;
+            case 'ageGroup': groupField = 'ageGroup'; break;
+            case 'caste': groupField = 'casteCode'; break;
+            default: groupField = 'vaccineTypeId';
+        }
+
+        console.log('Grouping by field:', groupField);
+
+        // Group data by month and then by the selected group field
+        const monthlyAggregates = new Map();
+        const groupStats = new Map();
+
+        filtered.forEach(item => {
+            const monthKey = format(item.parsedDate, 'yyyy-MM'); // Keep as '2024-12'
+            const groupValue = item[groupField];
+
+            if (!monthlyAggregates.has(monthKey)) {
+                monthlyAggregates.set(monthKey, new Map());
+            }
+            if (!groupStats.has(groupValue)) {
+                groupStats.set(groupValue, []);
+            }
+
+            // Store the item for this month+group combination
+            monthlyAggregates.get(monthKey).set(groupValue, item);
+            groupStats.get(groupValue).push(item);
+        });
+
+        const months = Array.from(monthlyAggregates.keys()).sort();
+        const groups = Array.from(groupStats.keys())
+            .filter(g => g != null && g !== '' && g !== 'ALL') // Filter out null/empty/ALL groups
+            .sort((a, b) => {
+                if (typeof a === 'number' && typeof b === 'number') return a - b;
+                return String(a).localeCompare(String(b));
+            });
+
+        console.log('Groups found:', { months, groups });
+
+        // Create chart data - one row per month with columns for each group
+        const chartData = months.map(month => {
+            const row = { month: format(parseISO(month + '-01'), 'MMM yy') }; // Display as "Dec 24"
+            const monthData = monthlyAggregates.get(month);
+
+            groups.forEach(group => {
+                const item = monthData?.get(group);
+                row[group] = item ? item.dropoutRate : null;
+                row[`${group}_due`] = item ? item.totalDue : 0;
+                row[`${group}_completed`] = item ? item.totalCompleted : 0;
+                row[`${group}_count`] = item ? item.dropoutCount : 0;
+            });
+
+            return row;
+        });
+
+        // Create radar data - average performance per group
+        const radarData = groups.map(group => {
+            const items = groupStats.get(group);
+            const avgDropout = items.reduce((sum, item) => sum + (item.dropoutRate || 0), 0) / items.length;
+            const totalDue = items.reduce((sum, item) => sum + (item.totalDue || 0), 0);
+            const totalCompleted = items.reduce((sum, item) => sum + (item.totalCompleted || 0), 0);
+            const completionRate = totalDue > 0 ? (totalCompleted / totalDue) * 100 : 0;
+
+            return {
+                subject: getGroupLabel(group, groupBy),
+                dropoutRate: Number(avgDropout.toFixed(2)),
+                completionRate: Number(completionRate.toFixed(2)),
+                fullMark: 100
+            };
+        });
+
+        // Calculate summary statistics
+        const validDropoutRates = filtered.map(item => item.dropoutRate).filter(rate => rate != null);
+        const avgDropoutRate = validDropoutRates.length > 0
+            ? validDropoutRates.reduce((sum, rate) => sum + rate, 0) / validDropoutRates.length
+            : 0;
+
+        const result = {
+            chartData,
+            groups,
+            radarData,
+            summary: {
+                totalMonths: months.length,
+                totalGroups: groups.length,
+                avgDropoutRate: Number(avgDropoutRate.toFixed(2))
+            }
+        };
+
+        console.log('Final processed result:', result);
+        return result;
     }, []);
 
     // FIX: Use appliedFilters for API calls, not filters
@@ -625,94 +772,7 @@ const AnalyticsDashboard = () => {
         ];
     }, [data.overview]);
 
-    const processMonthlyDropoutData = useCallback((rawData, groupBy, monthRange) => {
-        if (!rawData || rawData.length === 0) return { chartData: [], groups: [], radarData: [], summary: { totalMonths: 0, totalGroups: 0, avgDropoutRate: 0 } };
-
-        // Convert BS dates to AD for date calculations
-        const processedData = rawData.map(item => {
-            try {
-                const adDate = convertNepaliToEnglish(item.snapshotMonth + '-01');
-                return {
-                    ...item,
-                    parsedDate: parseISO(adDate)
-                };
-            } catch (error) {
-                console.warn('Failed to parse date:', item.snapshotMonth);
-                return { ...item, parsedDate: new Date() };
-            }
-        });
-
-        const cutoff = subMonths(new Date(), parseInt(monthRange || 12));
-        const filtered = processedData.filter(d => d.parsedDate >= cutoff);
-
-        let groupField = groupBy;
-        if (groupBy === 'vaccine') groupField = 'vaccineTypeId';
-        else if (groupBy === 'caste') groupField = 'casteCode';
-
-        const monthlyAggregates = new Map();
-        const groupStats = new Map();
-
-        filtered.forEach(item => {
-            const monthKey = format(item.parsedDate, 'yyyy-MM');
-            const groupValue = item[groupField];
-
-            if (!monthlyAggregates.has(monthKey)) {
-                monthlyAggregates.set(monthKey, new Map());
-            }
-            if (!groupStats.has(groupValue)) {
-                groupStats.set(groupValue, []);
-            }
-
-            monthlyAggregates.get(monthKey).set(groupValue, item);
-            groupStats.get(groupValue).push(item);
-        });
-
-        const months = Array.from(monthlyAggregates.keys()).sort();
-        const groups = Array.from(groupStats.keys())
-            .filter(g => g != null && g !== 0)
-            .sort((a, b) => (typeof a === 'number' ? a - b : String(a).localeCompare(String(b))));
-
-        const chartData = months.map(month => {
-            const row = { month: format(parseISO(month + '-01'), 'MMM yy') };
-            const monthData = monthlyAggregates.get(month);
-
-            groups.forEach(group => {
-                const item = monthData?.get(group);
-                row[group] = item ? item.dropoutRate : null;
-                row[`${group}_due`] = item ? item.totalDue : 0;
-                row[`${group}_completed`] = item ? item.totalCompleted : 0;
-            });
-
-            return row;
-        });
-
-        const radarData = groups.map(group => {
-            const items = groupStats.get(group);
-            const avgDropout = items.reduce((sum, item) => sum + item.dropoutRate, 0) / items.length;
-            const totalDue = items.reduce((sum, item) => sum + item.totalDue, 0);
-            const totalCompleted = items.reduce((sum, item) => sum + item.totalCompleted, 0);
-            const completionRate = totalDue > 0 ? (totalCompleted / totalDue) * 100 : 0;
-
-            return {
-                subject: getGroupLabel(group, groupBy),
-                dropoutRate: avgDropout,
-                completionRate: completionRate,
-                fullMark: 100
-            };
-        });
-
-        return {
-            chartData,
-            groups,
-            radarData,
-            summary: {
-                totalMonths: months.length,
-                totalGroups: groups.length,
-                avgDropoutRate: filtered.reduce((sum, item) => sum + item.dropoutRate, 0) / filtered.length
-            }
-        };
-    }, []);
-
+    // FIXED: Monthly dropout data processing
     const monthlyDropoutData = useMemo(() => {
         return processMonthlyDropoutData(
             data.trends?.monthlyDropout,
@@ -876,6 +936,28 @@ const AnalyticsDashboard = () => {
     };
 
     const MonthlyDropoutTab = () => {
+        // Debug logging
+        console.log('=== MONTHLY DROPOUT DEBUG ===');
+        console.log('Raw data count:', data.trends?.monthlyDropout?.length || 0);
+        console.log('Applied filters:', appliedFilters);
+        console.log('Processed data:', monthlyDropoutData);
+
+        if (!monthlyDropoutData.chartData || monthlyDropoutData.chartData.length === 0) {
+            return (
+                <div className="alert alert-warning">
+                    <p>📊 Monthly Dropout Analytics</p>
+                    <p>Raw records available: {data.trends?.monthlyDropout?.length || 0}</p>
+                    <p>Processed chart data: {monthlyDropoutData.chartData?.length || 0}</p>
+                    <p>Groups found: {monthlyDropoutData.groups?.join(', ') || 'none'}</p>
+                    <p>Try changing the "Group By" filter to see different views</p>
+                    <div className="mt-2">
+                        <p className="text-sm">Current grouping: <strong>{appliedFilters.dropoutGroup}</strong></p>
+                        <p className="text-sm">Month range: <strong>{appliedFilters.monthRange} months</strong></p>
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
