@@ -22,6 +22,7 @@ import Graph from './pages/Graph.jsx';
 import Layout from './components/Layout.jsx';
 import PrintCardWrapper from './components/printdata.jsx';
 import Navbar from './components/NavBar.jsx';
+import SearchRecords from './pages/SearchRecords.jsx'
 
 import { Outlet } from 'react-router-dom';
 
@@ -89,6 +90,7 @@ function App() {
                   {/* Add/Edit routes (Super Admin + Ward Officer) */}
                   <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'WARD_OFFICER']}><Layout /></ProtectedRoute>}>
                     <Route path="/add-child" element={<AddChild />} />
+                    <Route path="/search" element={<SearchRecords />} />
                     <Route path="/edit-child" element={<EditChild />} />
                     <Route path="/edit-mother" element={<EditMother />} />
                     <Route path="/add-mother" element={<AddMother />} />
