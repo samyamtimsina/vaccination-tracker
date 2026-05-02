@@ -1436,7 +1436,7 @@ export const saveMonthlyInventory = async (req, res) => {
                     }
                 });
             }
-        });
+        }, { timeout: 10000 });
 
         res.json({
             success: true,

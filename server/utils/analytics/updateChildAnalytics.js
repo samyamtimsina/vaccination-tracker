@@ -222,7 +222,8 @@ export async function updateChildAnalytics() {
         await prisma.$transaction(
             entries.map(entry =>
                 prisma.childAnalyticsFact.create({ data: entry })
-            )
+            ),
+            { timeout: 10000 }
         );
         console.log(`[Analytics] Wrote ${entries.length} new analytics facts.`);
 

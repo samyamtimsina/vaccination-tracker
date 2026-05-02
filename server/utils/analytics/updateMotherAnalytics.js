@@ -142,7 +142,8 @@ export async function updateMotherAnalytics() {
         await prisma.$transaction(
             entries.map(entry =>
                 prisma.motherAnalyticsFact.create({ data: entry })
-            )
+            ),
+            { timeout: 10000 }
         );
 
         // 6️⃣ Update meta

@@ -212,7 +212,7 @@ export const createChild = async (req, res) => {
           dueVaccines: true,
         },
       });
-    });
+    }, { timeout: 10000 });
 
     res.status(201).json(createdChild);
   } catch (error) {
@@ -829,7 +829,7 @@ export const updateChild = async (req, res) => {
       }
 
       console.log('Transaction completing...');
-    });
+    }, { timeout: 10000 });
 
     console.log('Transaction completed successfully. Fetching updated child...');
     const updatedChild = await prisma.child.findUnique({
