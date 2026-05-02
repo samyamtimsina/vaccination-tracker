@@ -14,11 +14,17 @@ export default function Login() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { isSubmitting },
   } = useForm();
   const { login, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+
+  const fillDemoAccount = (email, password) => {
+    setValue('email', email);
+    setValue('password', password);
+  };
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
@@ -237,6 +243,23 @@ export default function Login() {
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => fillDemoAccount('ward1@mail.com', 'ward1234')}
+                        className="btn btn-outline btn-sm text-base-content border-base-300 hover:border-primary hover:text-primary"
+                      >
+                        Ward demo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fillDemoAccount('admin@mail.com', 'admin123')}
+                        className="btn btn-outline btn-sm text-base-content border-base-300 hover:border-secondary hover:text-secondary"
+                      >
+                        Admin demo
+                      </button>
+                    </div>
+
                     <button
                       type="submit"
                       disabled={isSubmitting}
@@ -261,7 +284,7 @@ export default function Login() {
                 </div>
 
                 <div className="relative z-10">
-                  <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl mb-6 sm:mb-8">
+                  <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-white/15 backdrop-blur-sm rounded-xl sm:rounded-2xl mb-6 sm:mb-8">
                     <svg
                       className="w-6 h-6 sm:w-8 sm:h-8"
                       fill="currentColor"
@@ -276,51 +299,71 @@ export default function Login() {
                   </div>
 
                   <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 leading-tight">
-                    {t('hero.title')}
+                    🔐 Demo Access
                   </h1>
 
-                  <p className="text-blue-100 text-base sm:text-lg mb-8 sm:mb-10 leading-relaxed">
-                    {t('hero.description')}
+                  <p className="text-blue-100/85 text-base sm:text-lg mb-8 sm:mb-10 leading-relaxed">
+                    This application uses pre-configured accounts for demonstration purposes. You can log in using the credentials below to explore different user roles and features.
                   </p>
 
-                  <div className="space-y-4 sm:space-y-6">
-                    {Array.isArray(features) ? (
-                      features.map((feature, index) => (
-                        <div key={index} className="flex items-start gap-3 sm:gap-4">
-                          <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl flex items-center justify-center">
-                            <svg
-                              className="w-4 h-4 sm:w-5 sm:h-5"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              {index === 0 && (
-                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              )}
-                              {index === 1 && (
-                                <path
-                                  fillRule="evenodd"
-                                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 howern0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z"
-                                  clipRule="evenodd"
-                                />
-                              )}
-                              {index === 2 && (
-                                <path
-                                  fillRule="evenodd"
-                                  d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                  clipRule="evenodd"
-                                />
-                              )}
-                            </svg>
-                          </div>
-                          <div>
-                            <h3 className="font-semibold mb-1 text-sm sm:text-base">{feature.title}</h3>
-                            <p className="text-blue-100 text-xs sm:text-sm leading-relaxed">{feature.description}</p>
-                          </div>
+                  <div className="space-y-4 sm:space-y-5">
+                    <div className="rounded-[28px] border border-white/10 bg-white/10 p-5 sm:p-6 shadow-2xl shadow-slate-950/10 backdrop-blur-xl">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-base text-white">🏥 Ward Account (Standard User)</p>
+                          <p className="mt-2 text-sm text-blue-100/80 leading-relaxed">
+                            Use this account to experience the system as a ward-level user, including data entry and routine operations.
+                          </p>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-red-300 text-sm">Features not available</p>
-                    )}
+                        <button
+                          type="button"
+                          onClick={() => fillDemoAccount('ward1@mail.com', 'ward1234')}
+                          className="btn btn-sm btn-outline text-white border-white/20 hover:border-white/40 hover:bg-white/10"
+                        >
+                          Fill Ward
+                        </button>
+                      </div>
+
+                      <div className="mt-5 grid gap-2 text-sm text-blue-100/85">
+                        <p>
+                          <span className="font-medium text-white">Email:</span> ward1@mail.com
+                        </p>
+                        <p>
+                          <span className="font-medium text-white">Password:</span> ward1234
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[28px] border border-white/10 bg-white/10 p-5 sm:p-6 shadow-2xl shadow-slate-950/10 backdrop-blur-xl">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-base text-white">🛠️ Super Admin Account</p>
+                          <p className="mt-2 text-sm text-blue-100/80 leading-relaxed">
+                            Use this account to access full administrative controls, including managing users, overseeing data, and system-level actions.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => fillDemoAccount('admin@mail.com', 'admin123')}
+                          className="btn btn-sm btn-outline text-white border-white/20 hover:border-white/40 hover:bg-white/10"
+                        >
+                          Fill Admin
+                        </button>
+                      </div>
+
+                      <div className="mt-5 grid gap-2 text-sm text-blue-100/85">
+                        <p>
+                          <span className="font-medium text-white">Email:</span> admin@mail.com
+                        </p>
+                        <p>
+                          <span className="font-medium text-white">Password:</span> admin123
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-1 pt-4 border-t border-white/10 text-sm text-blue-100/80">
+                      💡 Note: This is a demo environment intended for evaluation and portfolio purposes. Data may be reset periodically, and actions performed here are not permanent.
+                    </div>
                   </div>
                 </div>
               </div>
