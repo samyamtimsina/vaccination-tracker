@@ -19,7 +19,7 @@ const app = express();
 
 // Configure CORS
 const corsOptions = {
-  origin: 'http://localhost:5173',
+  origin: 'https://vaccination-tracker-livid.vercel.app',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
