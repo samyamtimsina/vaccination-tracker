@@ -1,3 +1,3 @@
-import { PrismaClient, Prisma } from '../generated/prisma/client.js';
-export const prisma = new PrismaClient();
-export { Prisma };
+import { PrismaClient } from '@prisma/client';
+
+export const prisma = new PrismaClient(); 
